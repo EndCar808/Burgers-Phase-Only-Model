@@ -7,6 +7,8 @@
 #  Compiler flags
 # ---------------------------------------------------------------------
 GCC := gcc
+LIBFLAG := -lfftw3 -lm 
+# OPTFLAG := -03
 
 
 
@@ -31,14 +33,17 @@ SRCOBJ := $(patsubst $(SRCDIF)/%.c, $(OBJBIN)/%.o, $(SRCFILE))
 # ---------------------------------------------------------------------
 #  Builds
 # ---------------------------------------------------------------------
-all: PDE_Burgers
+all: main
 
 
-PDE_Burgers: $(SRCOBJ)
-	$(GCC) -o bin/PDE_Burgers $^ 
+# main: 
+# 	$(GCC) -o bin/PDE_Burgers src/main.c $(LIBFLAG) $(OPTFLAG)
+
+main: $(SRCOBJ)
+	$(GCC) -o bin/main $^ $(LIBFLAG) 
 
 $(OBJBIN)/%.o: $(SRCDIF)/%.c
-	$(GCC) -o $@ $<
+	$(GCC) -o $@ $< $(LIBFLAG) 
 
 
 
