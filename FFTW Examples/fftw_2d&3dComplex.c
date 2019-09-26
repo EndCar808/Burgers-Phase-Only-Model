@@ -77,22 +77,22 @@ int main(int argc, char** argv) {
 		printf("\n");	
 	}
 
-	// // fill 3d array
-	// int temp1, temp2, index;
-	// printf("\nx_k:\n\n");
-	// for(int i = 0; i < X; ++i) {
-	// 	temp1 = i*Y;
-	// 	for (int j = 0; j < Y; ++j) {
-	// 		temp2 = temp1 + j;
-	// 		for (int k = 0; k < Z; ++k)
-	// 		{	
-	// 			index
-	// 			in3d[index] = exp(-index);
-	// 		printf("%d %11.7f %11.7f\n", index, creal(in[index]), cimag(in[index]));
-	// 		}
-			
-	// 	}		
-	// }
+	// fill 3d array
+	int temp2;
+	printf("\nx_3d:\n\n");
+	for(int k = 0; k < Z; ++k) {
+		printf("k = %d\n", k);
+		for (int i = 0; i < X; ++i) {
+			temp2 = k*Y*Z + i*Y;
+			for (int j = 0; j < Y; ++j) {	
+				index = temp2 + j;
+				in3d[index] = index;
+				printf("%d %11.7f %11.7f ", index, creal(in3d[index]), cimag(in3d[index]));
+			}
+			printf("\n");
+		}		
+		printf("\n");
+	}
 
 
 
@@ -100,7 +100,7 @@ int main(int argc, char** argv) {
 	fftw_execute(my_plan_2d); // can perform this multiple times
 	fftw_execute(my_plan_3d);
 
-	printf("\nx_2d:\n\n");
+	printf("\nOUT x_2d:\n\n");
 	for(int i = 0; i < X; ++i) {
 		temp = i*Y;
 		for (int j = 0; j < Y; ++j) {
@@ -112,29 +112,46 @@ int main(int argc, char** argv) {
 	}
 
 
+	printf("\nOUT x_3d:\n\n");
+	for(int k = 0; k < Z; ++k) {
+		printf("k = %d\n", k);
+		for (int i = 0; i < X; ++i) {
+			temp2 = k*Y*Z + i*Y;
+			for (int j = 0; j < Y; ++j) {	
+				index = temp2 + j;
+				in3d[index] = index;
+				printf("%d %11.7f %11.7f ", index, creal(out3d[index]), cimag(out3d[index]));
+			}
+			printf("\n");
+		}		
+		printf("\n");
+	}
+
 
 
 
 	///////////
-	/// Can also perform multidimensional DFTs or achieve the same as above
+	/// We can also perform multidimensional DFTs or achieve the same as above
 	/// using the general complex dft function. We need to know the number of dimensions 
 	/// and an array of their sizes.
 	/// 
-	/// Here we perform the same tranforms as above
+	/// Here we perform the same 2d tranform as above
 	int rank = 2;
 	int dim[rank];
 	dim[0] = X; 
 	dim[1] = Y;
 
-
 	fftw_plan my_plan_nd;
+
 
 
 	my_plan_nd = fftw_plan_dft(rank, dim, in2d, out2d, FFTW_FORWARD, FFTW_ESTIMATE);
 
 	fftw_execute(my_plan_nd);
 
-	printf("\nx_nd:\n\n");
+
+
+	printf("\nOUT x_nd:\n\n");
 	for(int i = 0; i < X; ++i) {
 		temp = i*Y;
 		for (int j = 0; j < Y; ++j) {
