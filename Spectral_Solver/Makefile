@@ -9,7 +9,7 @@
 GCC := gcc
 LIBFLAG := -lfftw3 -lm 
 # OPTFLAG := -03
-
+DEPS = $(wildcard *.h) 
 
 
 # ---------------------------------------------------------------------
@@ -24,27 +24,34 @@ BINDIR := $(shell mkdir -p $(BIN))
 OUT := output
 OUTDIR := $(shell mkdir -p $(OUT))
 
-SRCDIF := src
-SRCFILE := $(wildcard $(SRCDIF)/*.c)
-SRCOBJ := $(patsubst $(SRCDIF)/%.c, $(OBJBIN)/%.o, $(SRCFILE))
-
+SRCDIR := src
+SRCFILE := $(wildcard $(SRCDIR)/*.c)
+SRCOBJ := $(patsubst $(SRCDIR)/%.c, $(OBJBIN)/%.o, $(SRCFILE))
 
 
 # ---------------------------------------------------------------------
 #  Builds
 # ---------------------------------------------------------------------
-all: main
+############
+.PHONY: all
+############
 
 
-# main: 
-# 	$(GCC) -o bin/PDE_Burgers src/main.c $(LIBFLAG) $(OPTFLAG)
+all: $(BIN)/main
 
-main: $(SRCOBJ)
-	$(GCC) -o bin/main $^ $(LIBFLAG) 
 
-$(OBJBIN)/%.o: $(SRCDIF)/%.c
-	$(GCC) -o $@ $< $(LIBFLAG) 
 
+$(BIN)/main: $(SRCOBJ)
+	$(GCC) -o $@ $^ $(LIBFLAG)
+
+$(OBJBIN)/%.o: $(SRCDIR)/%.c
+	$(GCC) -c $^ -o $@ $(LIBFLAG)
+
+# $(OBJBIN)/main.o: $(SRCDIR)/main.c 
+# 	$(GCC) -c $^ -o $@ $(LIBFLAG)
+
+# $(OBJBIN)/utils.o: src/utils.c
+# 	$(GCC) -c $^ -o $@ $(LIBFLAG)
 
 
 # ---------------------------------------------------------------------
