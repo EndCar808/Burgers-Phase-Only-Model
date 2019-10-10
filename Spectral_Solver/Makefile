@@ -7,8 +7,11 @@
 #  Compiler flags
 # ---------------------------------------------------------------------
 GCC := gcc
-LIBFLAG := -lfftw3 -lm 
-# OPTFLAG := -03
+CCFLAG := -O3
+LIBFLAG := -lfftw3 -lm -lhdf5
+INCDIR = -I/usr/include/hdf5/serial/  -I/usr/include/gsl/	## these are the direcotry additions necessary when using software on UBUNTU desktop
+LIBDIR = -L/usr/lib/x86_64-linux-gnu/hdf5/serial/
+
 DEPS = $(wildcard *.h) 
 
 
@@ -42,10 +45,10 @@ all: $(BIN)/main
 
 
 $(BIN)/main: $(SRCOBJ)
-	$(GCC) -o $@ $^ $(LIBFLAG)
+	$(GCC) $(CCFLAG) -o $@ $^ ${INCDIR} ${LIBDIR} $(LIBFLAG)
 
 $(OBJBIN)/%.o: $(SRCDIR)/%.c
-	$(GCC) -c $^ -o $@ $(LIBFLAG)
+	$(GCC) $(CCFLAG) -c $^ -o $@ ${INCDIR} ${LIBDIR} $(LIBFLAG)
 
 # $(OBJBIN)/main.o: $(SRCDIR)/main.c 
 # 	$(GCC) -c $^ -o $@ $(LIBFLAG)

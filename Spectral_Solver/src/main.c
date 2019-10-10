@@ -11,6 +11,8 @@
 #include <time.h>
 #include <complex.h>
 #include <fftw3.h>
+#include <hdf5.h>
+#include <hdf5_hl.h>
 
 
 // ---------------------------------------------------------------------
@@ -28,6 +30,9 @@
 // ---------------------------------------------------------------------
 int main(int argc, char** argv) {
 
+	// ------------------------------
+	//  Variable Definitions
+	// ------------------------------
 	// Domain variables
 	int N = atoi(argv[1]);
 	
@@ -58,9 +63,32 @@ int main(int argc, char** argv) {
 
 
 	// ------------------------------
+	//  HDF5 File Create
+	// ------------------------------
+	// create hdf5 file identifier handle
+	hid_t HDF_file_handle;
+
+	// define filename - const because it doesnt change
+	const char* output_file_name = "./output/Runtime_Data.h5";
+
+	// create datafile - H5F_ACC_TRUNC overwrites file if it exists already
+	HDF_file_handle = H5Fcreate(output_file_name, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+
+	// create compound hdf5 datatype for complex modes
+	
+	
+	
+	// use hdf5_hl library to create datasets
+	// define dimensions and dimension sizes
+	hsize_t HDF_D1ndims = 1;
+	hsize_t D1dims[HDF_D1ndims];
+	hsize_t HDF_D2ndims = 2;
+	hsize_t D2dims[HDF_D2ndims];
+
+
+	// ------------------------------
 	//  FFTW plans
 	// ------------------------------
-	
 	// create fftw3 plans objects
 	fftw_plan fftw_plan_r2c, fftw_plan_c2r;
 
@@ -93,6 +121,8 @@ int main(int argc, char** argv) {
 	// set dt using CFL
 	double u_max = fabs(u[max]);
 	dt           = (1.0*dx) / u_max; 
+
+
 
 	// printf("\nu_max = %10.16lf\n", u_max);
 	// printf("\nCFL  dt = %10.16lf\n", dt);
@@ -134,36 +164,40 @@ int main(int argc, char** argv) {
 	double t = 0.0;
 	while (t < T) {
 
+		// Print Energy and Enstrophy
+		printf("Iter: %d | t = %4.4lf | Energy = %4.8lf,   Enstrophy = %4.8lf\n", iter, t, system_energy(u_z, N), system_enstrophy(u_z, kx, N));
+
 		//////////////
 		// STAGES
 		//////////////
 		/*---------- STAGE 2 ----------*/
 		// find RHS first and then update stage
-		deriv(u, u_z, RK1, kx, fftw_plan_dft_r2c_1d, fftw_plan_dft_c2r_1d, N);
-		for (int i = 0; i < n/2 + 1; ++i) {
+		deriv(u_z, RK1, nu, kx, &fftw_plan_r2c, &fftw_plan_c2r, N);
+		for (int i = 0; i < N/2 + 1; ++i) {
 			stage_tmp[i] = u_z[i] + (dt*A21)*RK1[i];
 		}
 		/*---------- STAGE 3 ----------*/
 		// find RHS first and then update stage
-		deriv(stage_tmp, RK2, kx, fftw_plan_dft_r2c_1d, fftw_plan_dft_c2r_1d, N);
-		for (int i = 0; i < n/2 + 1; ++i) {
+		deriv(stage_tmp, RK2, nu, kx, &fftw_plan_r2c, &fftw_plan_c2r, N);
+		for (int i = 0; i < N/2 + 1; ++i) {
 			stage_tmp[i] = u_z[i] + (dt*A32)*RK2[i];
 		}
 		/*---------- STAGE 4 ----------*/
 		// find RHS first and then update stage
-		deriv(stage_tmp, RK3, kx, fftw_plan_dft_r2c_1d, fftw_plan_dft_c2r_1d, N);
-		for (int i = 0; i < n/2 + 1; ++i) {
+		deriv(stage_tmp, RK3, nu, kx, &fftw_plan_r2c, &fftw_plan_c2r, N);
+		for (int i = 0; i < N/2 + 1; ++i) {
 			stage_tmp[i] = u_z[i] + (dt*A43)*RK3[i];
 		}
-		deriv(stage_tmp, RK4, kx, fftw_plan_dft_r2c_1d, fftw_plan_dft_c2r_1d, N);
+		deriv(stage_tmp, RK4, nu, kx, &fftw_plan_r2c, &fftw_plan_c2r, N);
 		
 
 		//////////////
 		// Update
 		//////////////
-		for (int i = 0; i < n/2 + 1; ++i) {
+		for (int i = 0; i < N/2 + 1; ++i) {
 			u_z[i] = u_z[i] + (dt*B1)*RK1[i] + (dt*B2)*RK2[i] + (dt*B3)*RK3[i] + (dt*B4)*RK4[i];  
 		}
+
 
 		// increment
 		t    += dt;
@@ -171,6 +205,25 @@ int main(int argc, char** argv) {
 	}
 
 
+	// destroy fftw plans
+	fftw_destroy_plan(fftw_plan_r2c);
+	fftw_destroy_plan(fftw_plan_c2r);
+
+
+	// free memory
+	free(kx);
+	free(u);
+	fftw_free(u_z);
+	fftw_free(RK1);
+	fftw_free(RK2);
+	fftw_free(RK3);
+	fftw_free(RK4);
+	fftw_free(stage_tmp);
+
+
+	// close hdf5 datafile
+	H5Fclose(HDF_file_handle);
+	
 
 	return 0;
 }
