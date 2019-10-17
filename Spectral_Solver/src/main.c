@@ -74,11 +74,30 @@ int main(int argc, char** argv) {
 	// create datafile - H5F_ACC_TRUNC overwrites file if it exists already
 	HDF_file_handle = H5Fcreate(output_file_name, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
 
-	// create compound hdf5 datatype for complex modes
+	/* create compound hdf5 datatype for complex modes */
+	// create the C stuct to store the complex datatype
+	typedef struct compound_complex {
+		double re;
+		double im;
+	} compound_complex;
+
+	// declare and intialize the new complex datatpye
+	compound_complex complex_data;
+	complex_data.re = 0.0;
+	complex_data.im = 0.0;
+
+	// create the new HDF5 compound datatpye using the new complex datatype above
+	// use this id to write/read the complex modes to/from file later
+	hid_t comp_id; 
+	comp_id = H5Tcreate(H5T_COMPOUND, sizeof(complex_data));
+
+	// insert each of the members of the complex datatype struct into the new HDF5 compound datatype
+	// using the offsetof() function to find the offset in bytes of the field of the complex struct
+	H5Tinsert(comp_id, "r", offsetof(complex_data, re), H5T_NATIVE_DOUBLE);
+	H5Tinsert(comp_id, "i", offsetof(complex_data, im), H5T_NATIVE_DOUBLE);
 	
 	
-	
-	// use hdf5_hl library to create datasets
+	/* use hdf5_hl library to create datasets */
 	// define dimensions and dimension sizes
 	hsize_t HDF_D1ndims = 1;
 	hsize_t D1dims[HDF_D1ndims];
@@ -162,7 +181,7 @@ int main(int argc, char** argv) {
 	// ------------------------------
 	int iter = 1;
 	double t = 0.0;
-	while (t < T) {
+	while (t < dt*1.0) {
 
 		// Print Energy and Enstrophy
 		printf("Iter: %d | t = %4.4lf | Energy = %4.8lf,   Enstrophy = %4.8lf\n", iter, t, system_energy(u_z, N), system_enstrophy(u_z, kx, N));
