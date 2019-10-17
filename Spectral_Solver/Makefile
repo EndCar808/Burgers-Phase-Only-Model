@@ -8,7 +8,7 @@
 # ---------------------------------------------------------------------
 GCC := gcc
 CCFLAG := -O3
-LIBFLAG := -lfftw3 -lm -lhdf5
+LIBFLAG := -lfftw3 -lm -lhdf5 -lhdf5_hl
 INCDIR = -I/usr/include/hdf5/serial/  -I/usr/include/gsl/	## these are the direcotry additions necessary when using software on UBUNTU desktop
 LIBDIR = -L/usr/lib/x86_64-linux-gnu/hdf5/serial/
 
