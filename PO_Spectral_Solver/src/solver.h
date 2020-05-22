@@ -24,6 +24,9 @@ void initial_condition(double* phi, double* amp, int* kx, int num_osc, int k0, i
 void max(double* a, int n, int k0, double* max_val);
 void min(double* a, int n, int k0, double* min_val);
 
+void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_name, hid_t* file_space, hid_t* data_set, hid_t* mem_space, int num_t_steps, int num_osc, int k_range, int k1_range);
+void write_hyperslab_data_d(hid_t file_space, hid_t data_set, hid_t mem_space, double* data, int n, int index);
+
 double get_timestep(double* amps, fftw_plan plan_c2r, fftw_plan plan_r2c, int* kx, int n, int num_osc, int k0);
 int get_transient_iters(double* amps, fftw_plan plan_c2r, fftw_plan plan_r2c, int* kx, int n, int num_osc, int k0);
 

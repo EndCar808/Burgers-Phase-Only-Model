@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <time.h>
+#include <string.h>
 #include <complex.h>
 #include <fftw3.h>
 #include <hdf5.h>
@@ -32,6 +33,8 @@
 //  Main function
 // ---------------------------------------------------------------------
 int main(int argc, char** argv) {
+
+	clock_t begin = clock();
 
 	// ------------------------------
 	//  Variable Definitions
@@ -74,10 +77,7 @@ int main(int argc, char** argv) {
 	double* phi;
 	phi = (double* ) malloc(num_osc * sizeof(double));
 
-	// soln arrays
-	double* u;
-	u = (double* ) malloc(N*sizeof(double));
-
+	// // modes array
 	fftw_complex* u_z;
 	u_z	= (fftw_complex* ) fftw_malloc(num_osc * sizeof(fftw_complex));
 
@@ -147,10 +147,10 @@ int main(int argc, char** argv) {
 	// ------------------------------
 	initial_condition(phi, amp, kx, num_osc, k0, cutoff, a, b);
 
-	for (int i = 0; i < num_osc; ++i) {
-		printf("k[%d]: %d | a: %5.15lf   p: %5.16lf   | u_z[%d]: %5.16lf  %5.16lfI \n", i, kx[i], amp[i], phi[i], i, creal(amp[i] * cexp(I * phi[i])), cimag(amp[i] * cexp(I * phi[i])));
-	}
-	printf("\n");
+	// for (int i = 0; i < num_osc; ++i) {
+	// 	printf("k[%d]: %d | a: %5.15lf   p: %5.16lf   | u_z[%d]: %5.16lf  %5.16lfI \n", i, kx[i], amp[i], phi[i], i, creal(amp[i] * cexp(I * phi[i])), cimag(amp[i] * cexp(I * phi[i])));
+	// }
+	// printf("\n");
 
 
 
@@ -161,147 +161,63 @@ int main(int argc, char** argv) {
 	dt = get_timestep(amp, fftw_plan_c2r, fftw_plan_r2c, kx, N, num_osc, k0);
 
 	// time varibales
-	int ntsteps = 1e3; 
-	double t0   = 0.0;
-	double T    = t0 + ntsteps * dt;
+	int iters     = 1e2;
+	int save_step = 1;
+	int ntsteps   = iters / save_step; 
+	double t0     = 0.0;
+	double T      = t0 + ntsteps * dt;
 
 
+	// ------------------------------
+	//  HDF5 File Create
+	// ------------------------------
+	// create hdf5 file identifier handle
+	hid_t HDF_file_handle;
 
-	// // ------------------------------
-	// //  HDF5 File Create
-	// // ------------------------------
-	// // create hdf5 file identifier handle
-	// hid_t HDF_file_handle;
+	// create hdf5 handle identifiers for hyperslabing the full evolution data
+	hid_t HDF_file_space[2];
+	hid_t HDF_data_set[2];
+	hid_t HDF_mem_space[2];
 
+	// define filename - const because it doesnt change
+	char output_file_name[128] = "../Data/Output/Runtime_Data";
+	char output_file_data[128];
 
-	// // define filename - const because it doesnt change
-	// const char* output_file_name = "./output/Runtime_Data.h5";
-
-	// // create datafile - H5F_ACC_TRUNC overwrites file if it exists already
-	// HDF_file_handle = H5Fcreate(output_file_name, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-
-	// /* create compound hdf5 datatype for complex modes */
-	// // create the C stuct to store the complex datatype
-	// typedef struct compound_complex {
-	// 	double re;
-	// 	double im;
-	// } compound_complex;
-
-	// // declare and intialize the new complex datatpye
-	// compound_complex complex_data;
-	// complex_data.re = 0.0;
-	// complex_data.im = 0.0;
-
-	// // create the new HDF5 compound datatpye using the new complex datatype above
-	// // use this id to write/read the complex modes to/from file later
-	// hid_t comp_id; 
-	// comp_id = H5Tcreate(H5T_COMPOUND, sizeof(complex_data));
-
-	// // insert each of the members of the complex datatype struct into the new HDF5 compound datatype
-	// // using the offsetof() function to find the offset in bytes of the field of the complex struct type
-	// H5Tinsert(comp_id, "r", offsetof(compound_complex, re), H5T_NATIVE_DOUBLE);
-	// H5Tinsert(comp_id, "i", offsetof(compound_complex, im), H5T_NATIVE_DOUBLE);
+	// form the filename of the output file
+	sprintf(output_file_data,  "_N[%d]_k0[%d]_ALPHA[%1.3lf]_BETA[%1.3lf]_u0[%s]_ITERS[%d].h5", N, k0, a, b, "ALIGNED", ntsteps);
+	strcat(output_file_name, output_file_data);
 	
-	
-	// /* use hdf5_hl library to create datasets */
-	// // define dimensions and dimension sizes
-	// hsize_t HDF_D1ndims = 1;
-	// hsize_t D1dims[HDF_D1ndims];
-	// hsize_t HDF_D2ndims = 2;
-	// hsize_t D2dims[HDF_D2ndims];
+	// Print file name to screen
+	printf("\nOutput File: %s \n\n", output_file_name);
 
-
-	// // ------------------------------
-	// //  HDF5 Hyperslab space creation
-	// // ------------------------------
-	// // create hdf5 handle identifiers for hyperslabing the full evolution data
-	// hid_t HDF_file_space, HDF_data_set, HDF_data_set_real, HDF_mem_space;
-
-	// // create hdf5 dimension arrays for creating the hyperslabs
-	// static const int dimensions = 2;
-	// hsize_t dims[dimensions];      // array to hold dims of full evolution data
-	// hsize_t maxdims[dimensions];   // array to hold max dims of full evolution data
-	// hsize_t chunkdims[dimensions]; // array to hold dims of the hyperslab chunks
-
-	// // initialize the hyperslab arrays
-	// dims[0]      = ceil((T - t0) / dt) + 1; // number of timesteps
-	// dims[1]      = num_osc;                 // number of modes
-	// maxdims[0]   = H5S_UNLIMITED;           // setting max time index to unlimited means we must chunk our data
-	// maxdims[1]   = N;                 // same as before = number of modes
-	// chunkdims[0] = 1;                       // 1D chunk to be saved 
-	// chunkdims[1] = N;                 // 1D chunk of size number of modes
-
-
-	// // create the 2D dataspace - setting the no. of dimensions, expected and max size of the dimensions
-	// HDF_file_space = H5Screate_simple(dimensions, dims, maxdims);
-
-
-	// // must create a propertly list to enable data chunking due to max time dimension being unlimited
-	// // create property list 
-	// hid_t plist;
-	// plist = H5Pcreate(H5P_DATASET_CREATE);
-
-	// // using this property list set the chuncking - stores the chunking info in plist
-	// H5Pset_chunk(plist, dimensions, chunkdims);
-
-
-	// // Create the dataset in the previouosly created datafile - using the chunk enabled property list and new compound datatype
-	// HDF_data_set = H5Dcreate(HDF_file_handle, "ComplexModesFull", comp_id, HDF_file_space, H5P_DEFAULT, plist, H5P_DEFAULT);
-	// HDF_data_set_real = H5Dcreate(HDF_file_handle, "RealModesFull", H5T_NATIVE_DOUBLE, HDF_file_space, H5P_DEFAULT, plist, H5P_DEFAULT);
-
-
-	// // create the memory space for the slab
-	// dims[0] = 1;
-	// dims[1] = N;
-
-	// // setting the max dims to NULL defaults to same size as dims
-	// HDF_mem_space = H5Screate_simple(dimensions, dims, NULL);
-
-
-	// // close the created property list
-	// H5Pclose(plist);
-
+	// open output file and create hyperslabbed datasets 
+	open_output_create_slabbed_datasets(&HDF_file_handle, output_file_name, HDF_file_space, HDF_data_set, HDF_mem_space, ntsteps, num_osc, k_range, k1_range);
 
 
 	// ------------------------------
 	//  Write Initial Conditions to File
 	// ------------------------------
-	/* write initial condition to hypslab */
-	// Create the necessary arrays to insert initial condition into correct spot
-	// hsize_t start_index[dimensions]; // stores the index in the hyperslabbed dataset to start writing to
-	// hsize_t count[dimensions];       // stores the size of hyperslab to write to the dataset
+	write_hyperslab_data_d(HDF_file_space[0], HDF_data_set[0], HDF_mem_space[0], phi, num_osc, 0);
 
-	// count[0]       = 1;				 // 1D slab so first dim is 1
-	// count[1]       = N;		 // 1D slab of size number of modes
-	// start_index[0] = 0;			     // set the starting row index to first position in the global dataset
-	// start_index[1] = 0;				 // set column index to 0 to start writing from the first column
-
-
-	// // select appropriate hyperslab 
-	// H5Sselect_hyperslab(HDF_file_space, H5S_SELECT_SET, start_index, NULL, count, NULL);
+	// compute triads for initial conditions
+	triad_phases(triads, &triad_phase_order, phi, kmin, kmax);
 	
-
 	// // then write the current modes to this hyperslab
-	// H5Dwrite(HDF_data_set, comp_id, HDF_mem_space, HDF_file_space, H5P_DEFAULT, u_z);
-	// H5Dwrite(HDF_data_set_real, H5T_NATIVE_DOUBLE, HDF_mem_space, HDF_file_space, H5P_DEFAULT, u);
-
+	write_hyperslab_data_d(HDF_file_space[1], HDF_data_set[1], HDF_mem_space[1], triads, k_range * k1_range, 0);
 
 	
-
-	
-
 
 	// ------------------------------
 	//  Integration & Looping Params
 	// ------------------------------
 	int iter = 1;
 	double t = 0.0;	
-
+	int save_data_indx = 1;
 
 	// ------------------------------
 	//  Begin Integration
 	// ------------------------------
-	while (t < 1*dt) {
+	while (t < T) {
 
 		// Construct the modes
 		for (int i = 0; i < num_osc; ++i) {
@@ -360,30 +276,20 @@ int main(int argc, char** argv) {
 		//////////////
 		// Print to file
 		//////////////
-		// if ((stats == 0 && iter % save_step == 0) || (stationary == 1 && iter % save_step == 0)) {
-		// 	//update the hyperslab starting index
-		// 	start_index[0] = iter;
+		if (iter % save_step == 0) {
+			// Write phases
+			write_hyperslab_data_d(HDF_file_space[0], HDF_data_set[0], HDF_mem_space[0], phi, num_osc, save_data_indx);
 
-		// 	// select appropriate hyperslab 
-		// 	H5Sselect_hyperslab(HDF_file_space, H5S_SELECT_SET, start_index, NULL, count, NULL);
+			// compute triads for initial conditions
+			triad_phases(triads, &triad_phase_order, phi, kmin, kmax);
+			
+			// write triads
+			write_hyperslab_data_d(HDF_file_space[1], HDF_data_set[1], HDF_mem_space[1], triads, k_range * k1_range, save_data_indx);
 
-		// 	// then write the current modes to this hyperslab
-		// 	H5Dwrite(HDF_data_set, comp_id, HDF_mem_space, HDF_file_space, H5P_DEFAULT, u_z);
-
-		// 	// transform back to real and write to hyper slab
-		// 	fftw_execute(fftw_plan_c2r);
-		// 	for (int i = 0; i < N; ++i)	{
-		// 		u[i] /= N;
-		// 	}
-		// 	H5Dwrite(HDF_data_set_real, H5T_NATIVE_DOUBLE, HDF_mem_space, HDF_file_space, H5P_DEFAULT, u);
-						
-		// 	// Compute the triads
-		// 	triad_phases(triads, &triad_phase_order, phi, kmin, kmax);
-
-		// 	save_data_indx++;
-		// }
+			// increment indx for next iteration
+			save_data_indx++;
+		}
 				
-
 
 		// increment
 		t   = iter*dt;
@@ -401,7 +307,6 @@ int main(int argc, char** argv) {
 
 	// free memory
 	free(kx);
-	free(u);
 	free(u_pad);
 	free(triads);
 	fftw_free(u_z);
@@ -413,9 +318,23 @@ int main(int argc, char** argv) {
 	fftw_free(u_z_pad);
 
 
-	// // close hdf5 datafile
-	// H5Fclose(HDF_file_handle);
+	// close hdf5 datafile
+	H5Sclose( HDF_mem_space[0] );
+	H5Dclose( HDF_data_set[0] );
+	H5Sclose( HDF_file_space[0] );
+	H5Sclose( HDF_mem_space[1] );
+	H5Dclose( HDF_data_set[1] );
+	H5Sclose( HDF_file_space[1] );
+	H5Fclose(HDF_file_handle);
 	
+
+	clock_t end = clock();
+
+	// calculate execution time
+	double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+
+	printf("Time: %20.16lf\n", time_spent);
+	printf("\n\n");
 
 	return 0;
 }
