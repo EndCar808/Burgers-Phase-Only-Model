@@ -27,7 +27,7 @@ if (len(sys.argv) == 1):
 	sys.exit()
 else :
 	inpt_dir_data = str(sys.argv[1])
-
+	
 
 # print directory of input file to screen
 print("\n\tData Directory: %s\n" % inpt_dir_data)
@@ -37,8 +37,14 @@ print("\n\tData Directory: %s\n" % inpt_dir_data)
 if (os.path.isfile(inpt_dir_data + "/Runtime_Data.h5")):
 	HDFfileData = h5py.File(inpt_dir_data + "/Runtime_Data.h5", 'r')
 else:
-	print("Cannot open data file, Error.\n")
+	print("Cannot open %s data file, Error.\n" % "/Runtime_Data.h5")
 	sys.exit()
+
+if (os.path.isfile(inpt_dir_data + "/Matlab_data.h5")):
+	HDFfileDataMatlab = h5py.File(inpt_dir_data + "/Matlab_data.h5", 'r')
+else:
+	print("Cannot open %s data file, Error. Continuing regardless! \n" % "/Runtime_Data.h5")
+
 
 
 # print input file name to screen
@@ -74,7 +80,7 @@ else:
 	print("Failed to detect output directory, Error! \n")
 	sys.exit()
 
-print("\tOutput Directory: %s\n\n" % out_dir_data)
+print("\t Output Directory: %s\n\n" % out_dir_data)
 
 
 
@@ -82,14 +88,31 @@ print("\tOutput Directory: %s\n\n" % out_dir_data)
 ######################
 ##	Open datasets
 ######################
-# Size parameters
-num_c_modes = HDFfileData['ComplexModesFull'].shape[1]
-num_r_modes = (num_c_modes-1)*2
+num_r_modes  = HDFfileData['ComplexModesFull'].shape[1]
+
+# num_r_modes = (num_c_modes-1)*2
 num_tsteps  = HDFfileData['ComplexModesFull'].shape[0]
+
+# read in MATLAB data to test against
+if (HDFfileDataMatlab):
+	k1 = np.array(np.transpose(HDFfileDataMatlab['k1']), dtype = complex)
+	k2 = np.array(np.transpose(HDFfileDataMatlab['k2']), dtype = complex)
+	k3 = np.array(np.transpose(HDFfileDataMatlab['k3']), dtype = complex)
+	k4 = np.array(np.transpose(HDFfileDataMatlab['k4']), dtype = complex)
+	U_Z_real = HDFfileDataMatlab['uhatreal']
+	U_Z_imag = HDFfileDataMatlab['uhatimag']
+	# recreate complex modes from real and imaginary data 
+	U_Z = np.array(np.transpose(U_Z_real[:, :]), dtype = complex) # matlab stores in column major so need to transpose
+	U_Z.imag = np.transpose(U_Z_imag[:, :])
+
+
+print("\nNumber of tsteps: %s\n" % num_tsteps)
 
 
 # data
 u_z = HDFfileData['ComplexModesFull']
+u   = HDFfileData['RealModesFull']
+
 
 
 
@@ -101,21 +124,41 @@ x  = np.arange(0, 2*np.pi, dx)
 
 
 
+print(U_Z.shape)
+print(u_z.shape)
+print(u.shape)
+
+print(k1[0, :])
+
+print("\n\n")
+print(u_z[2, :])
+
+print("\n\n")
+
+
+
+plt.plot(x, u[1, :], '*-', x, k1[0, :])
+# plt.plot(x, u[1, :] - k1[0, :])
+# plt.plot(x, np.fft.ifft(u_z[1, :]), '*-', x, np.fft.ifft(k1[0, :]))
+plt.legend(('Solver main', 'Matlab'))
+plt.show()
+
 ######################
 ##	Plotting
 ######################
-for t in range(num_tsteps):
-	print("Snapshot Indx = %d\n" % t)
-	# plt.clf()
+# for t in range(num_tsteps):
+# 	print("Snapshot Indx = %d\n" % t)
+# 	# plt.clf()
 
-	plt.plot(np.fft.ifft(u_z[t, :]).real)
+# 	plt.plot(x, np.fft.ifft(u_z[t, :]).real, x, np.fft.ifft(U_Z[t, :]).real)
+# 	plt.legend(('C', 'Matlab'))
 	
-	plt.title('Real Space Solution')
-	plt.xlabel(r'$x$')
-	plt.ylabel(r'$u$')
-	plt.grid(which='major', axis='both')
-	plt.savefig(out_dir_data +'/Snap_{:05d}.png'.format(t), format='png', dpi = 800)	
-	plt.close()
+# 	plt.title('Real Space Solution')
+# 	plt.xlabel(r'$x$')
+# 	plt.ylabel(r'$u$')
+# 	plt.grid(which='major', axis='both')
+# 	plt.savefig(out_dir_data +'/Snap_{:05d}.png'.format(t), format='png', dpi = 800)	
+# 	plt.close()
 	
 
 

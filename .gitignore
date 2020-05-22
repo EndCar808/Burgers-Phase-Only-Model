@@ -1,0 +1,17 @@
+*.o
+*.exe
+*.asv
+
+# Data
+*.h5
+*.dat
+*.txt
+*.png
+*.mat
+*.jpeg
+*.jpg
+*.mp4
+*.fig
+
+# Data Folders
+.Data/
