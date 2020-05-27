@@ -14,4 +14,7 @@
 *.fig
 
 # Data Folders
+./Data/
 .Data/
+./Libraries/
+Libraries/

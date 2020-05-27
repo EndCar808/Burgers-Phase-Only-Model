@@ -21,38 +21,84 @@ import matplotlib.pyplot as plt
 ######################
 ##	Read input file
 ######################
-# Check if program was given directory for input file
 if (len(sys.argv) == 1):
-	print("No Input file specified, Error.\n")
+	print("No Input file Directory specified, Error.\n")
 	sys.exit()
-else :
-	inpt_dir_data = str(sys.argv[1])
+else:
+	HDFfileData = h5py.File(str(sys.argv[1]))
+	
+# Check if program was given directory for input file
+# if (len(sys.argv) == 1):
+# 	print("No Input file Directory specified, Error.\n")
+# 	sys.exit()
+# else:
+# 	inpt_dir_data = str(sys.argv[1])
 	
 
-# print directory of input file to screen
-print("\n\tData Directory: %s\n" % inpt_dir_data)
+# # print directory of input file to screen
+# print("\n\tData Directory: %s\n" % inpt_dir_data)
 
 
-# Open input file in given directory for reading in data
-if (os.path.isfile(inpt_dir_data + "/Runtime_Data.h5")):
-	HDFfileData = h5py.File(inpt_dir_data + "/Runtime_Data.h5", 'r')
-else:
-	print("Cannot open %s data file, Error.\n" % "/Runtime_Data.h5")
-	sys.exit()
+# # Open input file in given directory for reading in data
+# if (os.path.isfile(inpt_dir_data + "/*.h5")):
+# 	HDFfileData = h5py.File(inpt_dir_data + "/*.h5", 'r')
+# else:
+# 	print("Cannot open %s data file, Error.\n" % "/Runtime_Data.h5")
+# 	sys.exit()
 
-if (os.path.isfile(inpt_dir_data + "/Matlab_data.h5")):
-	HDFfileDataMatlab = h5py.File(inpt_dir_data + "/Matlab_data.h5", 'r')
-else:
-	print("Cannot open %s data file, Error. Continuing regardless! \n" % "/Runtime_Data.h5")
+# if (os.path.isfile(inpt_dir_data + "/Matlab_data.h5")):
+# 	HDFfileDataMatlab = h5py.File(inpt_dir_data + "/Matlab_data.h5", 'r')
+# else:
+# 	print("Cannot open %s data file, Error. Continuing regardless! \n" % "/Runtime_Data.h5")
 
 
 
 # print input file name to screen
-print("\t     Data File: %s\n" % "/Runtime_Data.h5")
+print("\n\nData File: %s\n" % str(sys.argv[1]))
 
 
+phases = HDFfileData['Phases']
+triads = HDFfileData['Triads']
+time   = HDFfileData['Time']
+amps   = HDFfileData['Amps']
+R      = HDFfileData['PhaseOrderR']
+Phi    = HDFfileData['PhaseOrderPhi']
+lce    = HDFfileData['LCE']
+
+print(phases[:, :])
+
+triads_dims = triads.attrs['Triad_Dims']
+
+print("\n\n")
+print(triads[:, :])
+print("\n\n")
 
 
+print("\n\n")
+print(amps[:])
+print("\n\n")
+
+print("\n\n")
+print(time[:])
+
+print("\n\n")
+
+print("\n\n")
+print(lce[-3:, :])
+
+print("\n\n")
+
+
+print("\n\n")
+print(amps[:])
+print("\n\n")
+
+
+print(len(amps[:]))
+
+# plt.plot(time[:], R[:], 'b-', time[:], R[:], 'g-')
+# # plt.savefig('../Plotting/Test_.png', format='png', dpi = 800)
+# plt.show()
 
 ######################
 ##	Output Directory
@@ -61,7 +107,7 @@ print("\t     Data File: %s\n" % "/Runtime_Data.h5")
 out_dir_data = os.getcwd()
 
 
-# # create output directory if doesn't exist
+# create output directory if doesn't exist
 # if (os.path.isdir(out_dir_data + "/TestPlots")):
 # 	out_dir_data += "/TestPlots" # add new dir to path
 # 	os.mkdir(out_dir_data)       # make the new dir
@@ -74,74 +120,74 @@ out_dir_data = os.getcwd()
 # 	out_dir_data += "/TestPlots"
 
 # check if output directory exist
-if (os.path.isdir(out_dir_data + "/TestPlots")):
-	out_dir_data += "/TestPlots"
-else:
-	print("Failed to detect output directory, Error! \n")
-	sys.exit()
+# if (os.path.isdir(out_dir_data + "/TestPlots")):
+# 	out_dir_data += "/TestPlots"
+# else:
+# 	print("Failed to detect output directory, Error! \n")
+# 	sys.exit()
 
-print("\t Output Directory: %s\n\n" % out_dir_data)
-
-
-
-
-######################
-##	Open datasets
-######################
-num_r_modes  = HDFfileData['ComplexModesFull'].shape[1]
-
-# num_r_modes = (num_c_modes-1)*2
-num_tsteps  = HDFfileData['ComplexModesFull'].shape[0]
-
-# read in MATLAB data to test against
-if (HDFfileDataMatlab):
-	k1 = np.array(np.transpose(HDFfileDataMatlab['k1']), dtype = complex)
-	k2 = np.array(np.transpose(HDFfileDataMatlab['k2']), dtype = complex)
-	k3 = np.array(np.transpose(HDFfileDataMatlab['k3']), dtype = complex)
-	k4 = np.array(np.transpose(HDFfileDataMatlab['k4']), dtype = complex)
-	U_Z_real = HDFfileDataMatlab['uhatreal']
-	U_Z_imag = HDFfileDataMatlab['uhatimag']
-	# recreate complex modes from real and imaginary data 
-	U_Z = np.array(np.transpose(U_Z_real[:, :]), dtype = complex) # matlab stores in column major so need to transpose
-	U_Z.imag = np.transpose(U_Z_imag[:, :])
-
-
-print("\nNumber of tsteps: %s\n" % num_tsteps)
-
-
-# data
-u_z = HDFfileData['ComplexModesFull']
-u   = HDFfileData['RealModesFull']
+# print("\t Output Directory: %s\n\n" % out_dir_data)
 
 
 
 
-######################
-##	Prelim data calc
-######################
-dx = 2*np.pi / num_r_modes;
-x  = np.arange(0, 2*np.pi, dx)
+# ######################
+# ##	Open datasets
+# ######################
+# num_r_modes  = HDFfileData['ComplexModesFull'].shape[1]
+
+# # num_r_modes = (num_c_modes-1)*2
+# num_tsteps  = HDFfileData['ComplexModesFull'].shape[0]
+
+# # read in MATLAB data to test against
+# if (HDFfileDataMatlab):
+# 	k1 = np.array(np.transpose(HDFfileDataMatlab['k1']), dtype = complex)
+# 	k2 = np.array(np.transpose(HDFfileDataMatlab['k2']), dtype = complex)
+# 	k3 = np.array(np.transpose(HDFfileDataMatlab['k3']), dtype = complex)
+# 	k4 = np.array(np.transpose(HDFfileDataMatlab['k4']), dtype = complex)
+# 	U_Z_real = HDFfileDataMatlab['uhatreal']
+# 	U_Z_imag = HDFfileDataMatlab['uhatimag']
+# 	# recreate complex modes from real and imaginary data 
+# 	U_Z = np.array(np.transpose(U_Z_real[:, :]), dtype = complex) # matlab stores in column major so need to transpose
+# 	U_Z.imag = np.transpose(U_Z_imag[:, :])
+
+
+# print("\nNumber of tsteps: %s\n" % num_tsteps)
+
+
+# # data
+# u_z = HDFfileData['ComplexModesFull']
+# u   = HDFfileData['RealModesFull']
 
 
 
-print(U_Z.shape)
-print(u_z.shape)
-print(u.shape)
 
-print(k1[0, :])
-
-print("\n\n")
-print(u_z[2, :])
-
-print("\n\n")
+# ######################
+# ##	Prelim data calc
+# ######################
+# dx = 2*np.pi / num_r_modes;
+# x  = np.arange(0, 2*np.pi, dx)
 
 
 
-plt.plot(x, u[1, :], '*-', x, k1[0, :])
-# plt.plot(x, u[1, :] - k1[0, :])
-# plt.plot(x, np.fft.ifft(u_z[1, :]), '*-', x, np.fft.ifft(k1[0, :]))
-plt.legend(('Solver main', 'Matlab'))
-plt.show()
+# print(U_Z.shape)
+# print(u_z.shape)
+# print(u.shape)
+
+# print(k1[0, :])
+
+# print("\n\n")
+# print(u_z[2, :])
+
+# print("\n\n")
+
+
+
+# plt.plot(x, u[1, :], '*-', x, k1[0, :])
+# # plt.plot(x, u[1, :] - k1[0, :])
+# # plt.plot(x, np.fft.ifft(u_z[1, :]), '*-', x, np.fft.ifft(k1[0, :]))
+# plt.legend(('Solver main', 'Matlab'))
+# plt.show()
 
 ######################
 ##	Plotting

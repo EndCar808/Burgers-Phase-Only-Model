@@ -18,6 +18,11 @@
 #include <fftw3.h> // include the latest FFTW library
 #include <omp.h>
 #include <gsl/gsl_cblas.h>
+// #include <f2c.h>
+// #include <cblas.h>
+#include <lapacke.h>
+// #include <clapack.h>
+// #include <gsl/gsl_linalg.h>
 
 
 
@@ -26,6 +31,7 @@ void po_rhs(double* rhs, fftw_complex* u_z, fftw_plan *plan_c2r_pad, fftw_plan *
 void po_rhs_extended(double* rhs, double* rhs_ext, fftw_complex* u_z, double* pert, fftw_plan *plan_c2r_pad, fftw_plan *plan_r2c_pad, int* kx, int n, int num_osc, int k0);
 void jacobian(double* jac, fftw_complex* u_z, int n, int num_osc, int k0);
 void convolution_direct(fftw_complex* convo, fftw_complex* u_z, int n, int k0);
+void orthonormalize(double* rhs_pert, double* pert, double* znorm, int num_osc, int kmin);
 
 
 int main( int argc, char** argv) {
@@ -34,7 +40,7 @@ int main( int argc, char** argv) {
 	///	Initialize vars
 	///-----------------
 	// Real space collocation points 
-	int N = pow(2, 4);
+	int N = 8;
 
 	// padded array size
 	int M = 2 * N;
@@ -43,11 +49,12 @@ int main( int argc, char** argv) {
 	int num_osc = (N / 2) + 1;
 
 	// Forcing wavenumber
-	int k0 = 3;
+	int k0 = 0;
+	int kmin = k0 + 1;
 	
 	// Spectrum vars
-	double a = 0.235;
-	double b = 1.25;
+	double a = 1.0;
+	double b = 0.0;
 	double cutoff = ((double) num_osc - 1.0) / 2.0;
 
 
@@ -111,7 +118,7 @@ int main( int argc, char** argv) {
 		k[i] = i;
 		if(i > 0) {
 			amp[i] = pow((double)i, -a) * exp(-b * pow((double)k[i]/cutoff, 2) );
-			phi[i] = M_PI/4.0;	
+			phi[i] = M_PI/2.0;	
 			// phi[i] = M_PI*( (double) rand() / (double) RAND_MAX);	
 		}
 		u_z[i] = amp[i]*(cos(phi[i]) + I*sin(phi[i]));
@@ -132,23 +139,23 @@ int main( int argc, char** argv) {
 	///-----------------
 	///	Evaluate RHS
 	///-----------------
-	clock_t begin = clock();
+	// clock_t begin = clock();
 
-	po_rhs(rhs, u_z, &fftw_plan_c2r_pad, &fftw_plan_r2c_pad, k, N, num_osc, k0);
+	// po_rhs(rhs, u_z, &fftw_plan_c2r_pad, &fftw_plan_r2c_pad, k, N, num_osc, k0);
 	
-	clock_t end = clock();
+	// clock_t end = clock();
 
-	// calculate execution time
-	double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+	// // calculate execution time
+	// double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
 
-	printf("Time: %5.8lf\n", time_spent);
-	printf("\n\n");
+	// printf("Time: %5.8lf\n", time_spent);
+	// printf("\n\n");
 
-	printf("RHS:\n");
-	for (int i = 0; i < num_osc; ++i) {
-		printf("rhs[%d]: %5.15lf \n", i, rhs[i]);
-	}
-	printf("\n\n");
+	// printf("RHS:\n");
+	// for (int i = 0; i < num_osc; ++i) {
+	// 	printf("rhs[%d]: %5.15lf \n", i, rhs[i]);
+	// }
+	// printf("\n\n");
 	
 
 
@@ -274,6 +281,102 @@ int main( int argc, char** argv) {
 
 
 
+	///-----------------
+	///	Orthonormalize
+	///-----------------
+	int kdim = num_osc - kmin;
+	double* r;
+	r = (double* )malloc(sizeof(double) * (kdim));
+	double* Q;
+	Q = (double* )malloc(sizeof(double) * (kdim) * (kdim));
+
+	// // norm of first col
+	// r[0] = 0.0;
+	// for (int i = 0; i < (kdim); ++i) {
+	// 	r[0] += pow(rhs_pert[i * (kdim)], 2);
+	// }
+	// r[0] = sqrt(r[0]);
+	// // write first col of Q;
+	// for (int i = 0; i < kdim; ++i) {
+	// 	Q[i * (kdim)] = rhs_pert[i * (kdim)] / r[0];
+	// }
+
+
+	// for (int kk = 1; kk < (kdim); ++kk) {
+	// 	for (int j = 0; j < kk - 1; ++j) {
+	// 		// get the dot prod of col q_j with col k of input
+	// 		int rr = 0.0;
+	// 		for (int i = 0; i < (kdim); ++i) {
+	// 			rr += rhs_pert[i * (kdim) + kk] * Q[i * (kdim) + j];
+	// 		}
+
+	// 		// update
+	// 		for (int i = 0; i < (kdim); ++i) {
+	// 			rhs_pert[i * (kdim) + kk] = rhs_pert[i * (kdim) + kk]  - rr * Q[i * (kdim) + j];
+	// 		}
+	// 	}
+
+	// 	// norm of 
+	// 	r[kk] = 0.0;
+	// 	for (int i = 0; i < (kdim); ++i) {
+	// 		r[kk] += pow(rhs_pert[i * (kdim) + kk], 2);
+	// 	}
+	// 	r[kk] = sqrt(r[kk]);
+
+	// 	// write first col of Q;
+	// 	for (int i = 0; i < kdim; ++i) {
+	// 		Q[i * (kdim) + kk] = rhs_pert[i * (kdim) + kk] / r[kk];
+	// 	}
+	// }
+
+	/////////////////////////////////////////
+	// int dim  = kdim;
+	// double* r_tmp;
+	// r_tmp = (double* )malloc(sizeof(double) * dim * dim);
+
+	// for (int i = 0; i < dim; ++i) {
+	// 	for (int j = 0; j < dim; ++j) {
+	// 		for (int kk = 0; kk < dim; ++kk) {
+	// 			r_tmp[i * dim + j] = r_tmp[i * dim + j] + rhs_pert[kk * dim + i]*rhs_pert[kk * dim + j]; 
+	// 		}
+	// 	}
+	// 	r[i] = sqrt(r_tmp[i * dim + i]);
+
+	// 	for (int kk = 0; kk < dim; ++kk) {
+	// 		rhs_pert[kk * dim + i] = rhs_pert[kk * dim + i] / r[i]; 
+	// 	}
+	// 	for (int j = i + 1; j < dim; ++j) {
+	// 		r_tmp[i * dim + j] /= r[i];
+	// 	}
+	// 	for (int j = i + 1; j < dim; ++j) {
+	// 		for (int kk = 0; kk < dim; ++kk) {
+	// 			rhs_pert[kk * dim + j] = rhs_pert[kk * dim + j] - rhs_pert[kk * dim + i] * r_tmp[i * dim + j]; 
+	// 		}
+	// 	}
+	// }
+
+
+
+	// printf("Norm:\n");
+	// for (int i = 0; i < kdim; ++i) {
+	// 	printf("r[%d]: %20.15lf\n", i, r[i]);
+	// }
+	// printf("\n\n");
+
+	// for (int i = 0; i < kdim; ++i) {
+	// 	tmp = i * (kdim);
+	// 	for (int j = 0; j < kdim; ++j) {
+	// 		indx = tmp + j;
+	// 		printf("Q[%d]: %20.16lf\t", indx, rhs_pert[indx]);
+	// 	}
+	// 	printf("\n");
+	// }
+	// printf("\n\n");
+
+	double* znorm;
+	znorm = (double* )malloc(sizeof(double) * (num_osc - kmin));
+
+	orthonormalize(rhs_pert, pert, znorm, num_osc, kmin);
 
 	///------------------
 	/// Free memory
@@ -432,6 +535,93 @@ void jacobian(double* jac, fftw_complex* u_z, int n, int num_osc, int k0) {
 	fftw_free(conv);
 }
 
+void orthonormalize(double* rhs_pert, double* pert, double* znorm, int num_osc, int kmin) {
+
+	// Initialize vars
+	int tmp;
+	int indx;
+	int kdim = num_osc - kmin;
+
+	// Initialize lapack vars
+	lapack_int info;
+	lapack_int m   = kdim;
+	lapack_int n   = kdim;
+	lapack_int lda = kdim;
+
+	// Initialize the blas variables for dgemm
+	double alpha = 1.0;     // prefactor of A*B
+	double beta  = 0.0;     // prefactor of C
+	int K = kdim;    // no. of cols of A / rows of B
+	int ldb = kdim;  // leading dim of B
+	int ldc = kdim;  // leading dim of C
+	
+	// Allocate temporary memory
+	double* tau;
+	tau = (double* )malloc(sizeof(double) * kdim);	
+	double* col_change;
+	col_change =  (double* )malloc(sizeof(double) * (kdim) * (kdim));
+
+	// Initialize col_change matrix
+	for (int i = 0; i < kdim; ++i) {
+		for (int j = 0; j < kdim; ++j) {
+			col_change[i * (kdim) + j] = 0.0; 
+		}
+	}
+
+	///---------------
+	/// Perform QR Fac
+	///---------------
+	info = LAPACKE_dgeqrf(LAPACK_ROW_MAJOR, m, n, rhs_pert, lda, tau);
+
+
+	// extract the diagonals of R
+	for (int i = 0; i < kdim; ++i) {
+		if (rhs_pert[i * (kdim) + i] < 0) {
+			col_change[i * (kdim) + i] = -1.0;
+		} else {
+			col_change[i * (kdim) + i] = 1.0;
+		}
+		znorm[i] = rhs_pert[i * (kdim) + i] * col_change[i * (kdim) + i];
+		printf("r[%d]: %20.15lf\n", i, znorm[i]);
+		
+	}
+	printf("\n\n");
+
+	for (int i = 0; i < kdim; ++i) {
+		tmp = i * (kdim);
+		for (int j = 0; j < kdim; ++j) {
+			indx = tmp + j;
+			printf("col[%d]: %20.16lf\t", indx, col_change[indx]);
+		}
+		printf("\n");
+	}
+	printf("\n\n");
+
+
+	///---------------
+	/// Form the Q matrix
+	///---------------
+    info = LAPACKE_dorgqr(LAPACK_ROW_MAJOR, m, m, n, rhs_pert, lda, tau);
+
+   
+   	// Correct the orientation of the Q matrix columns 
+	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, m, n, K, 1.0, rhs_pert, lda, col_change, ldb, 0.0, pert, ldc);
+
+
+    for (int i = 0; i < kdim; ++i) {
+		tmp = i * (kdim);
+		for (int j = 0; j < kdim; ++j) {
+			indx = tmp + j;
+			printf("Q[%d]: %20.16lf\t", indx, pert[indx]);
+		}
+		printf("\n");
+	}
+
+	free(tau);
+	free(col_change);
+
+}
+
 
 void po_rhs_extended(double* rhs, double* rhs_ext, fftw_complex* u_z, double* pert, fftw_plan *plan_c2r_pad, fftw_plan *plan_r2c_pad, int* kx, int n, int num_osc, int k0) {
 
@@ -531,7 +721,7 @@ void po_rhs_extended(double* rhs, double* rhs_ext, fftw_complex* u_z, double* pe
 	}
 
 
-	// Call matrix matrix multiplication - C = alpha*A*B + beta*C => rhs_ext = alpha*jac_tmp*pert + 0.0*C
+	// Call matrix matrix multiplication - C = alpha*A*B + beta*C => rhs_ext = alpha*jac_tmp*pert + 0.0*rhs_ext
 	// variables setup
 	double alpha = 1.0;     // prefactor of A*B
 	double beta  = 0.0;     // prefactor of C

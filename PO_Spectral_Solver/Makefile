@@ -1,6 +1,6 @@
 # Enda Carroll
-# Sept 2019
-# Makfile to compile solver programme for Burgers equation
+# May 2020
+# Makfile to compile programmes for Phase Only Burgers equation
 
  
 # ---------------------------------------------------------------------
@@ -8,9 +8,12 @@
 # ---------------------------------------------------------------------
 GCC := gcc
 CCFLAG := -O3 -W -Wall
-LIBFLAG := -fopenmp -lpthread -lgsl -lgslcblas -lfftw3_omp -lfftw3 -lm -lhdf5 -lhdf5_hl
-INCDIR = -I/usr/include/hdf5/serial/  -I/usr/include/gsl/	## these are the direcotry additions necessary when using software on UBUNTU desktop
-LIBDIR = -L/usr/lib/x86_64-linux-gnu/hdf5/serial/
+LIBFLAG := -fopenmp -lpthread -lfftw3_omp -lfftw3 -lm -lhdf5 -lhdf5_hl
+GSLFLAG := -lgsl -lgslcblas
+LAPACKFLAG := -llapacke -llapack -lblas -lgfortran
+INCDIR = -I/usr/include/hdf5/serial/  -I/usr/include/gsl/ -I../Libraries/lapack-3.9.0/CBLAS/include/ -I../Libraries/lapack-3.9.0/LAPACKE/include/
+LIBDIR = -L/usr/lib/x86_64-linux-gnu/hdf5/serial/ -L../Libraries/lapack-3.9.0/
+
 
 DEPS = $(wildcard *.h) 
 
@@ -29,9 +32,14 @@ OUTDIR := $(shell mkdir -p $(OUT))
 
 SRCDIR := src
 SRCFILE := $(wildcard $(SRCDIR)/*.c)
-SRCOBJ := $(patsubst $(SRCDIR)/%.c, $(OBJBIN)/%.o, $(SRCFILE))
 
+# Filter out the redundant main file from src file list
+SRCFILE_LCE := $(filter-out $(SRCDIR)/main_solver.c, $(SRCFILE))  # Compiling LCE so filter our solver main file
+SRCFILE_SOLV := $(filter-out $(SRCDIR)/main_lce.c, $(SRCFILE))    # Compiling solver so filter our LCE main file
 
+# Construct appropritate object string list from filtered src file list
+SRCOBJ_LCE := $(patsubst $(SRCDIR)/%.c, $(OBJBIN)/%.o, $(SRCFILE_LCE))
+SRCOBJ_SOLV := $(patsubst $(SRCDIR)/%.c, $(OBJBIN)/%.o, $(SRCFILE_SOLV))
 # ---------------------------------------------------------------------
 #  Builds
 # ---------------------------------------------------------------------
@@ -40,21 +48,35 @@ SRCOBJ := $(patsubst $(SRCDIR)/%.c, $(OBJBIN)/%.o, $(SRCFILE))
 ############
 
 
-all: $(BIN)/main
+all: $(BIN)/main_solver $(BIN)/main_lce
 
 
+############
+#  Solver
+############
+solver: $(BIN)/main_solver 
 
-$(BIN)/main: $(SRCOBJ)
+$(BIN)/main_solver: $(SRCOBJ_SOLV)
 	$(GCC) $(CCFLAG) -o $@ $^ ${INCDIR} ${LIBDIR} $(LIBFLAG)
 
 $(OBJBIN)/%.o: $(SRCDIR)/%.c
 	$(GCC) $(CCFLAG) -c $^ -o $@ ${INCDIR} ${LIBDIR} $(LIBFLAG)
 
-# $(OBJBIN)/main.o: $(SRCDIR)/main.c 
-# 	$(GCC) -c $^ -o $@ $(LIBFLAG)
 
-# $(OBJBIN)/utils.o: src/utils.c
-# 	$(GCC) -c $^ -o $@ $(LIBFLAG)
+############
+#  LCE
+############
+lce: $(BIN)/main_lce 
+
+$(BIN)/main_lce: $(SRCOBJ_LCE)
+	$(GCC) $(CCFLAG) -o $@ $^ ${INCDIR} ${LIBDIR}  $(GSLFLAG) $(LAPACKFLAG) $(LIBFLAG) 
+
+$(OBJBIN)/%.o: $(SRCDIR)/%.c
+	$(GCC) $(CCFLAG) -c $^ -o $@ ${INCDIR} ${LIBDIR}  $(GSLFLAG) $(LAPACKFLAG) $(LIBFLAG) 
+
+
+
+
 
 
 # ---------------------------------------------------------------------
