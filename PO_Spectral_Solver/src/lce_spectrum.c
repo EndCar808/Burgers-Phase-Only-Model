@@ -48,7 +48,7 @@ void initial_conditions_lce(double* pert, double* phi, double* amp, int* kx, int
 	for (int i = 0; i < num_osc; ++i) {
 
 		// fill the wavenumbers array
-		kx[i] = i;
+		kx[i] = (int) i;
 
 		// fill amp and phi arrays
 		if(i <= k0) {
@@ -521,7 +521,7 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	int k1_range = (int)((kmax - kmin + 1)/ 2.0);
 
 	// print update every x iterations
-	int print_every = (int)((double)m_end * 0.1);
+	int print_every = (m_end >= 10 ) ? (int)((double)m_end * 0.1) : 10;
 
 	// Looping variables
 	int tmp;
@@ -531,7 +531,7 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	//  Allocate memory
 	// ------------------------------
 	// Allocate mode related arrays
-	int* kx       = (int* ) malloc(num_osc * sizeof(int));
+	int* kx  = (int* ) malloc(num_osc * sizeof(int));
 	double* amp   = (double* ) malloc(num_osc * sizeof(double));
 	double* phi   = (double* ) malloc(num_osc * sizeof(double));
 	double* u_pad = (double* ) malloc(M * sizeof(double));
@@ -549,9 +549,9 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	
 	// initialize triad array to handle empty elements
 	for (int i = 0; i < k_range; ++i) {
-		int tmp = i * k1_range;
+		tmp = i * k1_range;
 		for (int j = 0; j < k1_range; ++j) {
-			int indx = tmp + j;
+			indx = tmp + j;
 			triads[indx] = -10.0;
 		}
 	}
@@ -634,7 +634,7 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	int save_step = 1;
 
 	// Solver time varibales 
-	int tot_tsteps = (m_iter * m_end) / save_step;
+	int tot_tsteps = (int) ((m_iter * m_end) / save_step);
 	
 	double t0      = 0.0;
 	double T       = t0 + m_iter * dt;	
@@ -670,21 +670,26 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 
 
 	// Create arrays for time and phase order to save after algorithm is finished
-	double* time_array      = (double* )malloc(sizeof(double) * tot_tsteps);
-	double* phase_order_R   = (double* )malloc(sizeof(double) * tot_tsteps);
-	double* phase_order_Phi = (double* )malloc(sizeof(double) * tot_tsteps);
+	double* time_array      = (double* )malloc(sizeof(double) * (tot_tsteps + 1));
+	double* phase_order_R   = (double* )malloc(sizeof(double) * (tot_tsteps + 1));
+	double* phase_order_Phi = (double* )malloc(sizeof(double) * (tot_tsteps + 1));
 
 	// ------------------------------
 	//  Write Initial Conditions to File
 	// ------------------------------
-	write_hyperslab_data_d(HDF_file_space[0], HDF_data_set[0], HDF_mem_space[0], phi, num_osc, 0);
+	write_hyperslab_data_d(HDF_file_space[0], HDF_data_set[0], HDF_mem_space[0], phi, "phi", num_osc, 0);
+
 
 	// compute triads for initial conditions
 	triad_phases(triads, &triad_phase_order, phi, kmin, kmax);
 	
 	// then write the current modes to this hyperslab
-	write_hyperslab_data_d(HDF_file_space[1], HDF_data_set[1], HDF_mem_space[1], triads, k_range * k1_range, 0);
-
+	write_hyperslab_data_d(HDF_file_space[1], HDF_data_set[1], HDF_mem_space[1], triads, "triads", k_range * k1_range, 0);
+	
+	phase_order_R[0]   = cabs(triad_phase_order);
+	phase_order_Phi[0] = carg(triad_phase_order);
+	
+	time_array[0] = t0;
 
 
 	// ------------------------------
@@ -698,7 +703,7 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 		// ------------------------------
 		//  Integrate System Forward
 		// ------------------------------
-		while (t < T) {
+		for (int p = 0; p < m_iter; ++p) {
 
 			// Construct the modes
 			for (int i = 0; i < num_osc; ++i) {
@@ -774,34 +779,36 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 						}
 					}
 			}			
-			// printf("Iter: %d | save_step: %d | save: %d - save_indx: %d\n", iter, save_step,  iter % save_step == 0, save_data_indx);
+			
 
 			//////////////
 			// Print to file
 			//////////////
 			if (iter % save_step == 0) {
 				// Write phases
-				write_hyperslab_data_d(HDF_file_space[0], HDF_data_set[0], HDF_mem_space[0], phi, num_osc, save_data_indx);
+				write_hyperslab_data_d(HDF_file_space[0], HDF_data_set[0], HDF_mem_space[0], phi, "phi", num_osc, save_data_indx);
 
 				// compute triads for initial conditions
 				triad_phases(triads, &triad_phase_order, phi, kmin, kmax);
 				
 				// write triads
-				write_hyperslab_data_d(HDF_file_space[1], HDF_data_set[1], HDF_mem_space[1], triads, k_range * k1_range, save_data_indx);
+				write_hyperslab_data_d(HDF_file_space[1], HDF_data_set[1], HDF_mem_space[1], triads, "triads", k_range * k1_range, save_data_indx);
 
 				// save time and phase order parameter
 				time_array[save_data_indx]      = iter * dt;
 				phase_order_R[save_data_indx]   = cabs(triad_phase_order);
 				phase_order_Phi[save_data_indx] = carg(triad_phase_order);
 
-
+				
 				// increment indx for next iteration
-				save_data_indx++;
+				save_data_indx += 1;
 			}
-					
+			
+
+
 			// increment
-			t   = iter*dt;			
-			iter++;
+			t    = iter*dt;			
+			iter += 1;			
 		}
 
 		
@@ -810,7 +817,7 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 		// ------------------------------
 		orthonormalize(pert, znorm, num_osc, kmin);
 
-		
+
 		// ------------------------------
 		//  Compute LCEs & Write To File
 		// ------------------------------
@@ -820,7 +827,7 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 		}
 
 		// then write the current LCEs to this hyperslab
-		write_hyperslab_data_d(HDF_file_space[2], HDF_data_set[2], HDF_mem_space[2], lce, num_osc - kmin, m - 1);
+		write_hyperslab_data_d(HDF_file_space[2], HDF_data_set[2], HDF_mem_space[2], lce, "lce", num_osc - kmin, m - 1);
 		
 
 		// Print update to screen
@@ -838,7 +845,7 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 		//  Update For Next Iteration
 		// ------------------------------
 		T = T + m_iter * dt;
-		m++;
+		m += 1;
 	}
 	// ------------------------------
 	//  Write 1D Arrays Using HDF5Lite
@@ -852,20 +859,19 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	H5LTmake_dataset(HDF_file_handle, "Amps", D2, D2dims, H5T_NATIVE_DOUBLE, amp);
 	
 	// Wtie time
-	D2dims[0] = 1;
-	D2dims[1] = tot_tsteps;
+	D2dims[0] = tot_tsteps + 1;
+	D2dims[1] = 1;
 	H5LTmake_dataset(HDF_file_handle, "Time", D2, D2dims, H5T_NATIVE_DOUBLE, time_array);
 	
 	// Write Phase Order R
-	D2dims[0] = 1;
-	D2dims[1] = tot_tsteps;
+	D2dims[0] = tot_tsteps + 1;
+	D2dims[1] = 1;
 	H5LTmake_dataset(HDF_file_handle, "PhaseOrderR", D2, D2dims, H5T_NATIVE_DOUBLE, phase_order_R);
 
 	// Write Phase Order Phi
-	D2dims[0] = 1;
-	D2dims[1] = tot_tsteps;
+	D2dims[0] = tot_tsteps + 1;
+	D2dims[1] = 1;
 	H5LTmake_dataset(HDF_file_handle, "PhaseOrderPhi", D2, D2dims, H5T_NATIVE_DOUBLE, phase_order_Phi);
-
 
 
 
@@ -885,6 +891,9 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	free(lce);
 	free(run_sum);
 	free(triads);
+	free(phase_order_Phi);
+	free(phase_order_R);
+	free(time_array);
 	free(RK1);
 	free(RK2);
 	free(RK3);
@@ -907,5 +916,8 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	H5Sclose( HDF_mem_space[1] );
 	H5Dclose( HDF_data_set[1] );
 	H5Sclose( HDF_file_space[1] );
+	H5Sclose( HDF_mem_space[2] );
+	H5Dclose( HDF_data_set[2] );
+	H5Sclose( HDF_file_space[2] );
 	H5Fclose(HDF_file_handle);
 }

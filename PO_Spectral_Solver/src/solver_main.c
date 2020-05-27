@@ -66,7 +66,7 @@ int main(int argc, char** argv) {
 	// ------------------------------
 	//  Call Solver Here
 	// ------------------------------
-	solver(&HDF_Outputfile_handle, N, 1, 1.0, 0.0, 1e2, 1, "ALIGNED");
+	solver(&HDF_Outputfile_handle, N, 1, 1.0, 0.0, 1e6, 1, "ALIGNED");
 	// ------------------------------
 	//  Call Solver Here
 	// ------------------------------

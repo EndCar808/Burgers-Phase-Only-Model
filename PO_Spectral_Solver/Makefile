@@ -34,8 +34,8 @@ SRCDIR := src
 SRCFILE := $(wildcard $(SRCDIR)/*.c)
 
 # Filter out the redundant main file from src file list
-SRCFILE_LCE := $(filter-out $(SRCDIR)/main_solver.c, $(SRCFILE))  # Compiling LCE so filter our solver main file
-SRCFILE_SOLV := $(filter-out $(SRCDIR)/main_lce.c, $(SRCFILE))    # Compiling solver so filter our LCE main file
+SRCFILE_LCE := $(filter-out $(SRCDIR)/solver_main.c, $(SRCFILE))  # Compiling LCE so filter our solver main file
+SRCFILE_SOLV := $(filter-out $(wildcard $(SRCDIR)/lce*.c), $(SRCFILE))    # Compiling solver so filter our LCE main file
 
 # Construct appropritate object string list from filtered src file list
 SRCOBJ_LCE := $(patsubst $(SRCDIR)/%.c, $(OBJBIN)/%.o, $(SRCFILE_LCE))
@@ -48,15 +48,15 @@ SRCOBJ_SOLV := $(patsubst $(SRCDIR)/%.c, $(OBJBIN)/%.o, $(SRCFILE_SOLV))
 ############
 
 
-all: $(BIN)/main_solver $(BIN)/main_lce
+all: $(BIN)/solver_main $(BIN)/lce_main
 
 
 ############
 #  Solver
 ############
-solver: $(BIN)/main_solver 
+solver: $(BIN)/solver_main 
 
-$(BIN)/main_solver: $(SRCOBJ_SOLV)
+$(BIN)/solver_main: $(SRCOBJ_SOLV)
 	$(GCC) $(CCFLAG) -o $@ $^ ${INCDIR} ${LIBDIR} $(LIBFLAG)
 
 $(OBJBIN)/%.o: $(SRCDIR)/%.c
@@ -66,9 +66,9 @@ $(OBJBIN)/%.o: $(SRCDIR)/%.c
 ############
 #  LCE
 ############
-lce: $(BIN)/main_lce 
+lce: $(BIN)/lce_main 
 
-$(BIN)/main_lce: $(SRCOBJ_LCE)
+$(BIN)/lce_main: $(SRCOBJ_LCE)
 	$(GCC) $(CCFLAG) -o $@ $^ ${INCDIR} ${LIBDIR}  $(GSLFLAG) $(LAPACKFLAG) $(LIBFLAG) 
 
 $(OBJBIN)/%.o: $(SRCDIR)/%.c

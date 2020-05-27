@@ -44,6 +44,13 @@ int main(int argc, char** argv) {
 
 	// Collocation points
 	int N = atoi(argv[1]);
+	// int N_len = 3;
+	// int N[N_len];
+	// N[0] = 64;
+	// N[1] = 128;
+	// N[2] = 256;
+	double alpha = atof(argv[2]);
+	
 
 	int k0 = 1;
 
@@ -52,23 +59,23 @@ int main(int argc, char** argv) {
 
 	char* u0 = "ALIGNED";
 
-	int m_end  = 4000;
+	int m_end  = 6000;
 	int m_iter = 50;
 
 
 	// parallel thread variables
-	int i;
-	int tid;
-	int nthreads; 
-	int chunk = 1;
+	// int i;
+	// int tid;
+	// int nthreads; 
+	// int chunk = 1;
 
-	// alpha vars
-	double a_end   = 2.5;
-	double a_start = 0.0;
-	double a_step  = 0.05;
-	int a_len      = (int)((a_end - a_start) / a_step) + 1; 
+	// // alpha vars
+	// double a_end   = 2.5;
+	// double a_start = 0.0;
+	// double a_step  = 0.05;
+	// int a_len      = (int)((a_end - a_start) / a_step) + 1; 
 
-	// array of alpha variables
+	// // array of alpha variables
 	// double* alpha = (double* )malloc(sizeof(double) * a_len);
 	// for (int i = 0; i < a_len; ++i)	{
 	// 	alpha[i] = i * a_step;
@@ -93,21 +100,30 @@ int main(int argc, char** argv) {
 	// 	tid = omp_get_thread_num();
 		
 
+	// int nn;
+	// double aa;
+
 	// 	#pragma omp for schedule(dynamic, chunk) nowait 
-			// for (i = 0; i < a_len; ++i) {
+		// for (int n = 0; n < 1; ++n)	{
+		// 	for (i = 0; i < a_len; ++i) {
 
-				// print update
-				// printf("Thread[%d] working on Alpha[%d]: %5.5lf\n", tid, i, alpha[i]);
+		// 		// print update
+		// 		printf("N: %d working on Alpha[%d]: %5.5lf\n", N[n], i, alpha[i]);
 
-				// ------------------------------
-				//  Compute Spectrum
-				// ------------------------------
-				compute_lce_spectrum(N, a, b, u0, k0, m_end, m_iter);
-				// ------------------------------
-				//  Compute Spectrum
-				// ------------------------------
-			// }
-		
+		// 		nn = N[n];
+		// 		aa = alpha[i];
+
+		// 		// ------------------------------
+		// 		//  Compute Spectrum
+		// 		// ------------------------------
+		// 		compute_lce_spectrum(nn, aa, b, u0, k0, m_end, m_iter);
+		// 		// ------------------------------
+		// 		//  Compute Spectrum
+		// 		// ------------------------------
+		// 	}
+		// }
+			
+		compute_lce_spectrum(N, alpha, b, u0, k0, m_end, m_iter);
 	// }  
 
 	

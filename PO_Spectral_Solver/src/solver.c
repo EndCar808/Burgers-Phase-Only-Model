@@ -24,7 +24,7 @@
 //  User Libraries and Headers
 // ---------------------------------------------------------------------
 #include "utils.h"
-#include "lce_spectrum.h"
+
 
 
 // ---------------------------------------------------------------------
@@ -204,7 +204,7 @@ void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_n
 }
 
 
-void write_hyperslab_data_d(hid_t file_space, hid_t data_set, hid_t mem_space, double* data, int n, int index) {
+void write_hyperslab_data_d(hid_t file_space, hid_t data_set, hid_t mem_space, double* data, char* data_name, int n, int index) {
 
 	// Create dimension arrays for hyperslab
 	hsize_t start_index[2]; // stores the index in the hyperslabbed dataset to start writing to
@@ -216,10 +216,14 @@ void write_hyperslab_data_d(hid_t file_space, hid_t data_set, hid_t mem_space, d
 	start_index[1] = 0;		// set column index to 0 to start writing from the first column
 
 	// select appropriate hyperslab 
-	H5Sselect_hyperslab(file_space, H5S_SELECT_SET, start_index, NULL, count, NULL);
+	if ((H5Sselect_hyperslab(file_space, H5S_SELECT_SET, start_index, NULL, count, NULL)) < 0) {
+		printf("\n!!Error Selecting Hyperslab!! - For %s at Index: %d \n", data_name, index);
+	}
 
 	// then write the current modes to this hyperslab
-	H5Dwrite(data_set, H5T_NATIVE_DOUBLE, mem_space, file_space, H5P_DEFAULT, data);
+	if ((H5Dwrite(data_set, H5T_NATIVE_DOUBLE, mem_space, file_space, H5P_DEFAULT, data)) < 0) {
+		printf("\n!!Error Writing Slabbed Data!! - For %s at Index: %d \n", data_name, index);
+	}
 }
 
 
@@ -697,16 +701,28 @@ void solver(hid_t* HDF_file_handle, int N, int k0, double a, double b, int iters
 	open_output_create_slabbed_datasets(HDF_file_handle, output_file_name, HDF_file_space, HDF_data_set, HDF_mem_space, ntsteps, num_osc, k_range, k1_range);
 
 
+	// Create arrays for time and phase order to save after algorithm is finished
+	double* time_array      = (double* )malloc(sizeof(double) * (ntsteps + 1));
+	double* phase_order_R   = (double* )malloc(sizeof(double) * (ntsteps + 1));
+	double* phase_order_Phi = (double* )malloc(sizeof(double) * (ntsteps + 1));
+
+
 	// ------------------------------
 	//  Write Initial Conditions to File
 	// ------------------------------
-	write_hyperslab_data_d(HDF_file_space[0], HDF_data_set[0], HDF_mem_space[0], phi, num_osc, 0);
+	write_hyperslab_data_d(HDF_file_space[0], HDF_data_set[0], HDF_mem_space[0], phi, "phi", num_osc, 0);
 
 	// compute triads for initial conditions
 	triad_phases(triads, &triad_phase_order, phi, kmin, kmax);
 	
 	// // then write the current modes to this hyperslab
-	write_hyperslab_data_d(HDF_file_space[1], HDF_data_set[1], HDF_mem_space[1], triads, k_range * k1_range, 0);
+	write_hyperslab_data_d(HDF_file_space[1], HDF_data_set[1], HDF_mem_space[1], triads, "triads", k_range * k1_range, 0);
+
+	phase_order_R[0]   = cabs(triad_phase_order);
+	phase_order_Phi[0] = carg(triad_phase_order);
+	
+	// write initial time
+	time_array[0] = t0;
 
 	
 	// ------------------------------
@@ -775,13 +791,19 @@ void solver(hid_t* HDF_file_handle, int N, int k0, double a, double b, int iters
 		//////////////
 		if (iter % save_step == 0) {
 			// Write phases
-			write_hyperslab_data_d(HDF_file_space[0], HDF_data_set[0], HDF_mem_space[0], phi, num_osc, save_data_indx);
+			write_hyperslab_data_d(HDF_file_space[0], HDF_data_set[0], HDF_mem_space[0], phi, "phi", num_osc, save_data_indx);
 
 			// compute triads for initial conditions
 			triad_phases(triads, &triad_phase_order, phi, kmin, kmax);
 			
 			// write triads
-			write_hyperslab_data_d(HDF_file_space[1], HDF_data_set[1], HDF_mem_space[1], triads, k_range * k1_range, save_data_indx);
+			write_hyperslab_data_d(HDF_file_space[1], HDF_data_set[1], HDF_mem_space[1], triads, "triads", k_range * k1_range, save_data_indx);
+
+			// save time and phase order parameter
+			time_array[save_data_indx]      = iter * dt;
+			phase_order_R[save_data_indx]   = cabs(triad_phase_order);
+			phase_order_Phi[save_data_indx] = carg(triad_phase_order);
+
 
 			// increment indx for next iteration
 			save_data_indx++;
@@ -791,6 +813,31 @@ void solver(hid_t* HDF_file_handle, int N, int k0, double a, double b, int iters
 		t   = iter*dt;
 		iter++;
 	}
+	// ------------------------------
+	//  Write 1D Arrays Using HDF5Lite
+	// ------------------------------
+	hid_t D2 = 2;
+	hid_t D2dims[D2];
+
+	// Write amplitudes
+	D2dims[0] = 1;
+	D2dims[1] = num_osc;
+	H5LTmake_dataset(HDF_file_handle, "Amps", D2, D2dims, H5T_NATIVE_DOUBLE, amp);
+	
+	// Wtie time
+	D2dims[0] = tot_tsteps + 1;
+	D2dims[1] = 1;
+	H5LTmake_dataset(HDF_file_handle, "Time", D2, D2dims, H5T_NATIVE_DOUBLE, time_array);
+	
+	// Write Phase Order R
+	D2dims[0] = tot_tsteps + 1;
+	D2dims[1] = 1;
+	H5LTmake_dataset(HDF_file_handle, "PhaseOrderR", D2, D2dims, H5T_NATIVE_DOUBLE, phase_order_R);
+
+	// Write Phase Order Phi
+	D2dims[0] = tot_tsteps + 1;
+	D2dims[1] = 1;
+	H5LTmake_dataset(HDF_file_handle, "PhaseOrderPhi", D2, D2dims, H5T_NATIVE_DOUBLE, phase_order_Phi);
 
 
 	// ------------------------------

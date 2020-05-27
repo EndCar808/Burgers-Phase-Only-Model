@@ -24,7 +24,7 @@ void max(double* a, int n, int k0, double* max_val);
 void min(double* a, int n, int k0, double* min_val);
 
 void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_name, hid_t* file_space, hid_t* data_set, hid_t* mem_space, int num_t_steps, int num_osc, int k_range, int k1_range);
-void write_hyperslab_data_d(hid_t file_space, hid_t data_set, hid_t mem_space, double* data, int n, int index);
+void write_hyperslab_data_d(hid_t file_space, hid_t data_set, hid_t mem_space, double* data, char* data_name, int n, int index);
 
 void solver(hid_t* HDF_file_handle, int N, int k0, double a, double b, int iters, int save_step, char* u0);
 
