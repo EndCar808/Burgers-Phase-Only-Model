@@ -1,5 +1,5 @@
 # Enda Carroll
-# June 2019
+# June 2020
 # Python code to call the lce algorithm
 
 from subprocess import Popen, PIPE
@@ -17,12 +17,13 @@ print(a)
 for i in n:
 	for j in a:
 		# The comand to run plus its agruments n and m
-		cmdRun = './bin/main_lce ' + str(i) + ' ' + str(j) 
+		cmdRun = './bin/lce_main ' + str(i) + ' ' + str(j) 
 
 		# Create a subprocess class using Popen in the shell - store this in runCode
-		runCode = Popen([cmdRun], shell = True, stdout = PIPE, stdin = PIPE)
+		runCode = Popen([cmdRun], shell = True, stdout = PIPE, stdin = PIPE, universal_newlines = True)
 
 		# Use communicate method to interact with the subprocess to send code and error ouptput 
 		[runCodeOutput, runCodeErr] = runCode.communicate()
 		print(runCodeOutput)
+		print(runCodeErr)
 		runCode.wait()

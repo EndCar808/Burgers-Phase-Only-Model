@@ -24,6 +24,7 @@
 // ---------------------------------------------------------------------
 //  User Libraries and Headers
 // ---------------------------------------------------------------------
+#include "data_types.h"
 #include "utils.h"
 #include "solver.h"
 
@@ -280,6 +281,48 @@ double trace(fftw_complex* u_z, int n, int num_osc, int k0) {
 	return tra;
 }
 
+void modified_gs(double* q, double* r, int num_osc, int kmin) {
+
+	int dim       = num_osc - kmin;
+	double* r_tmp = (double* )malloc(sizeof(double) * dim * dim);
+	double* a_tmp = (double* )malloc(sizeof(double) * dim * dim);
+
+	// Write input to temporary matrix
+	for (int i = 0; i < dim; ++i){
+		for (int j = 0; j < dim; ++j) {
+			a_tmp[i * dim + j ] = q[i * dim + j ] ;
+		}
+	}
+	
+	double norm;
+	for (int i = 0; i < dim; ++i) {
+		norm = 0.0;
+		for (int k = 0; k < dim; ++k) {
+				norm += a_tmp[k * dim + i]*a_tmp[k * dim + i];
+		}
+		r_tmp[i * dim + i] = sqrt(norm);
+
+		// Write diagonal to ouotput
+		r[i] = r_tmp[i * dim + i];
+
+		for (int k = 0; k < dim; ++k) {
+		 	q[k * dim + i]  =  a_tmp[k * dim + i] / r_tmp[i * dim + i]; 
+		} 
+
+		for (int j = i + 1; j < dim; ++j) {
+			for (int k = 0; k < dim; ++k) {
+				r_tmp[i * dim + j] += q[k * dim + i] * a_tmp[k * dim + j];
+			}
+			for (int k = 0; k < dim; ++k) {
+				a_tmp[k * dim + j] -= r_tmp[i * dim + j] * q[k * dim + i]; 
+			}
+		}
+	} 
+}
+
+
+
+
 
 void orthonormalize(double* pert, double* znorm, int num_osc, int kmin) {
 
@@ -327,10 +370,7 @@ void orthonormalize(double* pert, double* znorm, int num_osc, int kmin) {
 			col_change[i * (kdim) + i] = 1.0;
 			znorm[i] = rhs_pert[i * (kdim) + i];
 		}
-		// printf("r[%d]: %20.15lf\n", i, znorm[i]);
-		
 	}
-	// printf("\n\n");
 
 
 	///---------------
@@ -402,66 +442,67 @@ void open_output_create_slabbed_datasets_lce(hid_t* file_handle, char* output_fi
 
 	H5Pclose(plist);
 
-	//
-	//---------- TRIADS -----------//
-	//
-	// create hdf5 dimension arrays for creating the hyperslabs
-	static const int dim2 = 2;
-	hsize_t dims2[dim2];      // array to hold dims of full evolution data
-	hsize_t maxdims2[dim2];   // array to hold max dims of full evolution data
-	hsize_t chunkdims2[dim2]; // array to hold dims of the hyperslab chunks
+	#ifdef __TRIADS
+		//
+		//---------- TRIADS -----------//
+		//
+		// create hdf5 dimension arrays for creating the hyperslabs
+		static const int dim2 = 2;
+		hsize_t dims2[dim2];      // array to hold dims of full evolution data
+		hsize_t maxdims2[dim2];   // array to hold max dims of full evolution data
+		hsize_t chunkdims2[dim2]; // array to hold dims of the hyperslab chunks
 
-	// initialize the hyperslab arrays
-	dims2[0]      = num_t_steps + 1;             // number of timesteps + initial condition
-	dims2[1]      = k_range * k1_range;      // size of triads array
-	maxdims2[0]   = H5S_UNLIMITED;           // setting max time index to unlimited means we must chunk our data
-	maxdims2[1]   = k_range * k1_range;      // size of triads array
-	chunkdims2[0] = 1;                       // 1D chunk to be saved 
-	chunkdims2[1] = k_range*k1_range;         // size of triad array
+		// initialize the hyperslab arrays
+		dims2[0]      = num_t_steps + 1;             // number of timesteps + initial condition
+		dims2[1]      = k_range * k1_range;      // size of triads array
+		maxdims2[0]   = H5S_UNLIMITED;           // setting max time index to unlimited means we must chunk our data
+		maxdims2[1]   = k_range * k1_range;      // size of triads array
+		chunkdims2[0] = 1;                       // 1D chunk to be saved 
+		chunkdims2[1] = k_range*k1_range;         // size of triad array
 
-	// create the 2D dataspace - setting the no. of dimensions, expected and max size of the dimensions
-	file_space[1] = H5Screate_simple(dim2, dims2, maxdims2);
+		// create the 2D dataspace - setting the no. of dimensions, expected and max size of the dimensions
+		file_space[1] = H5Screate_simple(dim2, dims2, maxdims2);
 
-	// must create a propertly list to enable data chunking due to max time dimension being unlimited
-	// create property list 
-	hid_t plist2;
-	plist2 = H5Pcreate(H5P_DATASET_CREATE);
+		// must create a propertly list to enable data chunking due to max time dimension being unlimited
+		// create property list 
+		hid_t plist2;
+		plist2 = H5Pcreate(H5P_DATASET_CREATE);
 
-	// using this property list set the chuncking - stores the chunking info in plist
-	H5Pset_chunk(plist2, dim2, chunkdims2);
+		// using this property list set the chuncking - stores the chunking info in plist
+		H5Pset_chunk(plist2, dim2, chunkdims2);
 
-	// Create the dataset in the previouosly created datafile - using the chunk enabled property list and new compound datatype
-	data_set[1] = H5Dcreate(*file_handle, "Triads", H5T_NATIVE_DOUBLE, file_space[1], H5P_DEFAULT, plist2, H5P_DEFAULT);
-	
-	// create the memory space for the slab
-	dims2[0] = 1;
-	dims2[1] = k_range*k1_range;
+		// Create the dataset in the previouosly created datafile - using the chunk enabled property list and new compound datatype
+		data_set[1] = H5Dcreate(*file_handle, "Triads", H5T_NATIVE_DOUBLE, file_space[1], H5P_DEFAULT, plist2, H5P_DEFAULT);
+		
+		// create the memory space for the slab
+		dims2[0] = 1;
+		dims2[1] = k_range*k1_range;
 
-	// setting the max dims to NULL defaults to same size as dims
-	mem_space[1] = H5Screate_simple(dim2, dims2, NULL);
+		// setting the max dims to NULL defaults to same size as dims
+		mem_space[1] = H5Screate_simple(dim2, dims2, NULL);
 
-	// Create attribute data for the triad dimensions
-	hid_t triads_attr, triads_attr_space;
+		// Create attribute data for the triad dimensions
+		hid_t triads_attr, triads_attr_space;
 
-	hsize_t adims[2];
-	adims[0] = 1;
-	adims[1] = 2;
+		hsize_t adims[2];
+		adims[0] = 1;
+		adims[1] = 2;
 
-	triads_attr_space = H5Screate_simple (2, adims, NULL);
+		triads_attr_space = H5Screate_simple (2, adims, NULL);
 
-	triads_attr = H5Acreate(data_set[1], "Triad_Dims", H5T_NATIVE_INT, triads_attr_space, H5P_DEFAULT, H5P_DEFAULT);
+		triads_attr = H5Acreate(data_set[1], "Triad_Dims", H5T_NATIVE_INT, triads_attr_space, H5P_DEFAULT, H5P_DEFAULT);
 
-	int triads_dims[2];
-	triads_dims[0] = k_range;
-	triads_dims[1] = k1_range;
+		int triads_dims[2];
+		triads_dims[0] = k_range;
+		triads_dims[1] = k1_range;
 
-    herr_t status = H5Awrite(triads_attr, H5T_NATIVE_INT, triads_dims);
+	    herr_t status = H5Awrite(triads_attr, H5T_NATIVE_INT, triads_dims);
 
-	// close the created property list
-	status = H5Aclose(triads_attr);
-    status = H5Sclose(triads_attr_space);
-	status = H5Pclose(plist2);
-
+		// close the created property list
+		status = H5Aclose(triads_attr);
+	    status = H5Sclose(triads_attr_space);
+		status = H5Pclose(plist2);
+	#endif
 
 
 	//---------- LCE -----------//
@@ -543,23 +584,23 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	double* lce     = (double* )malloc(sizeof(double) * (num_osc - kmin));
 	double* run_sum = (double* )malloc(sizeof(double) * (num_osc - kmin));
 
-	
-	// Allocate array for triads
-	double* triads = (double* )malloc(k_range * k1_range * sizeof(double));
-	
-	// initialize triad array to handle empty elements
-	for (int i = 0; i < k_range; ++i) {
-		tmp = i * k1_range;
-		for (int j = 0; j < k1_range; ++j) {
-			indx = tmp + j;
-			triads[indx] = -10.0;
+	#ifdef __TRIADS
+		// Allocate array for triads
+		double* triads = (double* )malloc(k_range * k1_range * sizeof(double));
+		
+		// initialize triad array to handle empty elements
+		for (int i = 0; i < k_range; ++i) {
+			tmp = i * k1_range;
+			for (int j = 0; j < k1_range; ++j) {
+				indx = tmp + j;
+				triads[indx] = -10.0;
+			}
 		}
-	}
 
-	// Initilaize Phase Order peramter
-	fftw_complex triad_phase_order;
-	triad_phase_order = 0.0 + I * 0.0;
-
+		// Initilaize Phase Order peramter
+		fftw_complex triad_phase_order;
+		triad_phase_order = 0.0 + I * 0.0;
+	#endif
 	
 	
 	// ------------------------------
@@ -630,17 +671,16 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	//  Setup Variables
 	// ------------------------------
 	// LCE algorithm varibales
-	int m         = 1;
-	int save_step = 1;
+	int m          = 1;
+	int tot_msteps = (int) m_end / SAVE_LCE_STEP;
 
 	// Solver time varibales 
-	int tot_tsteps = (int) ((m_iter * m_end) / save_step);
-	
+	int tot_tsteps = (int) ((m_iter * m_end) / SAVE_DATA_STEP);	
 	double t0      = 0.0;
 	double T       = t0 + m_iter * dt;	
 
 
-
+	
 	// ------------------------------
 	//  HDF5 File Create
 	// ------------------------------
@@ -666,7 +706,7 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 
 
 	// open output file and create hyperslabbed datasets 
-	open_output_create_slabbed_datasets_lce(&HDF_file_handle, output_file_name, HDF_file_space, HDF_data_set, HDF_mem_space, tot_tsteps, m_end, num_osc, k_range, k1_range, kmin);
+	open_output_create_slabbed_datasets_lce(&HDF_file_handle, output_file_name, HDF_file_space, HDF_data_set, HDF_mem_space, tot_tsteps, tot_msteps, num_osc, k_range, k1_range, kmin);
 
 
 	// Create arrays for time and phase order to save after algorithm is finished
@@ -680,15 +720,18 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	write_hyperslab_data_d(HDF_file_space[0], HDF_data_set[0], HDF_mem_space[0], phi, "phi", num_osc, 0);
 
 
-	// compute triads for initial conditions
-	triad_phases(triads, &triad_phase_order, phi, kmin, kmax);
-	
-	// then write the current modes to this hyperslab
-	write_hyperslab_data_d(HDF_file_space[1], HDF_data_set[1], HDF_mem_space[1], triads, "triads", k_range * k1_range, 0);
-	
-	phase_order_R[0]   = cabs(triad_phase_order);
-	phase_order_Phi[0] = carg(triad_phase_order);
-	
+	#ifdef __TRIADS
+		// compute triads for initial conditions
+		triad_phases(triads, &triad_phase_order, phi, kmin, kmax);
+		
+		// then write the current modes to this hyperslab
+		write_hyperslab_data_d(HDF_file_space[1], HDF_data_set[1], HDF_mem_space[1], triads, "triads", k_range * k1_range, 0);
+		
+		phase_order_R[0]   = cabs(triad_phase_order);
+		phase_order_Phi[0] = carg(triad_phase_order);
+	#endif
+
+	// Write initial time
 	time_array[0] = t0;
 
 
@@ -698,6 +741,7 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	double t = 0.0;
 	int iter = 1;
 	int save_data_indx = 1;
+	int save_lce_indx  = 1;
 	while (m <= m_end) {
 
 		// ------------------------------
@@ -784,27 +828,31 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 			//////////////
 			// Print to file
 			//////////////
-			if (iter % save_step == 0) {
+			if (iter % SAVE_DATA_STEP == 0) {
 				// Write phases
 				write_hyperslab_data_d(HDF_file_space[0], HDF_data_set[0], HDF_mem_space[0], phi, "phi", num_osc, save_data_indx);
 
-				// compute triads for initial conditions
-				triad_phases(triads, &triad_phase_order, phi, kmin, kmax);
-				
-				// write triads
-				write_hyperslab_data_d(HDF_file_space[1], HDF_data_set[1], HDF_mem_space[1], triads, "triads", k_range * k1_range, save_data_indx);
 
-				// save time and phase order parameter
-				time_array[save_data_indx]      = iter * dt;
-				phase_order_R[save_data_indx]   = cabs(triad_phase_order);
-				phase_order_Phi[save_data_indx] = carg(triad_phase_order);
+				#ifdef __TRIADS
+					// compute triads for initial conditions
+					triad_phases(triads, &triad_phase_order, phi, kmin, kmax);
+					
+					// write triads
+					write_hyperslab_data_d(HDF_file_space[1], HDF_data_set[1], HDF_mem_space[1], triads, "triads", k_range * k1_range, save_data_indx);
+
+					// save phase order parameters
+					phase_order_R[save_data_indx]   = cabs(triad_phase_order);
+					phase_order_Phi[save_data_indx] = carg(triad_phase_order);
+				#endif
+
+				// save time
+				time_array[save_data_indx] = iter * dt;
 
 				
 				// increment indx for next iteration
 				save_data_indx += 1;
 			}
 			
-
 
 			// increment
 			t    = iter*dt;			
@@ -827,8 +875,10 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 		}
 
 		// then write the current LCEs to this hyperslab
-		write_hyperslab_data_d(HDF_file_space[2], HDF_data_set[2], HDF_mem_space[2], lce, "lce", num_osc - kmin, m - 1);
-		
+		if (m % SAVE_LCE_STEP == 0) {			
+			write_hyperslab_data_d(HDF_file_space[2], HDF_data_set[2], HDF_mem_space[2], lce, "lce", num_osc - kmin, save_lce_indx - 1);
+			save_lce_indx += 1;
+		}
 
 		// Print update to screen
 		if (m % print_every == 0) {
@@ -863,16 +913,17 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	D2dims[1] = 1;
 	H5LTmake_dataset(HDF_file_handle, "Time", D2, D2dims, H5T_NATIVE_DOUBLE, time_array);
 	
-	// Write Phase Order R
-	D2dims[0] = tot_tsteps + 1;
-	D2dims[1] = 1;
-	H5LTmake_dataset(HDF_file_handle, "PhaseOrderR", D2, D2dims, H5T_NATIVE_DOUBLE, phase_order_R);
+	#ifdef __TRIADS
+		// Write Phase Order R
+		D2dims[0] = tot_tsteps + 1;
+		D2dims[1] = 1;
+		H5LTmake_dataset(HDF_file_handle, "PhaseOrderR", D2, D2dims, H5T_NATIVE_DOUBLE, phase_order_R);
 
-	// Write Phase Order Phi
-	D2dims[0] = tot_tsteps + 1;
-	D2dims[1] = 1;
-	H5LTmake_dataset(HDF_file_handle, "PhaseOrderPhi", D2, D2dims, H5T_NATIVE_DOUBLE, phase_order_Phi);
-
+		// Write Phase Order Phi
+		D2dims[0] = tot_tsteps + 1;
+		D2dims[1] = 1;
+		H5LTmake_dataset(HDF_file_handle, "PhaseOrderPhi", D2, D2dims, H5T_NATIVE_DOUBLE, phase_order_Phi);
+	#endif
 
 
 	// ------------------------------
@@ -890,9 +941,11 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	free(znorm);
 	free(lce);
 	free(run_sum);
-	free(triads);
-	free(phase_order_Phi);
-	free(phase_order_R);
+	#ifdef __TRIADS
+		free(triads);
+		free(phase_order_Phi);
+		free(phase_order_R);
+	#endif
 	free(time_array);
 	free(RK1);
 	free(RK2);
@@ -913,9 +966,11 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	H5Sclose( HDF_mem_space[0] );
 	H5Dclose( HDF_data_set[0] );
 	H5Sclose( HDF_file_space[0] );
-	H5Sclose( HDF_mem_space[1] );
-	H5Dclose( HDF_data_set[1] );
-	H5Sclose( HDF_file_space[1] );
+	#ifdef __TRIADS
+		H5Sclose( HDF_mem_space[1] );
+		H5Dclose( HDF_data_set[1] );
+		H5Sclose( HDF_file_space[1] );
+	#endif
 	H5Sclose( HDF_mem_space[2] );
 	H5Dclose( HDF_data_set[2] );
 	H5Sclose( HDF_file_space[2] );

@@ -24,6 +24,10 @@
 // #include <clapack.h>
 // #include <gsl/gsl_linalg.h>
 
+inline int index(int i, unsigned j, int n)
+{     
+  return i * n + j;
+}
 
 
 void conv_2N_pad(fftw_complex* convo, fftw_complex* uz, fftw_plan *fftw_plan_r2c_ptr, fftw_plan *fftw_plan_c2r_ptr, int n, int num_osc, int k0);
@@ -31,6 +35,8 @@ void po_rhs(double* rhs, fftw_complex* u_z, fftw_plan *plan_c2r_pad, fftw_plan *
 void po_rhs_extended(double* rhs, double* rhs_ext, fftw_complex* u_z, double* pert, fftw_plan *plan_c2r_pad, fftw_plan *plan_r2c_pad, int* kx, int n, int num_osc, int k0);
 void jacobian(double* jac, fftw_complex* u_z, int n, int num_osc, int k0);
 void convolution_direct(fftw_complex* convo, fftw_complex* u_z, int n, int k0);
+void QR(double* Q, double* R, int m, int n);
+void modified_gs(double* q, double* r, int num_osc, int kmin);
 void orthonormalize(double* rhs_pert, double* pert, double* znorm, int num_osc, int kmin);
 
 
@@ -40,7 +46,7 @@ int main( int argc, char** argv) {
 	///	Initialize vars
 	///-----------------
 	// Real space collocation points 
-	int N = 8;
+	int N = 10;
 
 	// padded array size
 	int M = 2 * N;
@@ -49,7 +55,7 @@ int main( int argc, char** argv) {
 	int num_osc = (N / 2) + 1;
 
 	// Forcing wavenumber
-	int k0 = 0;
+	int k0 = 1;
 	int kmin = k0 + 1;
 	
 	// Spectrum vars
@@ -89,7 +95,7 @@ int main( int argc, char** argv) {
 	///	Init OpenMP Threads
 	///-----------------
 	// int n_threads = atoi(argv[1]);
-	// omp_set_num_threads(n_threads);
+	omp_set_num_threads(1);
 	// printf("\n\tNumber of OpenMP Threads running = %d\n\n" , omp_get_max_threads());
 	// fftw_init_threads();
 	// fftw_plan_with_nthreads((int)omp_get_max_threads());
@@ -118,10 +124,11 @@ int main( int argc, char** argv) {
 		k[i] = i;
 		if(i > 0) {
 			amp[i] = pow((double)i, -a) * exp(-b * pow((double)k[i]/cutoff, 2) );
-			phi[i] = M_PI/2.0;	
+			phi[i] = M_PI/2.0 * (1 + (1e-10 *(pow(i + 1, 0.9))));	
 			// phi[i] = M_PI*( (double) rand() / (double) RAND_MAX);	
 		}
 		u_z[i] = amp[i]*(cos(phi[i]) + I*sin(phi[i]));
+		// u_z[i] = amp[i]*(cexp(I * phi[i]));
 
 		
 		// Set forcing here
@@ -130,7 +137,7 @@ int main( int argc, char** argv) {
 			amp[i] = 0.0;
 			phi[i] = 0.0;
 		}
-		printf("k[%d]: %d | a: %5.15lf   p: %5.16lf   | u_z[%d]: %5.16lf  %5.16lfI \n", i, k[i], amp[i], phi[i], i, creal(u_z[i]), cimag(u_z[i]));
+		printf("k[%d]: %d | a: %5.15lf   p: %5.16lf   | u_z[%d]: %5.16lf  %5.16lfI | u_z[%d]: %5.16lf  %5.16lfI \n", i, k[i], amp[i], phi[i], i, creal(u_z[i]), cimag(u_z[i]), i, creal(amp[i]*cexp(I * phi[i]) ), cimag(amp[i] * cexp(I * phi[i])) );
 	}
 	printf("\n\n");
 
@@ -287,6 +294,10 @@ int main( int argc, char** argv) {
 	int kdim = num_osc - kmin;
 	double* r;
 	r = (double* )malloc(sizeof(double) * (kdim));
+	for (int i = 0; i < kdim; ++i)
+	{
+		r[i] = 0.0;
+	}
 	double* Q;
 	Q = (double* )malloc(sizeof(double) * (kdim) * (kdim));
 
@@ -330,36 +341,51 @@ int main( int argc, char** argv) {
 	// }
 
 	/////////////////////////////////////////
-	// int dim  = kdim;
-	// double* r_tmp;
-	// r_tmp = (double* )malloc(sizeof(double) * dim * dim);
+	modified_gs(rhs_pert, r, num_osc, kmin);
 
-	// for (int i = 0; i < dim; ++i) {
-	// 	for (int j = 0; j < dim; ++j) {
-	// 		for (int kk = 0; kk < dim; ++kk) {
-	// 			r_tmp[i * dim + j] = r_tmp[i * dim + j] + rhs_pert[kk * dim + i]*rhs_pert[kk * dim + j]; 
-	// 		}
-	// 	}
-	// 	r[i] = sqrt(r_tmp[i * dim + i]);
 
-	// 	for (int kk = 0; kk < dim; ++kk) {
-	// 		rhs_pert[kk * dim + i] = rhs_pert[kk * dim + i] / r[i]; 
+
+	printf("Norm:\n");
+	for (int i = 0; i < kdim; ++i) {
+		printf("r[%d]: %20.15lf\n", i, r[i]);
+	}
+	printf("\n\n");
+
+	for (int i = 0; i < kdim; ++i) {
+		tmp = i * (kdim);
+		for (int j = 0; j < kdim; ++j) {
+			indx = tmp + j;
+			printf("Q[%d]: %20.16lf\t", indx, rhs_pert[indx]);
+		}
+		printf("\n");
+	}
+	printf("\n\n");
+
+	// double* R;
+	// R = (double* )malloc(sizeof(double) * (kdim) * (kdim));
+
+	// for (int i = 0; i < kdim; ++i) {
+	// 	tmp = i * (kdim);
+	// 	for (int j = 0; j < kdim; ++j) {
+	// 		indx = tmp + j;
+	// 		R[indx] = 1.0;
 	// 	}
-	// 	for (int j = i + 1; j < dim; ++j) {
-	// 		r_tmp[i * dim + j] /= r[i];
-	// 	}
-	// 	for (int j = i + 1; j < dim; ++j) {
-	// 		for (int kk = 0; kk < dim; ++kk) {
-	// 			rhs_pert[kk * dim + j] = rhs_pert[kk * dim + j] - rhs_pert[kk * dim + i] * r_tmp[i * dim + j]; 
-	// 		}
-	// 	}
+	// 	// printf("\n");
 	// }
 
 
+	// QR(rhs_pert, R, num_osc - kmin, num_osc - kmin);
 
-	// printf("Norm:\n");
+
+
+	
 	// for (int i = 0; i < kdim; ++i) {
-	// 	printf("r[%d]: %20.15lf\n", i, r[i]);
+	// 	tmp = i * (kdim);
+	// 	for (int j = 0; j < kdim; ++j) {
+	// 		indx = tmp + j;
+	// 		printf("Q[%d]: %20.16lf\t", indx, R[indx]);
+	// 	}
+	// 	printf("\n");
 	// }
 	// printf("\n\n");
 
@@ -373,10 +399,15 @@ int main( int argc, char** argv) {
 	// }
 	// printf("\n\n");
 
-	double* znorm;
-	znorm = (double* )malloc(sizeof(double) * (num_osc - kmin));
 
-	orthonormalize(rhs_pert, pert, znorm, num_osc, kmin);
+	
+
+	
+
+	// double* znorm;
+	// znorm = (double* )malloc(sizeof(double) * (num_osc - kmin));
+
+	// orthonormalize(rhs_pert, pert, znorm, num_osc, kmin);
 
 	///------------------
 	/// Free memory
@@ -620,6 +651,206 @@ void orthonormalize(double* rhs_pert, double* pert, double* znorm, int num_osc, 
 	free(tau);
 	free(col_change);
 
+}
+
+
+/* Gram-Schmidt method on the CPU using OpenMP. Internally exchanges
+   the row/column order for better performance, since most loops are
+   rowwise.
+
+   array is the m x n matrix to decompose, and the decomposed matrix
+   is written to Q and R.
+*/
+
+void QR(double* Q, double* R, int m, int n) {
+
+
+
+// #pragma omp parallel 
+  for (int k = 0; k < n; ++k) {
+  	
+// #pragma omp for
+    for (int i = k; i < n; ++i) {
+      for (int j = 0; j < m; ++j) {
+        R[k*n + i] += Q[j * m  + k] * Q[j * m  + i];
+        // R[index(k, i, n)] += Q[index(j, k, m)] * Q[index(j, i, m)];
+        printf("R[%d]: %5.16lf\t",index(k, i, n), R[index(k, i, n)]);
+      }
+      printf("\n");
+    }
+    printf("Here\n");
+// #pragma omp single
+    R[k * n + k] = sqrt(R[k * n + k]);
+
+// #pragma omp for
+    for (int i = 0; i < m; i++){
+      Q[i * m + k] = Q[i * m + k] / R[k * n + k];
+      // Q[index(i, k, m)] = Q[index(i, k, m)] / R[index(k, k, n)];
+    }
+
+// #pragma omp for
+    for (int i = k + 1; i < n; i++) {
+      R[k * n + i] /= R[index(k, k, n)];
+       // R[index(k, i, n)] /= R[index(k, k, n)];
+    }
+
+// #pragma omp for
+    for (int j = k + 1; j < n; j++) {
+      for (int i = 0; i < m; i++) {
+        Q[index(i, j, m)] -= R[index(k, j, n)] * Q[index(i, k, m)];
+      }
+    }
+  }
+}
+
+
+
+
+
+void modified_gs(double* q, double* r, int num_osc, int kmin) {
+
+	int dim       = num_osc - kmin;
+	double* r_tmp = (double* )malloc(sizeof(double) * dim * dim);
+
+	for (int i = 0; i < dim; ++i){
+		for (int j = 0; j < dim; ++j) {
+			r_tmp[i * dim + j ] = 0.0;
+		}
+	}
+
+	double* a_tmp = (double* )malloc(sizeof(double) * dim * dim);
+
+	for (int i = 0; i < dim; ++i){
+		for (int j = 0; j < dim; ++j) {
+			a_tmp[i * dim + j ] = q[i * dim + j ] ;
+		}
+	}
+
+	
+	// for (int i = 0; i < dmi; ++i) {
+	// 	for (int j = i; j < dim; ++j) {
+	// 		for (int kk = 0; kk < dim; ++kk) {
+	// 			r_tmp[i * dim + j] += q[kk * dim + i]*q[kk * dim + j]; 
+	// 		}
+	// 	}
+	// 	r_tmp[i * dim + i] = sqrt(r_tmp[i * dim + i]);
+		
+	// 	for (int kk = 0; kk < dim; ++kk) {
+	// 		q[kk * dim + i] = q[kk * dim + i] / r_tmp[i * dim + i]; 
+	// 	}
+	// 	for (int j = i + 1; j < dim; ++j) {
+	// 		r_tmp[i * dim + j] = r_tmp[i * dim + j] / r_tmp[i * dim + i];
+	// 	}
+	// 	for (int j = i + 1; j < dim; ++j) {
+	// 		for (int kk = 0; kk < dim; ++kk) {
+	// 			q[kk * dim + j] = q[kk * dim + j] - r_tmp[i * dim + j] * q[kk * dim + i]; 
+	// 		}
+	// 	}
+	// }
+	
+	double norm;
+	for (int i = 0; i < dim; ++i) {
+		norm = 0.0;
+		for (int k = 0; k < dim; ++k) {
+				norm += a_tmp[k * dim + i]*a_tmp[k * dim + i];
+		}
+		r_tmp[i * dim + i] = sqrt(norm);
+
+		// if (i == 2) {
+		// 	printf("\n\n");
+		// 	for (int k = 0; k < dim; ++k) {
+		// 			printf("q[%d]: %5.16lf \t",k * dim + i,  a_tmp[k * dim + i]);
+		// 	}
+		// 	printf("\n\n");
+		// 	printf("Norm3: %5.16lf \n", r_tmp[i * dim + i]);
+		// 	break;
+		// }
+
+		for (int k = 0; k < dim; ++k) {
+		 	q[k * dim + i]  =  a_tmp[k * dim + i] / r_tmp[i * dim + i]; 
+
+		} 
+
+		for (int j = i + 1; j < dim; ++j) {
+			for (int k = 0; k < dim; ++k) {
+				r_tmp[i * dim + j] += q[k * dim + i] * a_tmp[k * dim + j];
+			}
+			for (int k = 0; k < dim; ++k) {
+				a_tmp[k * dim + j] -= r_tmp[i * dim + j] * q[k * dim + i]; 
+			}
+		}
+	}
+	// norm = 0.0;
+	// for (int k = 0; k < dim; ++k) {
+	// 	norm += a_tmp[k * dim + 0]*a_tmp[k * dim + 0];
+	// }
+	// r_tmp[0 * dim + 0] = sqrt(norm);
+	// for (int k = 0; k < dim; ++k) {
+	// 	q[k * dim + 0] = a_tmp[k * dim + 0] / r_tmp[0 * dim + 0];
+	// }
+
+	// for (int i = 1; i < dim; ++i) {
+	// 	for (int j = 0; j <= i - 1; ++j) {
+	// 		for (int k = 0; k < dim; ++k) {
+	// 			r_tmp[j * dim + i] += q[k * dim + j] * a_tmp[k * dim + i];
+	// 		}
+	// 		for (int k = 0; k < dim; ++k) {
+	// 			a_tmp[k * dim + i] -= r_tmp[j * dim + i] * q[k * dim + j];
+	// 		}
+	// 	}
+	// 	norm = 0.0;
+	// 	for (int k = 0; k < dim; ++k) {
+	// 		norm += a_tmp[k * dim + i]*a_tmp[k * dim + i];
+	// 	}
+	// 	r_tmp[i * dim + i] = sqrt(norm);
+	// 	for (int k = 0; k < dim; ++k) {
+	// 		q[k * dim + i] = a_tmp[k * dim + i] / r_tmp[i * dim + i];
+	// 	}
+	// }
+
+	// Write the diagonals to output
+	for (int i = 0; i < dim; ++i) {
+		for (int j = 0; j < dim; ++j)
+		{
+			printf("R[%d]: %5.16lf \t", i * dim + j, r_tmp[i * dim + j]);
+		}
+		r[i] = r_tmp[i * dim + i];
+		printf("\n");
+	}
+
+
+	double* Q = (double* )malloc(sizeof(double) * dim * dim);
+	printf("\n----Mat Mult----\n");
+	for (int i = 0; i < dim; ++i)
+	{
+		for (int j = 0; j < dim; ++j)
+		{
+			for (int k = 0; k < dim; ++k)
+			{
+				Q[i * dim + j] +=  q[i * dim + k] * r_tmp[k * dim + j];
+			}
+			printf("A[%d]: %5.15lf \t", i * dim + j, Q[i * dim + j]);
+		}
+		printf("\n");
+	}
+	printf("\n\n");
+
+
+	// double* Q = (double* )malloc(sizeof(double) * dim * dim);
+	printf("\n----Mat Mult----\n");
+	for (int i = 0; i < dim; ++i)
+	{
+		for (int j = 0; j < dim; ++j)
+		{
+			for (int k = 0; k < dim; ++k)
+			{
+				Q[i * dim + j] +=  q[k * dim + i] * q[k * dim + j];
+			}
+			printf("A[%d]: %5.15lf \t", i * dim + j, Q[i * dim + j]);
+		}
+		printf("\n");
+	}
+	printf("\n\n");
 }
 
 

@@ -825,17 +825,17 @@ void solver(hid_t* HDF_file_handle, int N, int k0, double a, double b, int iters
 	H5LTmake_dataset(HDF_file_handle, "Amps", D2, D2dims, H5T_NATIVE_DOUBLE, amp);
 	
 	// Wtie time
-	D2dims[0] = tot_tsteps + 1;
+	D2dims[0] = ntsteps + 1;
 	D2dims[1] = 1;
 	H5LTmake_dataset(HDF_file_handle, "Time", D2, D2dims, H5T_NATIVE_DOUBLE, time_array);
 	
 	// Write Phase Order R
-	D2dims[0] = tot_tsteps + 1;
+	D2dims[0] = ntsteps + 1;
 	D2dims[1] = 1;
 	H5LTmake_dataset(HDF_file_handle, "PhaseOrderR", D2, D2dims, H5T_NATIVE_DOUBLE, phase_order_R);
 
 	// Write Phase Order Phi
-	D2dims[0] = tot_tsteps + 1;
+	D2dims[0] = ntsteps + 1;
 	D2dims[1] = 1;
 	H5LTmake_dataset(HDF_file_handle, "PhaseOrderPhi", D2, D2dims, H5T_NATIVE_DOUBLE, phase_order_Phi);
 

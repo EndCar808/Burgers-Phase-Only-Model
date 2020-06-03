@@ -9,12 +9,13 @@ import matplotlib
 matplotlib.use('TkAgg') # Use this backend for displaying plots in window
 # matplotlib.use('Agg') # Use this backend for writing plots to file
 
+
 import h5py
 import sys
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-
+plt.style.use('classic')
 
 
 
@@ -65,12 +66,33 @@ R      = HDFfileData['PhaseOrderR']
 Phi    = HDFfileData['PhaseOrderPhi']
 lce    = HDFfileData['LCE']
 
-print(phases[:, :])
+# Reshape triads
+tdims     = triads.attrs['Triad_Dims']
+triadsnew = np.reshape(triads, np.append(triads.shape[0], tdims[0, :]))
 
-triads_dims = triads.attrs['Triad_Dims']
+
+
+print(phases.shape)
+
+
 
 print("\n\n")
-print(triads[:, :])
+print(triads.shape)
+print("\n\n")
+
+
+print("\n\n")
+print(amps.shape)
+print("\n\n")
+
+print("\n\n")
+print(time.shape)
+
+print("\n\n")
+
+print("\n\n")
+print(lce.shape)
+
 print("\n\n")
 
 
@@ -78,27 +100,44 @@ print("\n\n")
 print(amps[:])
 print("\n\n")
 
-print("\n\n")
-print(time[:])
+print(time[:, 0])
 
-print("\n\n")
+triad_2k = np.zeros((len(time), len(phases[0, :]) - 2))
+for k in range(2, len(phases[0, :]) - 2):
+	triad_2k[:, k] = phases[:, 2] + phases[:, k] - phases[:, k + 2]
 
-print("\n\n")
-print(lce[-3:, :])
-
-print("\n\n")
-
-
-print("\n\n")
-print(amps[:])
-print("\n\n")
+plt.figure()
+plt.plot(time[:, 0], R[:, 0], 'b-', time[:, 0], Phi[:, 0], 'g-')
+plt.legend(np.arange(2, len(phases[0, :])))
+plt.title(r'Kuramoto')
+plt.grid(True)
 
 
-print(len(amps[:]))
+plt.figure()
+for i in range(2, len(phases[0, :])):
+	plt.plot(time[:, 0], phases[:, i], '-')
+plt.legend(np.arange(2, len(phases[0, :])))
+plt.title(r'Phases Tseries')
+plt.grid(True)
 
-# plt.plot(time[:], R[:], 'b-', time[:], R[:], 'g-')
-# # plt.savefig('../Plotting/Test_.png', format='png', dpi = 800)
-# plt.show()
+print(np.extract(triads[:, :] != -10, triads))
+plt.figure()
+plt.hist(np.extract(triads[:, :] != -10, triads).flatten(), bins = 1000)
+plt.xlim(-0.1, 2*np.pi + 0.1)
+
+
+
+plt.figure()
+for i in range(2, len(triadsnew[0, :, 0])):
+	plt.plot(time[:, 0], triad_2k[:, i], '-')
+plt.grid(True)
+plt.title(r'Triads')
+
+
+plt.show()
+
+
+
 
 ######################
 ##	Output Directory

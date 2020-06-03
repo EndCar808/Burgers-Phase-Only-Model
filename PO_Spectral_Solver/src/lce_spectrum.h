@@ -28,6 +28,7 @@ void jacobian(double* jac, fftw_complex* u_z, int n, int num_osc, int k0);
 double trace(fftw_complex* u_z, int n, int num_osc, int k0);
 
 void orthonormalize(double* pert, double* znorm, int num_osc, int kmin);
+void modified_gs(double* q, double* r, int num_osc, int kmin);
 
 void open_output_create_slabbed_datasets_lce(hid_t* file_handle, char* output_file_name, hid_t* file_space, hid_t* data_set, hid_t* mem_space, int num_t_steps, int num_m_steps, int num_osc, int k_range, int k1_range, int kmin);
 

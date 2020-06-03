@@ -23,6 +23,7 @@
 // ---------------------------------------------------------------------
 //  User Libraries and Headers
 // ---------------------------------------------------------------------
+#include "data_types.h"
 #include "utils.h"
 #include "solver.h"
 #include "lce_spectrum.h"
@@ -44,89 +45,29 @@ int main(int argc, char** argv) {
 
 	// Collocation points
 	int N = atoi(argv[1]);
-	// int N_len = 3;
-	// int N[N_len];
-	// N[0] = 64;
-	// N[1] = 128;
-	// N[2] = 256;
-	double alpha = atof(argv[2]);
-	
 
+	// Alpha value
+	double alpha = atof(argv[2]);
+	double beta  = atof(argv[3]);;
+	
+	// Kill first k0 modes
 	int k0 = 1;
 
-	double a = 1.0;
-	double b = 1.0;
-
+	// Specify initial condition
 	char* u0 = "ALIGNED";
 
-	int m_end  = 6000;
+	// Integration parameters
+	int m_end  = 20000;
 	int m_iter = 50;
 
 
-	// parallel thread variables
-	// int i;
-	// int tid;
-	// int nthreads; 
-	// int chunk = 1;
-
-	// // alpha vars
-	// double a_end   = 2.5;
-	// double a_start = 0.0;
-	// double a_step  = 0.05;
-	// int a_len      = (int)((a_end - a_start) / a_step) + 1; 
-
-	// // array of alpha variables
-	// double* alpha = (double* )malloc(sizeof(double) * a_len);
-	// for (int i = 0; i < a_len; ++i)	{
-	// 	alpha[i] = i * a_step;
-	// }
-	// a_len = 2;
-	// double alpha[a_len];
-	// alpha[0] = 0.0;
-	// alpha[1] = 1.0; 
-
-
-
-	// set number of threads
-	// omp_set_num_threads(a_len);
-	
-	// printf("\n\tNumber of OpenMP Threads running = %d\n\n" , omp_get_max_threads());
-	
-
-	// #pragma omp parallel shared(N, a, b, u0, k0, m_end, m_iter, alpha, tid, chunk) private(i) 
-	// {
-
-	// 	// Obtain and print thread id 
-	// 	tid = omp_get_thread_num();
-		
-
-	// int nn;
-	// double aa;
-
-	// 	#pragma omp for schedule(dynamic, chunk) nowait 
-		// for (int n = 0; n < 1; ++n)	{
-		// 	for (i = 0; i < a_len; ++i) {
-
-		// 		// print update
-		// 		printf("N: %d working on Alpha[%d]: %5.5lf\n", N[n], i, alpha[i]);
-
-		// 		nn = N[n];
-		// 		aa = alpha[i];
-
-		// 		// ------------------------------
-		// 		//  Compute Spectrum
-		// 		// ------------------------------
-		// 		compute_lce_spectrum(nn, aa, b, u0, k0, m_end, m_iter);
-		// 		// ------------------------------
-		// 		//  Compute Spectrum
-		// 		// ------------------------------
-		// 	}
-		// }
-			
-		compute_lce_spectrum(N, alpha, b, u0, k0, m_end, m_iter);
-	// }  
-
-	
+	// ------------------------------
+	//  Compute Spectrum
+	// ------------------------------
+	compute_lce_spectrum(N, alpha, beta, u0, k0, m_end, m_iter);
+	// ------------------------------
+	//  Compute Spectrum
+	// ------------------------------
 
 
 	// Finish timing
