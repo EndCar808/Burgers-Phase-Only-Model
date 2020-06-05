@@ -40,10 +40,13 @@
  * @param dx         Value of increment in space
  * @param N          Value of the number of modes in the system
  */
-void initial_condition(double* phi, double* amp, int* kx, int num_osc, int k0, int cutoff, double a, double b) {
+void initial_condition(double* phi, double* amp, int* kx, int num_osc, int k0, double a, double b) {
 
 	// set the seed for the random number generator
 	srand(123456789);
+
+	// Spectrum cutoff
+	double cutoff = ((double) num_osc - 1.0) / 2.0;
 
 	for (int i = 0; i < num_osc; ++i) {
 
@@ -572,9 +575,6 @@ void solver(hid_t* HDF_file_handle, int N, int k0, double a, double b, int iters
 	int kmin = k0 + 1;
 	int kmax = num_osc - 1;
 	
-	// Spectrum var
-	double cutoff = ((double) num_osc - 1.0) / 2.0;
-	
 	
 	// ------------------------------
 	//  Allocate memory
@@ -656,7 +656,7 @@ void solver(hid_t* HDF_file_handle, int N, int k0, double a, double b, int iters
 	// ------------------------------
 	//  Generate Initial Conditions
 	// ------------------------------
-	initial_condition(phi, amp, kx, num_osc, k0, cutoff, a, b);
+	initial_condition(phi, amp, kx, num_osc, k0, a, b);
 	
 
 	// for (int i = 0; i < num_osc; ++i) {

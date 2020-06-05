@@ -538,6 +538,41 @@ void open_output_create_slabbed_datasets_lce(hid_t* file_handle, char* output_fi
 
 	H5Pclose(plist3);
 
+	#ifdef __LCE_ERROR
+		//---------- LCE ERROR -----------//
+		//
+		// initialize the hyperslab arrays
+		dims[0]      = num_m_steps;             // number of timesteps
+		dims[1]      = num_osc - kmin;          // number of oscillators
+		maxdims[0]   = H5S_UNLIMITED;           // setting max time index to unlimited means we must chunk our data
+		maxdims[1]   = num_osc - kmin;          // same as before = number of modes
+		chunkdims[0] = 1;                       // 1D chunk to be saved 
+		chunkdims[1] = num_osc - kmin;          // 1D chunk of size number of modes
+
+		// create the 2D dataspace - setting the no. of dimensions, expected and max size of the dimensions
+		file_space[3] = H5Screate_simple(dimensions, dims, maxdims);
+
+		// must create a propertly list to enable data chunking due to max time dimension being unlimited
+		// create property list 
+		hid_t plist4;
+		plist4 = H5Pcreate(H5P_DATASET_CREATE);
+
+		// using this property list set the chuncking - stores the chunking info in plist
+		H5Pset_chunk(plist4, dimensions, chunkdims);
+
+		// Create the dataset in the previouosly created datafile - using the chunk enabled property list and new compound datatype
+		data_set[3] = H5Dcreate(*file_handle, "LCE", H5T_NATIVE_DOUBLE, file_space[3], H5P_DEFAULT, plist4, H5P_DEFAULT);
+		
+		// create the memory space for the slab
+		dims[0] = 1;
+		dims[1] = num_osc - kmin;
+
+		// setting the max dims to NULL defaults to same size as dims
+		mem_space[3] = H5Screate_simple(dimensions, dims, NULL);
+
+		H5Pclose(plist3);
+	#endif	
+
 
 }
 
@@ -580,9 +615,13 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	fftw_complex* u_z_pad = (fftw_complex* ) fftw_malloc(2 * num_osc * sizeof(fftw_complex));
 
 	// LCE Spectrum Arrays
-	double* znorm   = (double* )malloc(sizeof(double) * (num_osc - kmin));	
-	double* lce     = (double* )malloc(sizeof(double) * (num_osc - kmin));
-	double* run_sum = (double* )malloc(sizeof(double) * (num_osc - kmin));
+	double* znorm    = (double* )malloc(sizeof(double) * (num_osc - kmin));	
+	double* lce      = (double* )malloc(sizeof(double) * (num_osc - kmin));
+	double* run_sum  = (double* )malloc(sizeof(double) * (num_osc - kmin));
+	#ifdef __LCE_ERROR
+		double* lce_last = (double* )malloc(sizeof(double) * (num_osc - kmin));
+		double* abs_err  = (double* )malloc(sizeof(double) * (num_osc - kmin));
+	#endif
 
 	#ifdef __TRIADS
 		// Allocate array for triads
@@ -689,9 +728,9 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 
 
 	// create hdf5 handle identifiers for hyperslabing the full evolution data
-	hid_t HDF_file_space[3];
-	hid_t HDF_data_set[3];
-	hid_t HDF_mem_space[3];
+	hid_t HDF_file_space[4];
+	hid_t HDF_data_set[4];
+	hid_t HDF_mem_space[4];
 
 	// // define filename - const because it doesnt change
 	char output_file_name[128] = "../Data/Output/LCE_Runtime_Data";
@@ -870,19 +909,37 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 		//  Compute LCEs & Write To File
 		// ------------------------------
 		for (int i = 0; i < num_osc - kmin; ++i) {
+			// Compute LCE
 			run_sum[i] = run_sum[i] + log(znorm[i]);
 			lce[i]     = run_sum[i] / (t - t0);
+
+			#ifdef __LCE_ERROR
+				// Compute Absolute Difference
+				if (m > 1) {
+					abs_err[i] = fabs(lce[i] - lce_last[i]);
+				}
+				// Save for next iteration
+				lce_last[i] = lce[i];
+			#endif
 		}
 
 		// then write the current LCEs to this hyperslab
 		if (m % SAVE_LCE_STEP == 0) {			
 			write_hyperslab_data_d(HDF_file_space[2], HDF_data_set[2], HDF_mem_space[2], lce, "lce", num_osc - kmin, save_lce_indx - 1);
+
+			#ifdef __LCE_ERROR
+				write_hyperslab_data_d(HDF_file_space[3], HDF_data_set[3], HDF_mem_space[3], abs_err, "lceError", num_osc - kmin, save_lce_indx - 1);
+			#endif
 			save_lce_indx += 1;
 		}
 
 		// Print update to screen
 		if (m % print_every == 0) {
-			printf("Iter: %d / %d | t: %5.6lf tsteps: %d | k0:%d alpha: %5.6lf beta: %5.6lf\n", m, m_end, t, m_end * m_iter, k0, a, b);
+			double lce_sum = 0.0;
+			for (int i = 0; i < num_osc - kmin; ++i) {
+				lce_sum += lce[i];
+			}
+			printf("Iter: %d / %d | t: %5.6lf tsteps: %d | k0:%d alpha: %5.6lf beta: %5.6lf | Sum: %5.9lf\n", m, m_end, t, m_end * m_iter, k0, a, b, lce_sum);
 			printf("k: \n");
 			for (int j = 0; j < num_osc - kmin; ++j) {
 				printf("%5.6lf ", lce[j]);
@@ -934,6 +991,15 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	fftw_destroy_plan(fftw_plan_c2r);
 	
 	// Free memory
+	#ifdef __TRIADS
+		free(triads);
+		free(phase_order_Phi);
+		free(phase_order_R);
+	#endif
+	#ifdef __LCE_ERROR
+		free(lce_last);
+		free(abs_err);
+	#endif
 	free(kx);
 	free(amp);
 	free(phi);
@@ -941,11 +1007,6 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	free(znorm);
 	free(lce);
 	free(run_sum);
-	#ifdef __TRIADS
-		free(triads);
-		free(phase_order_Phi);
-		free(phase_order_R);
-	#endif
 	free(time_array);
 	free(RK1);
 	free(RK2);
@@ -963,14 +1024,19 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	
 
 	// // Close HDF5 handles
-	H5Sclose( HDF_mem_space[0] );
-	H5Dclose( HDF_data_set[0] );
-	H5Sclose( HDF_file_space[0] );
 	#ifdef __TRIADS
 		H5Sclose( HDF_mem_space[1] );
 		H5Dclose( HDF_data_set[1] );
 		H5Sclose( HDF_file_space[1] );
 	#endif
+	#ifdef __LCE_ERROR
+		H5Sclose( HDF_mem_space[3] );
+		H5Dclose( HDF_data_set[3] );
+		H5Sclose( HDF_file_space[3] );
+	#endif
+	H5Sclose( HDF_mem_space[0] );
+	H5Dclose( HDF_data_set[0] );
+	H5Sclose( HDF_file_space[0] );
 	H5Sclose( HDF_mem_space[2] );
 	H5Dclose( HDF_data_set[2] );
 	H5Sclose( HDF_file_space[2] );
