@@ -23,8 +23,9 @@ plt.style.use('classic')
 ##	Create dataspace arrays
 ######################
 # N = 2**np.arange(4, 9)
-N = [64]
-alpha = np.arange(0.0, 2.55, 0.05)
+N = [64, 128, 256]
+# alpha = np.append(np.append(np.arange(0.0, 1.0, 0.05), np.arange(1.0, 2.0, 0.025)), np.arange(2.0, 2.5, 0.05))
+alpha = np.arange(0.0, 2.50, 0.05)
 
 
 ######################
@@ -58,7 +59,13 @@ kaplan_york_dim = np.zeros((len(N), len(alpha)))
 ######################
 norm = mpl.colors.Normalize(vmin = np.array(alpha).min(), vmax = np.array(alpha).max())
 cmap = mpl.cm.ScalarMappable(norm = norm, cmap = mpl.cm.viridis)
+print(cmap)
+print(cmap.to_rgba(0))
 cmap.set_array([])
+print("\n")
+print(cmap)
+print(cmap.to_rgba(5))
+
 
 
 
@@ -117,26 +124,26 @@ for n in range(0, len(N)):
     kk = np.arange(1, len(spectra[0, :]) + 1)
     plt.figure()
     for i in range(len(alpha)):
-        plt.plot(kk, spectra[i, :], '.-', c = cmap.to_rgba(i + 1))
+        plt.plot(kk, spectra[i, :], '.-', c = cmap.to_rgba(alpha[i]))
     plt.xlim(kk[0], kk[-1])
     plt.yscale('linear')
     plt.grid(which = 'both', axis = 'both')
     plt.ylabel(r"Value of Lyapunov Exponents")
     plt.title(r'Lyapunov Spectrum for $N = {}$'.format(N[n]))
-    cax = plt.colorbar(cmap, ticks = alpha)
-    plt.savefig(output_dir + "/SPECTRUM_N[{}]_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(n, beta, k0, iters), format='png', dpi = 800)  
+    cax = plt.colorbar(cmap, ticks = [0.0, 0.5, 1.0, 1.5, 2.0, 2.45])
+    plt.savefig(output_dir + "/SPECTRUM_N[{}]_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(N[n], beta, k0, iters), format='png', dpi = 800)  
     plt.close()
 
     plt.figure()
     for i in range(len(alpha)):
-        plt.plot(kk, (spectra[i, :] + np.flip(spectra[i, :], 0)) /2, '.-', c = cmap.to_rgba(i + 1))
+        plt.plot(kk, (spectra[i, :] + np.flip(spectra[i, :], 0)) /2, '.-', c = cmap.to_rgba(alpha[i]))
     plt.xlim(kk[0], kk[-1])
     plt.yscale('linear')
     plt.grid(which = 'both', axis = 'both')
     plt.ylabel(r"Value of Lyapunov Exponents")
     plt.title(r'Spectrum Symmetry for $N = {}$'.format(N[n]))
-    cax = plt.colorbar(cmap, ticks = alpha)
-    plt.savefig(output_dir + "/SPECTRUM_SYMETRY_N[{}]_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(n, beta, k0, iters), format='png', dpi = 800)  
+    cax = plt.colorbar(cmap, ticks = [0.0, 0.5, 1.0, 1.5, 2.0, 2.45])
+    plt.savefig(output_dir + "/SPECTRUM_SYMETRY_N[{}]_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(N[n], beta, k0, iters), format='png', dpi = 800)  
     plt.close()
 
 

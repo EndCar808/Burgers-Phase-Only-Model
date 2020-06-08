@@ -57,7 +57,7 @@ int main(int argc, char** argv) {
 	char* u0 = "ALIGNED";
 
 	// Integration parameters
-	int m_end  = 8000;
+	int m_end  = 1000;
 	int m_iter = 50;
 
 

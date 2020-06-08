@@ -10,7 +10,7 @@ a = np.append(np.append(np.arange(0.0, 1.0, 0.05), np.arange(1.0, 2.0, 0.025)), 
 print(a)
 print(a.shape)
 
-beta = 1.0;
+beta = 0.0;
 
 ######################
 ##	Create command list

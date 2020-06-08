@@ -11,6 +11,7 @@
 // #define __TRIADS
 // #define __MODES
 // #define __REALSPACE
+#define __LCE_ERROR
 
 
 
