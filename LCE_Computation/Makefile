@@ -1,6 +1,7 @@
 # Enda Carroll
 # May 2020
-# Makfile to compile programmes for Phase Only Burgers equation
+# Makfile to compile programmes for computing the Lyapunov Spectrum and vectors
+# of the Phase Only Burgers equation
 
  
 # ---------------------------------------------------------------------
@@ -32,9 +33,9 @@ OUTDIR := $(shell mkdir -p $(OUT))
 
 SRCDIR := src
 SRCFILE := $(wildcard $(SRCDIR)/*.c)
-SRCOBJ := $(patsubst $(SRCDIR)/%.c, $(OBJBIN)/%.o, $(SRCFILE))
 
-
+# Construct appropritate object string list from filtered src file list
+SRCOBJ_LCE := $(patsubst $(SRCDIR)/%.c, $(OBJBIN)/%.o, $(SRCFILE))
 # ---------------------------------------------------------------------
 #  Builds
 # ---------------------------------------------------------------------
@@ -46,16 +47,17 @@ SRCOBJ := $(patsubst $(SRCDIR)/%.c, $(OBJBIN)/%.o, $(SRCFILE))
 all: $(BIN)/main
 
 
-############
-#  Solver
-############
-solver: $(BIN)/main 
 
-$(BIN)/main: $(SRCOBJ)
-	$(GCC) $(CCFLAG) -o $@ $^ ${INCDIR} ${LIBDIR} $(LIBFLAG)
+############
+#  LCE
+############
+lce: $(BIN)/main 
 
-$(OBJBIN)/%.o: $(SRCDIR)/%.c
-	$(GCC) $(CCFLAG) -c $^ -o $@ ${INCDIR} ${LIBDIR} $(LIBFLAG)
+$(BIN)/main: $(SRCOBJ_LCE) $(DEPS)
+	$(GCC) $(CCFLAG) -o $@ $^ ${INCDIR} ${LIBDIR}  $(GSLFLAG) $(LAPACKFLAG) $(LIBFLAG) 
+
+$(OBJBIN)/%.o: $(SRCDIR)/%.c $(DEPS)
+	$(GCC) $(CCFLAG) -c $^ -o $@ ${INCDIR} ${LIBDIR}  $(GSLFLAG) $(LAPACKFLAG) $(LIBFLAG) 
 
 
 

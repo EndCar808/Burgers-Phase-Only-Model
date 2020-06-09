@@ -1,7 +1,6 @@
 // Enda Carroll
 // May 2020
-// Main function file for calling the Benettin et al., algorithm
-// for computing the Lyapunov spectrum of the Phase Only 1D Burgers equation
+// Main file for calling the pseudospectral solver for the 1D Burgers equation
 
 // ---------------------------------------------------------------------
 //  Standard Libraries and Headers
@@ -17,17 +16,14 @@
 #include <hdf5_hl.h>
 #include <omp.h>
 #include <gsl/gsl_cblas.h>
-#include <lapacke.h>
 
 
 // ---------------------------------------------------------------------
 //  User Libraries and Headers
 // ---------------------------------------------------------------------
-#include "data_types.h"
+// #include "data_types_solver.h"
 #include "utils.h"
 #include "solver.h"
-#include "lce_spectrum.h"
-
 
 
 
@@ -35,6 +31,7 @@
 //  Main function
 // ---------------------------------------------------------------------
 int main(int argc, char** argv) {
+
 
 	// ------------------------------
 	//  Setup 
@@ -46,30 +43,31 @@ int main(int argc, char** argv) {
 	// Collocation points
 	int N = atoi(argv[1]);
 
-	// Alpha value
-	double alpha = atof(argv[2]);
-	double beta  = atof(argv[3]);;
+
+	// // Get the number of threads 
+	int n_threads = atoi(argv[2]);
+
+
+	// set number of threads
+	omp_set_num_threads(n_threads);
 	
-	// Kill first k0 modes
-	int k0 = 1;
-
-	// Specify initial condition
-	char* u0 = "ALIGNED";
-
-	// Integration parameters
-	int m_end  = 1000;
-	int m_iter = 50;
+	printf("\n\tNumber of OpenMP Threads running = %d\n\n" , omp_get_max_threads());
+	
+	// Initialize and set threads for fftw plans
+	fftw_init_threads();
+	fftw_plan_with_nthreads((int)omp_get_max_threads());
 
 
 	// ------------------------------
-	//  Compute Spectrum
+	//  Call Solver Here
 	// ------------------------------
-	compute_lce_spectrum(N, alpha, beta, u0, k0, m_end, m_iter);
+	solver(N, 1, 1.0, 0.0, 1e5, 1, "ALIGNED");
 	// ------------------------------
-	//  Compute Spectrum
+	//  Call Solver Here
 	// ------------------------------
+	
 
-
+	
 	// Finish timing
 	clock_t end = clock();
 
@@ -78,7 +76,6 @@ int main(int argc, char** argv) {
 
 	printf("\n\tExecution Time: %20.16lf\n", time_spent);
 	printf("\n\n");
-
 
 	return 0;
 }

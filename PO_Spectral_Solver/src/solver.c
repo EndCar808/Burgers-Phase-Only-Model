@@ -560,7 +560,7 @@ double system_enstrophy(fftw_complex* u_z, int* k, int N) {
 }
 
 
-void solver(hid_t* HDF_file_handle, int N, int k0, double a, double b, int iters, int save_step, char* u0) {
+void solver(int N, int k0, double a, double b, int iters, int save_step, char* u0) {
 
 	// ------------------------------
 	//  Variable Definitions
@@ -681,6 +681,10 @@ void solver(hid_t* HDF_file_handle, int N, int k0, double a, double b, int iters
 	// ------------------------------
 	//  HDF5 File Create
 	// ------------------------------
+	// Create the HDF5 file handle
+	hid_t HDF_Outputfile_handle;
+
+
 	// create hdf5 handle identifiers for hyperslabing the full evolution data
 	hid_t HDF_file_space[2];
 	hid_t HDF_data_set[2];
@@ -698,7 +702,7 @@ void solver(hid_t* HDF_file_handle, int N, int k0, double a, double b, int iters
 	printf("\nOutput File: %s \n\n", output_file_name);
 
 	// open output file and create hyperslabbed datasets 
-	open_output_create_slabbed_datasets(HDF_file_handle, output_file_name, HDF_file_space, HDF_data_set, HDF_mem_space, ntsteps, num_osc, k_range, k1_range);
+	open_output_create_slabbed_datasets(&HDF_Outputfile_handle, output_file_name, HDF_file_space, HDF_data_set, HDF_mem_space, ntsteps, num_osc, k_range, k1_range);
 
 
 	// Create arrays for time and phase order to save after algorithm is finished
@@ -822,22 +826,29 @@ void solver(hid_t* HDF_file_handle, int N, int k0, double a, double b, int iters
 	// Write amplitudes
 	D2dims[0] = 1;
 	D2dims[1] = num_osc;
-	H5LTmake_dataset(HDF_file_handle, "Amps", D2, D2dims, H5T_NATIVE_DOUBLE, amp);
+	if ( (H5LTmake_dataset(HDF_Outputfile_handle, "Amps", D2, D2dims, H5T_NATIVE_DOUBLE, amp)) < 0){
+		printf("\n\n!!Failed to make - Amps - Dataset!!\n\n");
+	}
 	
 	// Wtie time
 	D2dims[0] = ntsteps + 1;
 	D2dims[1] = 1;
-	H5LTmake_dataset(HDF_file_handle, "Time", D2, D2dims, H5T_NATIVE_DOUBLE, time_array);
+	if ( (H5LTmake_dataset(HDF_Outputfile_handle, "Time", D2, D2dims, H5T_NATIVE_DOUBLE, time_array)) < 0) {
+		printf("\n\n!!Failed to make - Time - Dataset!!\n\n");
+	}
 	
 	// Write Phase Order R
 	D2dims[0] = ntsteps + 1;
 	D2dims[1] = 1;
-	H5LTmake_dataset(HDF_file_handle, "PhaseOrderR", D2, D2dims, H5T_NATIVE_DOUBLE, phase_order_R);
-
+	if ( (H5LTmake_dataset(HDF_Outputfile_handle, "PhaseOrderR", D2, D2dims, H5T_NATIVE_DOUBLE, phase_order_R)) < 0) {
+		printf("\n\n!!Failed to make - PhaseOrderR - Dataset!!\n\n");
+	}
 	// Write Phase Order Phi
 	D2dims[0] = ntsteps + 1;
 	D2dims[1] = 1;
-	H5LTmake_dataset(HDF_file_handle, "PhaseOrderPhi", D2, D2dims, H5T_NATIVE_DOUBLE, phase_order_Phi);
+	if ( (H5LTmake_dataset(HDF_Outputfile_handle, "PhaseOrderPhi", D2, D2dims, H5T_NATIVE_DOUBLE, phase_order_Phi)) < 0) {
+		printf("\n\n!!Failed to make - PhaseOrderPhi - Dataset!!\n\n");
+	}
 
 
 	// ------------------------------
@@ -851,6 +862,9 @@ void solver(hid_t* HDF_file_handle, int N, int k0, double a, double b, int iters
 	free(kx);
 	free(u_pad);
 	free(triads);
+	free(time_array);
+	free(phase_order_Phi);
+	free(phase_order_R);
 	fftw_free(u_z);
 	fftw_free(RK1);
 	fftw_free(RK2);
@@ -866,4 +880,7 @@ void solver(hid_t* HDF_file_handle, int N, int k0, double a, double b, int iters
 	H5Sclose( HDF_mem_space[1] );
 	H5Dclose( HDF_data_set[1] );
 	H5Sclose( HDF_file_space[1] );
+
+	// Close pipeline to output file
+	H5Fclose(HDF_Outputfile_handle);
 }

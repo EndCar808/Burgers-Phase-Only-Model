@@ -9,14 +9,22 @@ import matplotlib as mpl
 mpl.use('TkAgg') # Use this backend for displaying plots in window
 # matplotlib.use('Agg') # Use this backend for writing plots to file
 
-mpl.rcParams['figure.figsize'] = [16, 9]
+import matplotlib.pyplot as plt
+plt.style.use('seaborn-talk')
+mpl.rcParams['figure.figsize'] = [10, 8]
+mpl.rcParams['figure.autolayout'] = True
+mpl.rcParams['text.usetex'] = True
+mpl.rcParams['font.family'] = 'serif'
+mpl.rcParams['font.serif'] = 'Computer Modern Roman'
+mpl.rcParams['lines.linewidth'] = 1.25
+mpl.rcParams['lines.markersize'] = 6
 import h5py
 import sys
 import os
 import numpy as np
 np.set_printoptions(threshold=sys.maxsize)
-import matplotlib.pyplot as plt
-plt.style.use('classic')
+
+
 
 
 ######################
@@ -26,7 +34,7 @@ plt.style.use('classic')
 N = [64, 128, 256]
 # alpha = np.append(np.append(np.arange(0.0, 1.0, 0.05), np.arange(1.0, 2.0, 0.025)), np.arange(2.0, 2.5, 0.05))
 alpha = np.arange(0.0, 2.50, 0.05)
-
+print(alpha)
 
 ######################
 ##  Get Input Values
@@ -48,24 +56,18 @@ output_dir = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Snapshots
 ######################
 ##	Allocate Memory
 ######################
-num_pos_lce     = np.zeros((len(N), len(alpha)))
-prop_pos_lce    = np.zeros((len(N), len(alpha)))
-spectrum_sum    = np.zeros((len(N), len(alpha)))
-kaplan_york_dim = np.zeros((len(N), len(alpha)))
-
+num_pos_lce      = np.zeros((len(N), len(alpha)))
+prop_pos_lce     = np.zeros((len(N), len(alpha)))
+spectrum_sum     = np.zeros((len(N), len(alpha)))
+kaplan_york_dim  = np.zeros((len(N), len(alpha)))
+entropy_prod_dim = np.zeros((len(N), len(alpha)))
 
 ######################
 ##	Create Colourmap
 ######################
 norm = mpl.colors.Normalize(vmin = np.array(alpha).min(), vmax = np.array(alpha).max())
 cmap = mpl.cm.ScalarMappable(norm = norm, cmap = mpl.cm.viridis)
-print(cmap)
-print(cmap.to_rgba(0))
 cmap.set_array([])
-print("\n")
-print(cmap)
-print(cmap.to_rgba(5))
-
 
 
 
@@ -116,7 +118,8 @@ for n in range(0, len(N)):
                 k_indx  = l - 1
                 break
                 
-        kaplan_york_dim[n, a] = k_indx + (lcesum / np.absolute(spectrum[k_indx + 1]))
+        kaplan_york_dim[n, a]  = k_indx + (lcesum / np.absolute(spectrum[k_indx + 1]))
+        entropy_prod_dim[n, a] = lcesum
                 
     ######################
 	##	Plot Spectra
@@ -127,10 +130,11 @@ for n in range(0, len(N)):
         plt.plot(kk, spectra[i, :], '.-', c = cmap.to_rgba(alpha[i]))
     plt.xlim(kk[0], kk[-1])
     plt.yscale('linear')
-    plt.grid(which = 'both', axis = 'both')
+    plt.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
     plt.ylabel(r"Value of Lyapunov Exponents")
-    plt.title(r'Lyapunov Spectrum for $N = {}$'.format(N[n]))
+    plt.title(r'Lyapunov Spectrum for $N = {} \quad k_0 = {} \quad \beta = {}$'.format(N[n], k0, beta))
     cax = plt.colorbar(cmap, ticks = [0.0, 0.5, 1.0, 1.5, 2.0, 2.45])
+    cax.set_label(r'$\alpha$')
     plt.savefig(output_dir + "/SPECTRUM_N[{}]_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(N[n], beta, k0, iters), format='png', dpi = 800)  
     plt.close()
 
@@ -139,10 +143,11 @@ for n in range(0, len(N)):
         plt.plot(kk, (spectra[i, :] + np.flip(spectra[i, :], 0)) /2, '.-', c = cmap.to_rgba(alpha[i]))
     plt.xlim(kk[0], kk[-1])
     plt.yscale('linear')
-    plt.grid(which = 'both', axis = 'both')
-    plt.ylabel(r"Value of Lyapunov Exponents")
-    plt.title(r'Spectrum Symmetry for $N = {}$'.format(N[n]))
+    plt.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
+    plt.ylabel(r"Measure of Symmetry")
+    plt.title(r'Spectrum Symmetry for $N = {} \quad k_0 = {} \quad \beta = {}$'.format(N[n], k0, beta))
     cax = plt.colorbar(cmap, ticks = [0.0, 0.5, 1.0, 1.5, 2.0, 2.45])
+    cax.set_label(r'$\alpha$')
     plt.savefig(output_dir + "/SPECTRUM_SYMETRY_N[{}]_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(N[n], beta, k0, iters), format='png', dpi = 800)  
     plt.close()
 
@@ -151,15 +156,28 @@ for n in range(0, len(N)):
 ######################
 ##	Plot Results
 ######################
+# Entropy Production
+plt.figure()
+for i in range(len(N)):
+    plt.plot(alpha[:], entropy_prod_dim[i, :], '.-')
+plt.xlim(alpha[0], alpha[-1])
+plt.yscale('log')
+plt.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
+plt.xlabel(r"$\alpha$")
+plt.title(r'Entropy Production - $k_0 = {} \quad \beta = {}$'.format(k0, beta))
+plt.legend([r"$N = {val}$".format(val = nn) for nn in N])
+plt.savefig(output_dir + "/ENTROPY_PROD_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800)  
+plt.close()
+
 # Kaplan-Yorke Dimension
 plt.figure()
 for i in range(len(N)):
     plt.plot(alpha[:], kaplan_york_dim[i, :], '.-')
 plt.xlim(alpha[0], alpha[-1])
 plt.yscale('log')
-plt.grid(which = 'both', axis = 'both')
+plt.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
 plt.xlabel(r"$\alpha$")
-plt.title(r'Kaplan-Yorke Dimension')
+plt.title(r'Kaplan-Yorke Dimension - $k_0 = {} \quad \beta = {}$'.format(k0, beta))
 plt.legend([r"$N = {val}$".format(val = nn) for nn in N])
 plt.savefig(output_dir + "/KAPLANYORKE_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800)  
 plt.close()
@@ -169,9 +187,9 @@ plt.figure()
 for i in range(len(N)):
     plt.plot(alpha[:], prop_pos_lce[i, :], '.-')
 plt.xlim(alpha[0], alpha[-1])
-plt.grid(which = 'both', axis = 'both')
+plt.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
 plt.xlabel(r"$\alpha$")
-plt.title(r'Proportion of Positive Lyapunov Epxonents')
+plt.title(r'Proportion of Positive Lyapunov Epxonents - $k_0 = {} \quad \beta = {}$'.format(k0, beta))
 plt.legend([r"$N = {val}$".format(val = nn) for nn in N])
 plt.savefig(output_dir + "/PROPORTION_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800)  
 plt.close()
@@ -181,9 +199,9 @@ plt.figure()
 for i in range(len(N)):
     plt.plot(alpha[:], num_pos_lce[i, :],  '.-')
 plt.xlim(alpha[0], alpha[-1])
-plt.grid(which = 'both', axis = 'both')
+plt.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
 plt.xlabel(r"$\alpha$")
-plt.title(r'Number of Positive Lyapunov Epxonents')
+plt.title(r'Number of Positive Lyapunov Epxonents - $k_0 = {} \quad \beta = {}$'.format(k0, beta))
 plt.legend([r"$N = {val}$".format(val = nn) for nn in N])
 plt.savefig(output_dir + "/NUM_POS_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800)  
 plt.close()
@@ -193,11 +211,11 @@ plt.figure()
 for i in range(len(N)):
     plt.plot(alpha[:], spectrum_sum[i, :],  '.-')
 plt.xlim(alpha[0], alpha[-1])
-plt.axhline(y = 0, xmin = 0, xmax = 1., ls = '--', c = 'black');
+# plt.axhline(y = 0, xmin = 0, xmax = 1., ls = '--', c = 'black');
 plt.yscale('symlog')
-plt.grid(which = 'both', axis = 'both')
+plt.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
 plt.xlabel(r"$\alpha$")
-plt.title(r'Sum of Lyapunov Epxonents')
+plt.title(r'Sum of Lyapunov Epxonents - $k_0 = {} \quad \beta = {}$'.format(k0, beta))
 plt.legend([r"$N = {val}$".format(val = nn) for nn in N])
 plt.savefig(output_dir + "/SUM_LOGY_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800)  
 plt.close()
@@ -209,9 +227,9 @@ for i in range(len(N)):
 plt.xlim(alpha[0], alpha[-1])
 plt.axhline(y = 0, xmin = 0, xmax = 1., ls = '--', c = 'black');
 plt.yscale('linear')
-plt.grid(which = 'both', axis = 'both')
+plt.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
 plt.xlabel(r"$\alpha$")
-plt.title(r'Sum of Lyapunov Epxonents')
+plt.title(r'Sum of Lyapunov Epxonents - $k_0 = {} \quad \beta = {}$'.format(k0, beta))
 plt.legend([r"$N = {val}$".format(val = nn) for nn in N])
 plt.savefig(output_dir + "/SUM_LIN_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800)  
 plt.close()
