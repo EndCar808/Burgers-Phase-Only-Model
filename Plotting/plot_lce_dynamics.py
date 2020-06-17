@@ -5,18 +5,27 @@
 ######################
 ##	Library Imports
 ######################
-import matplotlib
-# matplotlib.use('TkAgg') # Use this backend for displaying plots in window
-matplotlib.use('Agg') # Use this backend for writing plots to file
+import matplotlib as mpl
+# mpl.use('TkAgg') # Use this backend for displaying plots in window
+mpl.use('Agg') # Use this backend for writing plots to file
 
-matplotlib.rcParams['figure.figsize'] = [16, 9]
+import matplotlib.pyplot as plt
+plt.style.use('seaborn-talk')
+mpl.rcParams['figure.figsize'] = [10, 8]
+mpl.rcParams['figure.autolayout'] = True
+mpl.rcParams['text.usetex'] = True
+mpl.rcParams['font.family'] = 'serif'
+mpl.rcParams['font.serif'] = 'Computer Modern Roman'
+mpl.rcParams['lines.linewidth'] = 1.25
+mpl.rcParams['lines.markersize'] = 6
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
 import h5py
 import sys
 import os
 import numpy as np
 np.set_printoptions(threshold=sys.maxsize)
-import matplotlib.pyplot as plt
-plt.style.use('classic')
+
+
 
 
 ######################
@@ -37,7 +46,7 @@ print("\n\nData File: %s\n" % str(sys.argv[1]))
 ##	Input & Output Dir
 ######################
 input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Output"
-output_dir = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Snapshots"
+output_dir = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Snapshots/TriadDynamics"
 
 
 
@@ -78,10 +87,10 @@ for k in range(2, len(phases[0, :]) - 2):
 
 
 ######################
-##	Preliminary Calcs
+##	Plot Summary Data
 ######################
 # Create Figure with SubAxes
-fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
+fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize = [16, 9])
 fig.suptitle(r'$N = {} \quad \alpha = {} \quad \beta = {} \quad k_0 = {}$'.format(N, 1, 0, k0))
 
 # TRIADS PDF
@@ -95,7 +104,7 @@ ax1.set_xticklabels([r"$0$", r"$\frac{\pi}{2}$", r"$\pi$", r"$\frac{3\pi}{2}$", 
 ax1.set_xlabel(r'$\varphi_{k_1, k - k_1}^{k}(t)$');
 ax1.set_ylabel(r'PDF');
 ax1.set_yscale('log');
-ax1.grid(b = True);
+ax1.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both');
 
 # LCE
 ax2.plot(lce[-1, :], '.-');
@@ -103,7 +112,7 @@ ax2.axhline(y = 0, xmin = 0, xmax = 1., ls = '--', c = 'black');
 ax2.set_xlabel(r'$k$');
 ax2.set_ylabel(r'Lyapunov Exponents');
 ax2.set_xlim(0, lce.shape[1] - 1);
-ax2.grid(b = True);
+ax2.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both');
 
 # KURAMOTO PARAMETER
 ax3.plot(time[:, 0], R[:, 0], time[:, 0], Phi[:, 0])
@@ -112,18 +121,16 @@ ax3.set_yticks([0.0, 0.5,  1.0, np.pi/2.0, 2.0, np.pi]);
 ax3.set_yticklabels([r"$0$", r"$0.5$", r"$1$", r"$\frac{\pi}{2}$", r"$2$", r"$\pi$"]);
 ax3.set_xlabel(r'$t$');
 ax3.legend([r"$\mathcal{R}(t)$", r"$\Phi(t)$"])
-ax3.grid(True)
+ax3.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
 
 # TRIAD TSERIES
 for i in range(2, len(triad_2k[0, :])):
 	ax4.plot(time[:, 0], triad_2k[:, i])
 ax4.set_xlabel(r'$t$');
 ax4.set_ylabel(r'$\varphi_{2, k}^{k + 2}$');
-ax4.grid(b = True);
-
-
-
-# plt.show()
+ax4.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both');
 
 plt.savefig(output_dir + "/LCE_DYNAMICS_N[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(64, 1.0, 0.0, 1, 500000), format='png', dpi = 800)  
 plt.close()
+
+
