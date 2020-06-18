@@ -11,7 +11,7 @@ a = np.arange(0.0, 2.5, 0.05)
 print(a)
 print(a.shape)
 
-beta = 1.0;
+beta = 0.0;
 
 ######################
 ##	Create command list

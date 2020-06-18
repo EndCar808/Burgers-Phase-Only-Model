@@ -71,6 +71,22 @@ phases = HDFfileData['Phases']
 time   = HDFfileData['Time']
 amps   = HDFfileData['Amps']
 lce    = HDFfileData['LCE']
+
+
+######################
+##	Preliminary Calcs
+######################
+ntsteps = phases.shape[0];
+num_osc = phases.shape[1];
+N       = 2 * num_osc - 1 - 1;
+kmin    = np.count_nonzero(amps[0, :] == 0);
+kmax    = amps.shape[1] - 1
+k0      = kmin - 1;
+
+
+######################
+##	Triad Data
+######################
 if 'Triads' in list(HDFfileData.keys()):
 	R      = HDFfileData['PhaseOrderR']
 	Phi    = HDFfileData['PhaseOrderPhi']
@@ -83,34 +99,26 @@ else:
 	numTriads  = 0
 	kmin       = np.count_nonzero(amps[0, :] == 0)
 	kmax       = amps.shape[1] - 1
-	triadphase = -10 *np.ones((kmax - kmin + 1, int((kmax - kmin + 1) / 2), time.shape[0]))
-	triads     = -10 *np.ones((kmax - kmin + 1, int((kmax - kmin + 1) / 2), time.shape[0]))
-	phaseOrder = np.complex(0.0, 0.0)*np.ones((time.shape[0], 1))
-	R          = np.ones((time.shape[0], 1))
-	Phi        = np.ones((time.shape[0], 1))
+	triadphase = -10 *np.ones((kmax - kmin + 1, int((kmax - kmin + 1) / 2), 1)) #
+	triads     = -10 *np.ones((kmax - kmin + 1, int((kmax - kmin + 1) / 2), 1)) #
+	# phaseOrder = np.complex(0.0, 0.0)*np.ones((time.shape[0], 1))
+	# R          = np.ones((time.shape[0], 1))
+	# Phi        = np.ones((time.shape[0], 1))
 	for k in range(kmin, kmax + 1):
 	    for k1 in range(kmin, int(k/2) + 1):
-	        triadphase[k - kmin, k1 - kmin, :] = phases[:, k1] + phases[:, k - k1] - phases[:, k]
-	        triads[k - kmin, k1 - kmin, :]     = np.mod(triadphase[k - kmin, k1 - kmin], 2*np.pi)
-	        phaseOrder[:, 0] += np.exp(np.complex(0.0, 1.0)*triads[k - kmin, k1 - kmin, :])
-	        numTriads += 1
-	R[:, 0]   = np.absolute(phaseOrder[:, 0] / numTriads)
-	Phi[:, 0] = np.angle(phaseOrder[:, 0] / numTriads)
+	        triadphase[k - kmin, k1 - kmin, 0] = phases[-1, k1] + phases[-1, k - k1] - phases[-1, k]
+	        triads[k - kmin, k1 - kmin, 0]     = np.mod(triadphase[k - kmin, k1 - kmin, 0], 2*np.pi)
+	        # phaseOrder[:, 0] += np.exp(np.complex(0.0, 1.0)*triads[k - kmin, k1 - kmin, :])
+	        # numTriads += 1
+	# R[:, 0]   = np.absolute(phaseOrder[:, 0] / numTriads)
+	# Phi[:, 0] = np.angle(phaseOrder[:, 0] / numTriads)
 
 
 # Print Final Time LCEs
 print(lce[-1, :])
 
 
-######################
-##	Preliminary Calcs
-######################
-ntsteps = phases.shape[0];
-num_osc = phases.shape[1];
-N       = 2 * num_osc - 1 - 1;
-kmin    = np.count_nonzero(amps[0, :] == 0);
-kmax    = amps.shape[1] - 1
-k0      = kmin - 1;
+
 
 
 
@@ -212,11 +220,11 @@ k0      = kmin - 1;
 # ##	Plot Final Time Data
 # ######################
 # Create Modes
-amps_full   = np.append(amps[0, :], np.flipud(amps[0, :-2]))
-phases_full = np.append(phases[-1, :], -np.flipud(phases[-1, :-2]))
-u_z = amps_full * np.exp(np.complex(0.0, 1.0) * phases_full)
-u   = np.real(np.fft.ifft(u_z))
-x   = np.arange(0, 2*np.pi, 2*np.pi/N)
+# amps_full   = np.append(amps[0, :], np.flipud(amps[0, :-2]))
+# phases_full = np.append(phases[-1, :], -np.flipud(phases[-1, :-2]))
+# u_z = amps_full * np.exp(np.complex(0.0, 1.0) * phases_full)
+# u   = np.real(np.fft.ifft(u_z))
+# x   = np.arange(0, 2*np.pi, 2*np.pi/N)
 
 # plt.plot(x, u / np.sqrt(np.mean(u**2)))
 # plt.xlabel(r'$x$')
@@ -226,11 +234,13 @@ x   = np.arange(0, 2*np.pi, 2*np.pi/N)
 # plt.close()
 
 
-# plt.plot(np.arange(kmin, kmax + 1), triads[:, 0, -1])
-# plt.xlabel(r'$k$')
-# plt.ylabel(r'$\varphi_{{{}, k}}^{{k + {}}}$'.format(str(kmin), str(kmin)));
-# plt.savefig(output_dir + "/Triad_versus_k_N[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_k0[{}]_ITERS[{}]_k1[{}].png".format(N, alpha, beta, k0, iters, k1), format='png', dpi = 400)  
-# plt.close()
+for i in range(50):
+	print("SNAP {}"+format(i))
+	plt.plot(np.arange(kmin, kmax + 1), triads[:, i, -1])
+	plt.xlabel(r'$k$')
+	plt.ylabel(r'$\varphi_{{{}, k}}^{{k + {}}}$'.format(str(kmin + i), str(kmin + i)));
+	plt.savefig(output_dir + "/Triad_versus_k_N[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_k0[{}]_ITERS[{}]_k1[{}].png".format(N, alpha, beta, k0, iters, k1 + i), format='png', dpi = 400)  
+	plt.close()
 
 
 
@@ -238,19 +248,19 @@ x   = np.arange(0, 2*np.pi, 2*np.pi/N)
 
 ######################
 ##	Plot Real Space Snaps
-######################
-for i, t in enumerate(time[:, 0]):
-	print(i)
+# ######################
+# for i, t in enumerate(time[:, 0]):
+# 	print(i)
 
-	phases_full = np.append(phases[i, :], -np.flipud(phases[i, :-2]))
-	u_z = amps_full * np.exp(np.complex(0.0, 1.0) * phases_full)
-	u   = np.real(np.fft.ifft(u_z))
-	plt.plot(x, u / np.sqrt(np.mean(u**2)))
-	plt.xlim(0, 2*np.pi)
-	plt.ylim(-3.2, 3.2)
-	plt.xlabel(r'$x$')
-	plt.ylabel(r'$u(x, T) / u_{rms}(x, T)$')
-	plt.legend(r'$t = {}$'.format(t))
-	plt.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
-	plt.savefig(output_dir + "/SNAPS/SNAPS_{:05d}.png".format(i), format='png', dpi = 400)  
-	plt.close()
+# 	phases_full = np.append(phases[i, :], -np.flipud(phases[i, :-2]))
+# 	u_z = amps_full * np.exp(np.complex(0.0, 1.0) * phases_full)
+# 	u   = np.real(np.fft.ifft(u_z))
+# 	plt.plot(x, u / np.sqrt(np.mean(u**2)))
+# 	plt.xlim(0, 2*np.pi)
+# 	plt.ylim(-3.2, 3.2)
+# 	plt.xlabel(r'$x$')
+# 	plt.ylabel(r'$u(x, T) / u_{rms}(x, T)$')
+# 	plt.legend(r'$t = {}$'.format(t))
+# 	plt.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
+# 	plt.savefig(output_dir + "/SNAPS/SNAPS_{:05d}.png".format(i), format='png', dpi = 400)  
+# 	plt.close()
