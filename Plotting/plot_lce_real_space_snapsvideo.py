@@ -51,7 +51,6 @@ def compute_realspace(amps, phases, N):
 
 def plot_snaps(i, x, u_urms, time):
 
-
 	plt.plot(x, u_urms)
 	plt.xlim(x[0], x[-1])
 	plt.ylim(-3.2, 3.2)
