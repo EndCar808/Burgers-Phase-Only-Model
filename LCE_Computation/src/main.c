@@ -50,7 +50,7 @@ int main(int argc, char** argv) {
 	double beta  = atof(argv[3]);;
 	
 	// Kill first k0 modes
-	int k0 = 2;
+	int k0 = 1;
 
 	// Specify initial condition
 	char* u0 = "ALIGNED";
