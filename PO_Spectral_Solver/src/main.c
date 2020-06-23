@@ -43,6 +43,14 @@ int main(int argc, char** argv) {
 	// Collocation points
 	int N = atoi(argv[1]);
 
+	int k0 = 1;
+
+	double alpha = 1.0;
+	double beta  = 1.0;
+
+	int tsteps     = 1e5;
+	int save_steps = 1;
+
 
 	// // Get the number of threads 
 	int n_threads = atoi(argv[2]);
@@ -61,7 +69,7 @@ int main(int argc, char** argv) {
 	// ------------------------------
 	//  Call Solver Here
 	// ------------------------------
-	solver(N, 1, 1.0, 0.0, 1e5, 1, "ALIGNED");
+	solver(N, k0, alpha, beta, tsteps, save_steps, "ALIGNED");
 	// ------------------------------
 	//  Call Solver Here
 	// ------------------------------

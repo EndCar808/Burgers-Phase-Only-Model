@@ -59,7 +59,7 @@ void initial_condition(double* phi, double* amp, int* kx, int num_osc, int k0, d
 			phi[i] = 0.0;
 		} else {
 			amp[i] = pow((double)i, -a) * exp(-b * pow((double) kx[i]/cutoff, 2) );
-			phi[i] = M_PI/4.0;	
+			phi[i] = (M_PI / 2.0) * (1.0 + 1e-10 * pow((double) i, 0.9));	
 			// phi[i] = M_PI*( (double) rand() / (double) RAND_MAX);	
 		}
 	}
@@ -360,16 +360,16 @@ void po_rhs(double* rhs, fftw_complex* u_z, fftw_plan *plan_c2r_pad, fftw_plan *
 
 	// Allocate temporary arrays
 	double* u_tmp;
-	u_tmp = (double* ) malloc(m*sizeof(double));
+	u_tmp = (double* ) malloc( m * sizeof(double));
 
 	fftw_complex* u_z_tmp;
-	u_z_tmp = (fftw_complex* ) fftw_malloc(2*num_osc*sizeof(fftw_complex));
+	u_z_tmp = (fftw_complex* ) fftw_malloc((2 * num_osc - 1) * sizeof(fftw_complex));
 
 	///---------------
 	/// Convolution
 	///---------------
 	// Write data to padded array
-	for (int i = 0; i < 2*num_osc; ++i)	{
+	for (int i = 0; i < (2 * num_osc - 1); ++i)	{
 		if(i < num_osc){
 			u_z_tmp[i] = u_z[i];
 		} else {
@@ -385,6 +385,7 @@ void po_rhs(double* rhs, fftw_complex* u_z, fftw_plan *plan_c2r_pad, fftw_plan *
 		u_tmp[i] = pow(u_tmp[i], 2);
 	}
 
+	
 	// transform forward to Fourier space
 	fftw_execute_dft_r2c((*plan_r2c_pad), u_tmp, u_z_tmp);
 
@@ -598,7 +599,7 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 	u_pad = (double* ) malloc(M * sizeof(double));
 
 	fftw_complex* u_z_pad;
-	u_z_pad	= (fftw_complex* ) fftw_malloc(2 * num_osc * sizeof(fftw_complex));
+	u_z_pad	= (fftw_complex* ) fftw_malloc((2 * num_osc - 1) * sizeof(fftw_complex));
 
 	// Triad phases array
 	int k_range  = kmax - kmin + 1;
@@ -659,10 +660,10 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 	initial_condition(phi, amp, kx, num_osc, k0, a, b);
 	
 
-	// for (int i = 0; i < num_osc; ++i) {
-	// 	printf("k[%d]: %d | a: %5.15lf   p: %5.16lf   | u_z[%d]: %5.16lf  %5.16lfI \n", i, kx[i], amp[i], phi[i], i, creal(amp[i] * cexp(I * phi[i])), cimag(amp[i] * cexp(I * phi[i])));
-	// }
-	// printf("\n");
+	for (int i = 0; i < num_osc; ++i) {
+		printf("k[%d]: %d | a: %5.15lf   p: %5.16lf   | u_z[%d]: %5.16lf  %5.16lfI \n", i, kx[i], amp[i], phi[i], i, creal(amp[i] * cexp(I * phi[i])), cimag(amp[i] * cexp(I * phi[i])));
+	}
+	printf("\n");
 
 	
 
@@ -677,7 +678,7 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 	double t0     = 0.0;
 	double T      = t0 + ntsteps * dt;
 
-
+	printf("\n\nTIMESTP: %5.16lf\n", dt);
 	// ------------------------------
 	//  HDF5 File Create
 	// ------------------------------
@@ -739,7 +740,7 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 	// ------------------------------
 	//  Begin Integration
 	// ------------------------------
-	while (t < T) {
+	while (t < 1.0*dt) {
 
 		// Construct the modes
 		for (int i = 0; i < num_osc; ++i) {
@@ -760,7 +761,9 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 		po_rhs(RK1, u_z_tmp, &fftw_plan_c2r, &fftw_plan_r2c, kx, N, num_osc, k0);
 		for (int i = 0; i < num_osc; ++i) {
 			u_z_tmp[i] = amp[i] * cexp(I * (phi[i] + A21 * dt * RK1[i]));
+			printf("rhs[%d]: %5.16lf\n", i, RK1[i]);
 		}
+		printf("\n\n");
 
 		/*---------- STAGE 2 ----------*/
 		// find RHS first and then update stage
@@ -787,8 +790,9 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 		//////////////
 		for (int i = 0; i < num_osc; ++i) {
 			phi[i] = phi[i] + (dt * B1) * RK1[i] + (dt * B2) * RK2[i] + (dt * B3) * RK3[i] + (dt * B4) * RK4[i];  
+			printf("phi[%d]: %5.16lf\n", i, phi[i]);
 		}
-
+		printf("\n\n");
 
 		//////////////
 		// Print to file
