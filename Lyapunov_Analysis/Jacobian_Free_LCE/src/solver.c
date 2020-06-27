@@ -18,19 +18,19 @@
 #include <hdf5_hl.h>
 #include <omp.h>
 #include <gsl/gsl_cblas.h>
+#include <lapacke.h>
 
 
 // ---------------------------------------------------------------------
 //  User Libraries and Headers
 // ---------------------------------------------------------------------
-#include "data_types.h"
 #include "utils.h"
 
 
 
 // ---------------------------------------------------------------------
 //  Function Definitions
-// ---------------------------------------------------------------------
+// ----------------------------------------------------------------------
 /**
  * Function to generate the initial condition for the solver and to initialize the wavenumber array
  * 
@@ -41,7 +41,7 @@
  * @param dx         Value of increment in space
  * @param N          Value of the number of modes in the system
  */
-void initial_condition(double* phi, double* amp, fftw_complex* u_z, int* kx, int num_osc, int k0, double a, double b) {
+void initial_condition(double* phi, double* amp, int* kx, int num_osc, int k0, double a, double b) {
 
 	// set the seed for the random number generator
 	srand(123456789);
@@ -58,15 +58,14 @@ void initial_condition(double* phi, double* amp, fftw_complex* u_z, int* kx, int
 		if(i <= k0) {
 			amp[i] = 0.0;
 			phi[i] = 0.0;
-			u_z[i] = 0.0 + 0.0 * I;
 		} else {
 			amp[i] = pow((double)i, -a) * exp(-b * pow((double) kx[i]/cutoff, 2) );
 			phi[i] = (M_PI / 2.0) * (1.0 + 1e-10 * pow((double) i, 0.9));	
 			// phi[i] = M_PI*( (double) rand() / (double) RAND_MAX);	
-			u_z[i] = amp[i] * exp(I * phi[i]);
 		}
 	}
 }
+
 
 
 void min(double* a, int n, int k0, double* min_val) {
@@ -94,7 +93,7 @@ void max(double* a, int n, int k0, double* max_val) {
 }
 
 
-void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_name, hid_t* file_space, hid_t* data_set, hid_t* mem_space, hid_t dtype, int num_t_steps, int num_osc, int k_range, int k1_range) {
+void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_name, hid_t* file_space, hid_t* data_set, hid_t* mem_space, int num_t_steps, int num_osc, int k_range, int k1_range) {
 
 	// ------------------------------
 	//  Create file
@@ -107,9 +106,9 @@ void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_n
 	// ------------------------------
 	//  Create datasets with hyperslabing
 	// ------------------------------
-	//-----------------------------//
+	//
 	//---------- PHASES -----------//
-	//-----------------------------//
+	//
 	// create hdf5 dimension arrays for creating the hyperslabs
 	static const int dimensions = 2;
 	hsize_t dims[dimensions];      // array to hold dims of full evolution data
@@ -117,7 +116,7 @@ void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_n
 	hsize_t chunkdims[dimensions]; // array to hold dims of the hyperslab chunks
 
 	// initialize the hyperslab arrays
-	dims[0]      = num_t_steps;             // number of timesteps
+	dims[0]      = num_t_steps + 1;             // number of timesteps
 	dims[1]      = num_osc;                 // number of oscillators
 	maxdims[0]   = H5S_UNLIMITED;           // setting max time index to unlimited means we must chunk our data
 	maxdims[1]   = num_osc;                 // same as before = number of modes
@@ -147,11 +146,9 @@ void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_n
 
 	H5Pclose(plist);
 
-	
-	//-----------------------------//
+	//
 	//---------- TRIADS -----------//
-	//-----------------------------//
-	#ifdef __TRIADS
+	//
 	// create hdf5 dimension arrays for creating the hyperslabs
 	static const int dim2 = 2;
 	hsize_t dims2[dim2];      // array to hold dims of full evolution data
@@ -159,7 +156,7 @@ void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_n
 	hsize_t chunkdims2[dim2]; // array to hold dims of the hyperslab chunks
 
 	// initialize the hyperslab arrays
-	dims2[0]      = num_t_steps;             // number of timesteps + initial condition
+	dims2[0]      = num_t_steps + 1;             // number of timesteps + initial condition
 	dims2[1]      = k_range * k1_range;      // size of triads array
 	maxdims2[0]   = H5S_UNLIMITED;           // setting max time index to unlimited means we must chunk our data
 	maxdims2[1]   = k_range * k1_range;      // size of triads array
@@ -208,103 +205,11 @@ void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_n
 	status = H5Aclose(triads_attr);
     status = H5Sclose(triads_attr_space);
 	status = H5Pclose(plist2);
-	#endif
 
-	//----------------------------//
-	//---------- MODES -----------//
-	//----------------------------//
-	#ifdef __MODES
-	// initialize the hyperslab arrays
-	dims[0]      = num_t_steps;              // number of timesteps
-	dims[1]      = num_osc;                 // number of oscillators
-	maxdims[0]   = H5S_UNLIMITED;           // setting max time index to unlimited means we must chunk our data
-	maxdims[1]   = num_osc;                 // same as before = number of modes
-	chunkdims[0] = 1;                       // 1D chunk to be saved 
-	chunkdims[1] = num_osc;                 // 1D chunk of size number of modes
-
-	// create the 2D dataspace - setting the no. of dimensions, expected and max size of the dimensions
-	file_space[2] = H5Screate_simple(dimensions, dims, maxdims);
-
-	// must create a propertly list to enable data chunking due to max time dimension being unlimited
-	// create property list 
-	hid_t plist3;
-	plist3 = H5Pcreate(H5P_DATASET_CREATE);
-
-	// using this property list set the chuncking - stores the chunking info in plist
-	H5Pset_chunk(plist3, dimensions, chunkdims);
-
-	// Create the dataset in the previouosly created datafile - using the chunk enabled property list and new compound datatype
-	data_set[2] = H5Dcreate(*file_handle, "Modes", dtype, file_space[2], H5P_DEFAULT, plist3, H5P_DEFAULT);
-	
-	// create the memory space for the slab
-	dims[0] = 1;
-	dims[1] = num_osc;
-
-	// setting the max dims to NULL defaults to same size as dims
-	mem_space[2] = H5Screate_simple(dimensions, dims, NULL);
-
-	H5Pclose(plist3);
-	#endif
-
-	//--------------------------------//
-	//---------- REALSPACE -----------//
-	//--------------------------------//
-	#ifdef __REALSPACE
-	int N = 2 * (num_osc - 1);
-	// initialize the hyperslab arrays
-	dims[0]      = num_t_steps;             // number of timesteps
-	dims[1]      = N;                       // number of collocation points
-	maxdims[0]   = H5S_UNLIMITED;           // setting max time index to unlimited means we must chunk our data
-	maxdims[1]   = N;                       // number of collocation points
-	chunkdims[0] = 1;                       // 1D chunk to be saved 
-	chunkdims[1] = N;                       // number of collocation points
-
-	// create the 2D dataspace - setting the no. of dimensions, expected and max size of the dimensions
-	file_space[3] = H5Screate_simple(dimensions, dims, maxdims);
-
-	// must create a propertly list to enable data chunking due to max time dimension being unlimited
-	// create property list 
-	hid_t plist4;
-	plist4 = H5Pcreate(H5P_DATASET_CREATE);
-
-	// using this property list set the chuncking - stores the chunking info in plist
-	H5Pset_chunk(plist4, dimensions, chunkdims);
-
-	// Create the dataset in the previouosly created datafile - using the chunk enabled property list and new compound datatype
-	data_set[3] = H5Dcreate(*file_handle, "RealSpace", H5T_NATIVE_DOUBLE, file_space[3], H5P_DEFAULT, plist4, H5P_DEFAULT);
-	
-	// create the memory space for the slab
-	dims[0] = 1;
-	dims[1] = N;
-
-	// setting the max dims to NULL defaults to same size as dims
-	mem_space[3] = H5Screate_simple(dimensions, dims, NULL);
-
-	H5Pclose(plist4);
-	#endif
 }
 
-hid_t create_complex_datatype() {
-	hid_t dtype;
-	// Create compound datatype for complex numbers
-	typedef struct complex_type {
-		double re;   // real part 
-		double im;   // imaginary part 
-	} complex_type;
 
-	struct complex_type cmplex;
-	cmplex.re = 0.0;
-	cmplex.im = 0.0;
-
-	// create complex compound datatype
-	dtype = H5Tcreate (H5T_COMPOUND, sizeof(cmplex));
-  	H5Tinsert(dtype, "r", offsetof(complex_type,re), H5T_NATIVE_DOUBLE);
-  	H5Tinsert(dtype, "i", offsetof(complex_type,im), H5T_NATIVE_DOUBLE);
-
-  	return dtype;
-}
-
-void write_hyperslab_data(hid_t file_space, hid_t data_set, hid_t mem_space, hid_t dtype, double* data, char* data_name, int n, int index) {
+void write_hyperslab_data_d(hid_t file_space, hid_t data_set, hid_t mem_space, double* data, char* data_name, int n, int index) {
 
 	// Create dimension arrays for hyperslab
 	hsize_t start_index[2]; // stores the index in the hyperslabbed dataset to start writing to
@@ -321,10 +226,11 @@ void write_hyperslab_data(hid_t file_space, hid_t data_set, hid_t mem_space, hid
 	}
 
 	// then write the current modes to this hyperslab
-	if ((H5Dwrite(data_set, dtype, mem_space, file_space, H5P_DEFAULT, data)) < 0) {
+	if ((H5Dwrite(data_set, H5T_NATIVE_DOUBLE, mem_space, file_space, H5P_DEFAULT, data)) < 0) {
 		printf("\n!!Error Writing Slabbed Data!! - For %s at Index: %d \n", data_name, index);
 	}
 }
+
 
 
 void conv_2N_pad(fftw_complex* convo, fftw_complex* uz, fftw_plan *fftw_plan_r2c_ptr, fftw_plan *fftw_plan_c2r_ptr, int n, int num_osc, int k0) {
@@ -579,6 +485,8 @@ double get_timestep(double* amps, fftw_plan plan_c2r, fftw_plan plan_r2c, int* k
 }
 
 
+
+
 int get_transient_iters(double* amps, fftw_plan plan_c2r, fftw_plan plan_r2c, int* kx, int n, int num_osc, int k0) {
 
 	// Initialize vars
@@ -671,49 +579,49 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 	// Forcing wavenumber
 	int kmin = k0 + 1;
 	int kmax = num_osc - 1;
-
-	// print update every x iterations
-	int print_update = (iters >= 10 ) ? (int)((double)iters * 0.1) : 1;
-
-	int indx;
-	int tmp;	
+	
 	
 	// ------------------------------
 	//  Allocate memory
 	// ------------------------------
 	// wavenumbers
-	int* kx = (int* ) malloc(num_osc * sizeof(int));
+	int* kx;
+	kx = (int* ) malloc(num_osc * sizeof(int));
 
 	// Oscillator arrays
-	double* amp = (double* ) malloc(num_osc * sizeof(double));
-	double* phi = (double* ) malloc(num_osc * sizeof(double));
+	double* amp;
+	amp = (double* ) malloc(num_osc * sizeof(double));
+	double* phi;
+	phi = (double* ) malloc(num_osc * sizeof(double));
 
-	// modes array
-	fftw_complex* u_z = (fftw_complex* ) fftw_malloc(num_osc * sizeof(fftw_complex));
-	#ifdef __REALSPACE
-	double* u = (double* ) malloc(N * sizeof(double));
-	#endif
+	// // modes array
+	fftw_complex* u_z;
+	u_z	= (fftw_complex* ) fftw_malloc(num_osc * sizeof(fftw_complex));
 
 	// padded solution arrays
-	double* u_pad = (double* ) malloc(M * sizeof(double));
-	fftw_complex* u_z_pad = (fftw_complex* ) fftw_malloc((2 * num_osc - 1) * sizeof(fftw_complex));
+	double* u_pad;
+	u_pad = (double* ) malloc(M * sizeof(double));
 
-	#ifdef __TRIADS
+	fftw_complex* u_z_pad;
+	u_z_pad	= (fftw_complex* ) fftw_malloc((2 * num_osc - 1) * sizeof(fftw_complex));
+
 	// Triad phases array
 	int k_range  = kmax - kmin + 1;
 	int k1_range = (int)((kmax - kmin + 1)/ 2.0);
 
-	double* triads = (double* )malloc(k_range * k1_range * sizeof(double));
+	double* triads;
+	triads = (double* )malloc(k_range * k1_range * sizeof(double));
 	// initialize triad array to handle empty elements
 	for (int i = 0; i < k_range; ++i) {
-		tmp = i * k1_range;
+		int tmp = i * k1_range;
 		for (int j = 0; j < k1_range; ++j) {
-			indx = tmp + j;
+			int indx = tmp + j;
 			triads[indx] = -10.0;
 		}
-	}
-	fftw_complex triad_phase_order = 0.0 + I * 0.0;
-	#endif
+	}	
+
+	fftw_complex triad_phase_order;
+	triad_phase_order = 0.0 + I * 0.0;
 
 
 	// ------------------------------
@@ -726,65 +634,55 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 				            B1 = 1.0/6.0, B2 = 1.0/3.0, B3 = 1.0/3.0, B4 = 1.0/6.0; 
 
 	// Memory fot the four RHS evaluations in the stages 
-	double*	RK1 = (double* )fftw_malloc(num_osc*sizeof(double));
-	double* RK2 = (double* )fftw_malloc(num_osc*sizeof(double));
-	double* RK3 = (double* )fftw_malloc(num_osc*sizeof(double));
-	double* RK4 = (double* )fftw_malloc(num_osc*sizeof(double));
+	double* RK1, *RK2, *RK3, *RK4;
+	RK1 = (double* )fftw_malloc(num_osc*sizeof(double));
+	RK2 = (double* )fftw_malloc(num_osc*sizeof(double));
+	RK3 = (double* )fftw_malloc(num_osc*sizeof(double));
+	RK4 = (double* )fftw_malloc(num_osc*sizeof(double));
 
 	// temporary memory to store stages
-	fftw_complex* u_z_tmp = (fftw_complex* )fftw_malloc(num_osc*sizeof(fftw_complex));
+	fftw_complex* u_z_tmp;
+	u_z_tmp = (fftw_complex* )fftw_malloc(num_osc*sizeof(fftw_complex));
+
 	
 
 	// ------------------------------
 	//  Create FFTW plans
 	// ------------------------------
 	// create fftw3 plans objects
-	fftw_plan fftw_plan_r2c_pad, fftw_plan_c2r_pad;
-	
-	// create plans - ensure no overwriting - fill arrays after
-	fftw_plan_r2c_pad = fftw_plan_dft_r2c_1d(M, u_pad, u_z_pad, FFTW_PRESERVE_INPUT); 
-	fftw_plan_c2r_pad = fftw_plan_dft_c2r_1d(M, u_z_pad, u_pad, FFTW_PRESERVE_INPUT);
-	#ifdef __REALSPACE
 	fftw_plan fftw_plan_r2c, fftw_plan_c2r;
-	fftw_plan_r2c = fftw_plan_dft_r2c_1d(N, u, u_z, FFTW_PRESERVE_INPUT); 
-	fftw_plan_c2r = fftw_plan_dft_c2r_1d(N, u_z, u, FFTW_PRESERVE_INPUT);
-	#endif
+
+	// create plans - ensure no overwriting - fill arrays after
+	fftw_plan_r2c = fftw_plan_dft_r2c_1d(M, u_pad, u_z_pad, FFTW_PRESERVE_INPUT); 
+	fftw_plan_c2r = fftw_plan_dft_c2r_1d(M, u_z_pad, u_pad, FFTW_PRESERVE_INPUT);
+
 
 
 	// ------------------------------
 	//  Generate Initial Conditions
 	// ------------------------------
-	initial_condition(phi, amp, u_z, kx, num_osc, k0, a, b);
+	initial_condition(phi, amp, kx, num_osc, k0, a, b);
 	
-	// Print IC if small system size
-	if (N <= 32) {
-		for (int i = 0; i < num_osc; ++i) {
-			printf("k[%d]: %d | a: %5.15lf   p: %5.16lf   | u_z[%d]: %5.16lf  %5.16lfI \n", i, kx[i], amp[i], phi[i], i, creal(u_z[i]), cimag(u_z[i]));
-		}
-		printf("\n");
+
+	for (int i = 0; i < num_osc; ++i) {
+		printf("k[%d]: %d | a: %5.15lf   p: %5.16lf   | u_z[%d]: %5.16lf  %5.16lfI \n", i, kx[i], amp[i], phi[i], i, creal(amp[i] * cexp(I * phi[i])), cimag(amp[i] * cexp(I * phi[i])));
 	}
+	printf("\n");
+
 	
 
 	// ------------------------------
 	//  Get Timestep & Time variables
 	// ------------------------------
-	int ntsteps = iters; 
-	double dt   = get_timestep(amp, fftw_plan_c2r_pad, fftw_plan_r2c_pad, kx, N, num_osc, k0);
-
-	// If calculating stats or integrating until transient get required iters
-	#ifdef __TRANSIENTS
-	int trans_iters    = get_transient_iters(amp, fftw_plan_c2r_pad, fftw_plan_r2c_pad, kx, N, num_osc, k0);
-	int num_save_steps = ntsteps / SAVE_DATA_STEP; 
-	#else 
-	int trans_iters    = 0;
-	int num_save_steps = ntsteps / SAVE_DATA_STEP + 1; 
-	#endif
-
-	// Time variables	
-	double t0 = 0.0;
-	double T  = t0 + (trans_iters + ntsteps) * dt;
+	double dt = get_timestep(amp, fftw_plan_c2r, fftw_plan_r2c, kx, N, num_osc, k0);
 
 
+	// time varibales
+	int ntsteps   = iters / save_step; 
+	double t0     = 0.0;
+	double T      = t0 + ntsteps * dt;
+
+	
 	// ------------------------------
 	//  HDF5 File Create
 	// ------------------------------
@@ -793,86 +691,47 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 
 
 	// create hdf5 handle identifiers for hyperslabing the full evolution data
-	hid_t HDF_file_space[4];
-	hid_t HDF_data_set[4];
-	hid_t HDF_mem_space[4];
+	hid_t HDF_file_space[2];
+	hid_t HDF_data_set[2];
+	hid_t HDF_mem_space[2];
+
+	// define filename - const because it doesnt change
+	char output_file_name[128] = "../Data/Output/Runtime_Data";
+	char output_file_data[128];
 
 	// form the filename of the output file
-	#ifdef __STATS
-	char output_file_name[128] = "../Data/Output/Stats/Runtime_Data";
-	char output_file_data[128];
-	sprintf(output_file_data,  "_N[%d]_k0[%d]_ALPHA[%1.3lf]_BETA[%1.3lf]_u0[%s]_ITERS[%d]_TRANS[%d].h5", N, k0, a, b, u0, ntsteps, trans_iters);
-	strcat(output_file_name, output_file_data);
-	
-	// Print file name to screen
-	printf("\nOutput File: %s \n\n", output_file_name);
-	printf("\n|------------- STATS RUN -------------|\n  Performing transient iterations, no data record...\n\n");
-	#else
-	char output_file_name[128] = "../Data/Output/Solver/Runtime_Data";
-	char output_file_data[128];
 	sprintf(output_file_data,  "_N[%d]_k0[%d]_ALPHA[%1.3lf]_BETA[%1.3lf]_u0[%s]_ITERS[%d].h5", N, k0, a, b, u0, ntsteps);
 	strcat(output_file_name, output_file_data);
 	
 	// Print file name to screen
 	printf("\nOutput File: %s \n\n", output_file_name);
-	#endif	
-
-	// Create complex datatype for hdf5 file if modes are being recorded
-	#ifdef __MODES
-	hid_t COMPLEX_DATATYPE = create_complex_datatype();
-	#else
-	hid_t COMPLEX_DATATYPE = -1;
-	#endif
 
 	// open output file and create hyperslabbed datasets 
-	open_output_create_slabbed_datasets(&HDF_Outputfile_handle, output_file_name, HDF_file_space, HDF_data_set, HDF_mem_space, COMPLEX_DATATYPE, num_save_steps, num_osc, k_range, k1_range);
+	open_output_create_slabbed_datasets(&HDF_Outputfile_handle, output_file_name, HDF_file_space, HDF_data_set, HDF_mem_space, ntsteps, num_osc, k_range, k1_range);
 
 
-	
+	// Create arrays for time and phase order to save after algorithm is finished
+	double* time_array      = (double* )malloc(sizeof(double) * (ntsteps + 1));
+	double* phase_order_R   = (double* )malloc(sizeof(double) * (ntsteps + 1));
+	double* phase_order_Phi = (double* )malloc(sizeof(double) * (ntsteps + 1));
+
 
 	// ------------------------------
 	//  Write Initial Conditions to File
 	// ------------------------------
-	// Create non chunked data arrays
-	double* time_array      = (double* )malloc(sizeof(double) * (num_save_steps));
-	#ifdef __TRIADS
-	double* phase_order_R   = (double* )malloc(sizeof(double) * (num_save_steps));
-	double* phase_order_Phi = (double* )malloc(sizeof(double) * (num_save_steps));	
-	#endif
+	write_hyperslab_data_d(HDF_file_space[0], HDF_data_set[0], HDF_mem_space[0], phi, "phi", num_osc, 0);
 
-	// Write initial condition if transient iterations are not being performed
-	#ifndef __TRANSIENTS
-	// Write Initial condition for phases
-	write_hyperslab_data(HDF_file_space[0], HDF_data_set[0], HDF_mem_space[0], H5T_NATIVE_DOUBLE, phi, "phi", num_osc, 0);
-
-	#ifdef __TRIADS
 	// compute triads for initial conditions
 	triad_phases(triads, &triad_phase_order, phi, kmin, kmax);
 	
 	// // then write the current modes to this hyperslab
-	write_hyperslab_data(HDF_file_space[1], HDF_data_set[1], HDF_mem_space[1], H5T_NATIVE_DOUBLE, triads, "triads", k_range * k1_range, 0);
+	write_hyperslab_data_d(HDF_file_space[1], HDF_data_set[1], HDF_mem_space[1], triads, "triads", k_range * k1_range, 0);
 
-	// Write initial order param values
 	phase_order_R[0]   = cabs(triad_phase_order);
 	phase_order_Phi[0] = carg(triad_phase_order);
-	#endif __TRIADS
-
-	#ifdef __MODES
-	// Write Initial condition for modes
-	write_hyperslab_data(HDF_file_space[2], HDF_data_set[2], HDF_mem_space[2], COMPLEX_DATATYPE, u_z, "u_z", num_osc, 0);
-	#endif
-
-	#ifdef __REALSPACE 
-	// transform back to Real Space
-	fftw_execute_dft_c2r(fftw_plan_c2r, u_z, u);
-
-	// Write Initial condition for real space
-	write_hyperslab_data(HDF_file_space[3], HDF_data_set[3], HDF_mem_space[3], H5T_NATIVE_DOUBLE, u, "u", N, 0);
-	#endif
 	
 	// write initial time
 	time_array[0] = t0;
-	#endif
 
 	
 	// ------------------------------
@@ -880,47 +739,44 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 	// ------------------------------
 	int iter = 1;
 	double t = 0.0;	
-	#ifdef __TRANSIENTS
-	int save_data_indx = 0;
-	#else
 	int save_data_indx = 1;
-	#endif
 
 	// ------------------------------
 	//  Begin Integration
 	// ------------------------------
-	while (t < T) {
+	while (t < 1.0*dt) {
 
 		// Construct the modes
 		for (int i = 0; i < num_osc; ++i) {
 			u_z_tmp[i] = amp[i] * cexp(I * phi[i]);
 		}
 
-		// Print Update
-		if ((iter > trans_iters) && (iter % print_update == 0)) {
-			printf("Iter: %d/%d | t = %4.4lf |\n", iter, ntsteps + trans_iters, t);
+		// Print Update - Energy and Enstrophy
+		if (iter % (int)(ntsteps * 0.1) == 0) {
+			printf("Iter: %d/%d | t = %4.4lf |\n", iter, ntsteps, t);
 		}		
+
 
 		//////////////
 		// STAGES
 		//////////////
 		/*---------- STAGE 1 ----------*/
 		// find RHS first and then update stage
-		po_rhs(RK1, u_z_tmp, &fftw_plan_c2r_pad, &fftw_plan_r2c_pad, kx, N, num_osc, k0);
+		po_rhs(RK1, u_z_tmp, &fftw_plan_c2r, &fftw_plan_r2c, kx, N, num_osc, k0);
 		for (int i = 0; i < num_osc; ++i) {
 			u_z_tmp[i] = amp[i] * cexp(I * (phi[i] + A21 * dt * RK1[i]));
 		}
 
 		/*---------- STAGE 2 ----------*/
 		// find RHS first and then update stage
-		po_rhs(RK2, u_z_tmp, &fftw_plan_c2r_pad, &fftw_plan_r2c_pad, kx, N, num_osc, k0);
+		po_rhs(RK2, u_z_tmp, &fftw_plan_c2r, &fftw_plan_r2c, kx, N, num_osc, k0);
 		for (int i = 0; i < num_osc; ++i) {
 			u_z_tmp[i] = amp[i] * cexp(I * (phi[i] + A32 * dt * RK2[i]));
 		}
 
 		/*---------- STAGE 3 ----------*/
 		// find RHS first and then update stage
-		po_rhs(RK3, u_z_tmp, &fftw_plan_c2r_pad, &fftw_plan_r2c_pad, kx, N, num_osc, k0);
+		po_rhs(RK3, u_z_tmp, &fftw_plan_c2r, &fftw_plan_r2c, kx, N, num_osc, k0);
 		for (int i = 0; i < num_osc; ++i) {
 			u_z_tmp[i] = amp[i] * cexp(I * (phi[i] + A43 * dt * RK3[i]));
 		}
@@ -928,7 +784,7 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 
 		/*---------- STAGE 4 ----------*/
 		// find RHS first and then update 
-		po_rhs(RK4, u_z_tmp, &fftw_plan_c2r_pad, &fftw_plan_r2c_pad, kx, N, num_osc, k0);
+		po_rhs(RK4, u_z_tmp, &fftw_plan_c2r, &fftw_plan_r2c, kx, N, num_osc, k0);
 
 
 		//////////////
@@ -938,53 +794,28 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 			phi[i] = phi[i] + (dt * B1) * RK1[i] + (dt * B2) * RK2[i] + (dt * B3) * RK3[i] + (dt * B4) * RK4[i];  
 		}
 
-		////////////
+		//////////////
 		// Print to file
-		////////////
-		if ((iter > trans_iters) && (iter % save_step == 0)) {
+		//////////////
+		if (iter % save_step == 0) {
 			// Write phases
-			write_hyperslab_data(HDF_file_space[0], HDF_data_set[0], HDF_mem_space[0], H5T_NATIVE_DOUBLE, phi, "phi", num_osc, save_data_indx);
+			write_hyperslab_data_d(HDF_file_space[0], HDF_data_set[0], HDF_mem_space[0], phi, "phi", num_osc, save_data_indx);
 
-			#ifdef __TRIADS
 			// compute triads for initial conditions
 			triad_phases(triads, &triad_phase_order, phi, kmin, kmax);
 			
 			// write triads
-			write_hyperslab_data(HDF_file_space[1], HDF_data_set[1], HDF_mem_space[1], H5T_NATIVE_DOUBLE, triads, "triads", k_range * k1_range, save_data_indx);
-
-			phase_order_R[save_data_indx]   = cabs(triad_phase_order);
-			phase_order_Phi[save_data_indx] = carg(triad_phase_order);
-			#endif
-			#ifdef __MODES || __REALSPACE
-			// Construct the modes
-			for (int i = 0; i < num_osc; ++i) {
-				u_z[i] = amp[i] * cexp(I * phi[i]);
-			}
-			#endif
-			#ifdef __MODES
-			// Write Initial condition for modes
-			write_hyperslab_data(HDF_file_space[2], HDF_data_set[2], HDF_mem_space[2], COMPLEX_DATATYPE, u_z, "u_z", num_osc, save_data_indx);
-			#endif
-			#ifdef __REALSPACE 
-			// transform back to Real Space
-			fftw_execute_dft_c2r(fftw_plan_c2r, u_z, u);
-
-			// Write Initial condition for real space
-			write_hyperslab_data(HDF_file_space[3], HDF_data_set[3], HDF_mem_space[3], H5T_NATIVE_DOUBLE, u, "u", N, save_data_indx);
-			#endif
-
+			write_hyperslab_data_d(HDF_file_space[1], HDF_data_set[1], HDF_mem_space[1], triads, "triads", k_range * k1_range, save_data_indx);
 
 			// save time and phase order parameter
 			time_array[save_data_indx]      = iter * dt;
+			phase_order_R[save_data_indx]   = cabs(triad_phase_order);
+			phase_order_Phi[save_data_indx] = carg(triad_phase_order);
+
 
 			// increment indx for next iteration
 			save_data_indx++;
 		}
-		// Check if transient iterations has been reached
-		#ifdef __TRANSIENTS
-		if (iter == trans_iters) printf("\n|---- TRANSIENT ITERATIONS COMPLETE ----|\n  Iterations Performed:\t%d\n  Iterations Left:\t%d\n\n", trans_iters, iters);
-		#endif
-
 				
 		// increment
 		t   = iter*dt;
@@ -1004,26 +835,24 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 	}
 	
 	// Wtie time
-	D2dims[0] = num_save_steps;
+	D2dims[0] = ntsteps + 1;
 	D2dims[1] = 1;
 	if ( (H5LTmake_dataset(HDF_Outputfile_handle, "Time", D2, D2dims, H5T_NATIVE_DOUBLE, time_array)) < 0) {
 		printf("\n\n!!Failed to make - Time - Dataset!!\n\n");
 	}
 	
-	#ifdef __TRIADS
 	// Write Phase Order R
-	D2dims[0] = num_save_steps;
+	D2dims[0] = ntsteps + 1;
 	D2dims[1] = 1;
 	if ( (H5LTmake_dataset(HDF_Outputfile_handle, "PhaseOrderR", D2, D2dims, H5T_NATIVE_DOUBLE, phase_order_R)) < 0) {
 		printf("\n\n!!Failed to make - PhaseOrderR - Dataset!!\n\n");
 	}
 	// Write Phase Order Phi
-	D2dims[0] = num_save_steps;
+	D2dims[0] = ntsteps + 1;
 	D2dims[1] = 1;
 	if ( (H5LTmake_dataset(HDF_Outputfile_handle, "PhaseOrderPhi", D2, D2dims, H5T_NATIVE_DOUBLE, phase_order_Phi)) < 0) {
 		printf("\n\n!!Failed to make - PhaseOrderPhi - Dataset!!\n\n");
 	}
-	#endif
 
 
 	// ------------------------------
@@ -1032,23 +861,14 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 	// destroy fftw plans
 	fftw_destroy_plan(fftw_plan_r2c);
 	fftw_destroy_plan(fftw_plan_c2r);
-	fftw_destroy_plan(fftw_plan_r2c_pad);
-	fftw_destroy_plan(fftw_plan_c2r_pad);
-
-
 
 	// free memory
 	free(kx);
 	free(u_pad);
-	#ifdef __REALSPACE
-	free(u);
-	#endif
-	#ifdef __TRIADS
-	free(triads);	
+	free(triads);
+	free(time_array);
 	free(phase_order_Phi);
 	free(phase_order_R);
-	#endif
-	free(time_array);
 	fftw_free(u_z);
 	fftw_free(RK1);
 	fftw_free(RK2);
@@ -1064,13 +884,15 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 	H5Sclose( HDF_mem_space[1] );
 	H5Dclose( HDF_data_set[1] );
 	H5Sclose( HDF_file_space[1] );
-	H5Sclose( HDF_mem_space[2] );
-	H5Dclose( HDF_data_set[2] );
-	H5Sclose( HDF_file_space[2] );
-	H5Sclose( HDF_mem_space[3] );
-	H5Dclose( HDF_data_set[3] );
-	H5Sclose( HDF_file_space[3] );
 
 	// Close pipeline to output file
 	H5Fclose(HDF_Outputfile_handle);
 }
+
+
+
+
+
+
+
+

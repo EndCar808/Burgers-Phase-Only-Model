@@ -1,6 +1,7 @@
 # Enda Carroll
 # May 2020
-# Makfile to compile programmes for Phase Only Burgers equation
+# Makfile to compile programmes for post processing Phase Only 
+# Burgers equation solver data
 
  
 # ---------------------------------------------------------------------
@@ -11,8 +12,8 @@ CCFLAG := -O3 -W -Wall
 LIBFLAG := -fopenmp -lpthread -lfftw3_omp -lfftw3 -lm -lhdf5 -lhdf5_hl
 GSLFLAG := -lgsl -lgslcblas
 LAPACKFLAG := -llapacke -llapack -lblas -lgfortran
-INCDIR = -I/usr/include/hdf5/serial/  -I/usr/include/gsl/ -I../Libraries/lapack-3.9.0/CBLAS/include/ -I../Libraries/lapack-3.9.0/LAPACKE/include/
-LIBDIR = -L/usr/lib/x86_64-linux-gnu/hdf5/serial/ -L../Libraries/lapack-3.9.0/
+INCDIR = -I/usr/include/hdf5/serial/ -I/usr/include/gsl/ -I../Libraries/lapack-3.9.0/CBLAS/include/ -I../Libraries/lapack-3.9.0/LAPACKE/include/
+LIBDIR = -L/usr/lib/x86_64-linux-gnu/hdf5/serial/ -L../Libraries/lapack-3.9.0/ 
 
 
 DEPS = $(wildcard *.h) 
@@ -52,10 +53,10 @@ all: $(BIN)/main
 solver: $(BIN)/main 
 
 $(BIN)/main: $(SRCOBJ) $(DEPS)
-	$(GCC) $(CCFLAG) -o $@ $^ ${INCDIR} ${LIBDIR} $(LIBFLAG)
+	$(GCC) $(CCFLAG) -o $@ $^ ${INCDIR} ${LIBDIR} $(LIBFLAG) $(GSLFLAG)
 
 $(OBJBIN)/%.o: $(SRCDIR)/%.c $(DEPS)
-	$(GCC) $(CCFLAG) -c $^ -o $@ ${INCDIR} ${LIBDIR} $(LIBFLAG)
+	$(GCC) $(CCFLAG) -c $^ -o $@ ${INCDIR} ${LIBDIR} $(LIBFLAG) $(GSLFLAG)
 
 
 

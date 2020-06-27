@@ -24,7 +24,7 @@ cmdList = [['./bin/main ' + str(i) + ' ' + str(j) + ' ' + str(beta)] for i in n 
 ##	Run commands in parallel
 ######################
 # Set the limit of subprocesses / threads to spawn at any one time	
-procLimit = 10
+procLimit = 25
 
 # Create grouped iterable of subprocess calls to Popen() - see grouper recipe in itertools
 groups = [(Popen(cmd, shell = True, stdout = PIPE, stdin = PIPE, universal_newlines = True) for cmd in cmdList)] * procLimit 

@@ -467,13 +467,11 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	}
 	printf("\n\n");
 
-	// print_array_2d_d(pert, "pert", num_osc - kmin, num_osc - kmin);
 
 	// ------------------------------
 	//  Get Timestep
 	// ------------------------------
-	double dt;
-	dt = get_timestep(amp, fftw_plan_c2r, fftw_plan_r2c, kx, N, num_osc, k0);
+	double dt = get_timestep(amp, fftw_plan_c2r, fftw_plan_r2c, kx, N, num_osc, k0);
 
 	#ifdef TRANSIENT
 	int trans_iters;
@@ -492,7 +490,7 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	int tot_t_save_steps = (int) ((m_iter * m_end) / SAVE_DATA_STEP);	
 
 	// LCE algorithm varibales
-	int m           = 1;
+	int m = 1;
 	#ifdef TRANSIENT
 	int trans_m = (int) ceil(trans_iters / m_iter);
 	#else
@@ -523,7 +521,7 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	hid_t HDF_mem_space[4];
 
 	// // define filename - const because it doesnt change
-	char output_file_name[128] = "../Data/Output/LCE_Runtime_Data";
+	char output_file_name[128] = "../../Data/Output/LCE/LCE_Runtime_Data";
 	char output_file_data[128];
 
 	// form the filename of the output file
