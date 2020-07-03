@@ -47,7 +47,7 @@ int main(int argc, char** argv) {
 
 	// Alpha value
 	double alpha = atof(argv[2]);
-	double beta  = atof(argv[3]);;
+	double beta  = atof(argv[3]);
 	
 	// Kill first k0 modes
 	int k0 = 1;
@@ -56,8 +56,8 @@ int main(int argc, char** argv) {
 	char* u0 = "ALIGNED";
 
 	// Integration parameters
-	int m_end  = 8000;
-	int m_iter = 50;
+	int m_end  = 1000;
+	int m_iter = 20;
 
 
 	// ------------------------------

@@ -220,8 +220,8 @@ plt.close()
 ##	Plot Final Time Data
 ######################
 Create Modes
-amps_full   = np.append(amps[0, :], np.flipud(amps[0, :-2]))
-phases_full = np.append(phases[-1, :], -np.flipud(phases[-1, :-2]))
+amps_full   = np.append(amps[0, :], np.flipud(amps[0, 1:-1]))
+phases_full = np.append(phases[-1, :], -np.flipud(phases[-1, 1:-1]))
 u_z = amps_full * np.exp(np.complex(0.0, 1.0) * phases_full)
 u   = np.real(np.fft.ifft(u_z))
 x   = np.arange(0, 2*np.pi, 2*np.pi/N)

@@ -29,7 +29,7 @@ int get_transient_iters(double* amps, fftw_plan plan_c2r, fftw_plan plan_r2c, in
 
 
 void conv_2N_pad(fftw_complex* convo, fftw_complex* uz, fftw_plan *fftw_plan_r2c_ptr, fftw_plan *fftw_plan_c2r_ptr, int n, int num_osc, int k0);
-void conv_direct(fftw_complex* convo, fftw_complex* u_z, int n, int k0);
+void conv_direct(fftw_complex* convo, fftw_complex* u_z, int num_osc, int k0);
 
 void po_rhs(double* rhs, fftw_complex* u_z, fftw_plan *plan_c2r_pad, fftw_plan *plan_r2c_pad, int* kx, int n, int num_osc, int k0);
 

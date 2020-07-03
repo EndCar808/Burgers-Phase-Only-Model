@@ -132,15 +132,14 @@ if __name__ == '__main__':
 	
 
 
-	## Create Process list
-	
+	## Create Process list	
 	procLim  = 10
 
-	# create iterable group
+	## Create iterable group of processess
 	groups_args = [(mprocs.Process(target = plot_snaps, args = (i, x, u_urms[i, :], time[i, 0])) for i in range(time.shape[0]))] * procLim
 	 
 
-	# Start timer
+	## Start timer
 	start = TIME.perf_counter()
 
 	## Loop of grouped iterable

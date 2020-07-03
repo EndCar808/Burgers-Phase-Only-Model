@@ -18,7 +18,7 @@
 
 
 
-void convolution_direct(fftw_complex* convo, fftw_complex* u_z, int n, int k0);
+void convolution_direct(fftw_complex* convo, fftw_complex* u_z, int num_osc, int k0);
 void jacobian(double* jac, fftw_complex* u_z, int n, int num_osc, int k0);
 double trace(fftw_complex* u_z, int n, int num_osc, int k0);
 
@@ -29,17 +29,17 @@ int main( int argc, char** argv) {
 	///	Initialize vars
 	///-----------------
 	// Real space collocation points 
-	int N       = 2^5;
+	int N       = 16;
 
 	// Number of oscillators
 	int num_osc = (N / 2) + 1;
 
 	// Forcing wavenumber
-	int k0 = 0;
+	int k0 = 2;
 	
 	// Spectrum vars
-	double a = 1.15;
-	double b = 2.0;
+	double a = 1.0;
+	double b = 0.0;
 	double cutoff = ((double) num_osc - 1.0) / 2.0;
 
 
@@ -80,27 +80,34 @@ int main( int argc, char** argv) {
 
 	for (int i = 0; i < num_osc; ++i)	{
 		k[i] = i;
-		if(i > 0) {
-			amp[i] = pow((double)i, -a) * exp(-b * pow((double)k[i]/cutoff, 2) );
-			phi[i] = M_PI/2.0;	
-			// phi[i] = M_PI*( (double) rand() / (double) RAND_MAX);	
-		}
-		u_z[i] = amp[i]*(cos(phi[i]) + I*sin(phi[i]));
-
 		
 		// Set forcing here
 		if(i <= k0) { /*|| i >= kmax) {*/
 			u_z[i] = 0.0 + 0.0*I;
 			amp[i] = 0.0;
 			phi[i] = 0.0;
+		} else if (i % 3 == 0) {
+		// } else {
+			amp[i] = pow((double)i, -a) * exp(-b * pow((double)k[i]/cutoff, 2) );
+			phi[i] = M_PI/2.0;	
+			// phi[i] = M_PI*( (double) rand() / (double) RAND_MAX);	
+		} else if ( i % 3 == 1) {
+			amp[i] = pow((double)i, -a) * exp(-b * pow((double)k[i]/cutoff, 2) );
+			phi[i] = M_PI/6.0;	
+		} else if ( i % 3 == 2) {
+			amp[i] = pow((double)i, -a) * exp(-b * pow((double)k[i]/cutoff, 2) );
+			phi[i] = -M_PI/6.0;	
 		}
+
+		u_z[i] = amp[i]*(cos(phi[i]) + I*sin(phi[i]));
+
 		printf("k[%d]: %d | a: %5.15lf   p: %5.16lf   | u_z[%d]: %5.16lf  %5.16lfI \n", i, k[i], amp[i], phi[i], i, creal(u_z[i]), cimag(u_z[i]));
 	}
 	printf("\n\n");
 
 
 	// Get convolution for diagonals
-	convolution_direct(conv, u_z, N, k0);
+	convolution_direct(conv, u_z, num_osc, k0);
 	for (int i = 0; i < num_osc; ++i) {
 		printf("conv[%d]: %5.16lf %5.16lfI\n", i, creal(conv[i]), cimag(conv[i]));
 	}
@@ -118,7 +125,7 @@ int main( int argc, char** argv) {
 		temp = (i - (k0 + 1)) * (num_osc - (k0 + 1));
 		for (int j = k0 + 1; j < num_osc; ++j)	{
 			indx = temp + (j - (k0 + 1));
-			printf("%5.16lf \t", jac[indx]);
+			printf("%5.16lf ", jac[indx]);
 		}
 		printf("\n");
 	}
@@ -145,7 +152,7 @@ int main( int argc, char** argv) {
 	free(phi);
 	free(k);
 	fftw_free(u_z);
-	fftw_free(jac);
+	free(jac);
 	fftw_free(conv);
 
 	
@@ -163,7 +170,7 @@ void jacobian(double* jac, fftw_complex* u_z, int n, int num_osc, int k0) {
 	conv = (fftw_complex* ) fftw_malloc(num_osc*sizeof(fftw_complex));
 	
 	// Call convolution for diagonal elements
-	convolution_direct(conv, u_z, n, k0);
+	convolution_direct(conv, u_z, num_osc, k0);
 
 	// Loop through k and k'
 	for (int kk = k0 + 1; kk < num_osc; ++kk) {
@@ -190,11 +197,11 @@ void jacobian(double* jac, fftw_complex* u_z, int n, int num_osc, int k0) {
 					}					
 				} else {
 					if (kk - kp < -k0) {
-						jac[index] = ((double) kk) * cimag( (u_z[kp] * conj( u_z[abs(kk - kp)] )) / u_z[kk] ) + ((double) kk) * cimag( (u_z[kp] * conj( u_z[kk + kp] )) / conj( u_z[kk] ) );;
+						jac[index] = ((double) kk) * cimag( (u_z[kp] * conj( u_z[abs(kk - kp)] )) / u_z[kk] ) + ((double) kk) * cimag( (u_z[kp] * conj( u_z[kk + kp] )) / conj( u_z[kk] ) );
 					} else if (kk - kp > k0) {
-						jac[index] = ((double) kk) * cimag( (u_z[kp] * u_z[kk - kp]) / u_z[kk] ) + ((double) kk) * cimag( (u_z[kp] * conj( u_z[kk + kp] )) / conj( u_z[kk] ) );;
+						jac[index] = ((double) kk) * cimag( (u_z[kp] * u_z[kk - kp]) / u_z[kk] ) + ((double) kk) * cimag( (u_z[kp] * conj( u_z[kk + kp] )) / conj( u_z[kk] ) );
 					} else {
-						jac[index] = ((double) kk) * cimag( (u_z[kp] * conj( u_z[kk + kp] )) / conj( u_z[kk] ) );;
+						jac[index] = ((double) kk) * cimag( (u_z[kp] * conj( u_z[kk + kp] )) / conj( u_z[kk] ) );
 					}
 				}
 			}
@@ -214,7 +221,7 @@ double trace(fftw_complex* u_z, int n, int num_osc, int k0) {
 	conv = (fftw_complex* ) fftw_malloc(num_osc*sizeof(fftw_complex));
 	
 	// Call convolution for diagonal elements
-	convolution_direct(conv, u_z, n, k0);
+	convolution_direct(conv, u_z, num_osc, k0);
 
 	for (int i = k0 + 1; i < num_osc; ++i)	{
 		if(2*i <= num_osc - 1) {
@@ -231,7 +238,7 @@ double trace(fftw_complex* u_z, int n, int num_osc, int k0) {
 
 
 
-void convolution_direct(fftw_complex* convo, fftw_complex* u_z, int n, int k0) {
+void convolution_direct(fftw_complex* convo, fftw_complex* u_z, int num_osc, int k0) {
 	
 	// Set the 0 to k0 modes to 0;
 	for (int i = 0; i <= k0; ++i) {
@@ -240,13 +247,13 @@ void convolution_direct(fftw_complex* convo, fftw_complex* u_z, int n, int k0) {
 	
 	// Compute the convolution on the remaining wavenumbers
 	int k1;
-	for (int kk = k0 + 1; kk < n; ++kk)	{
-		for (int k_1 = 1 + kk; k_1 < 2*n; ++k_1)	{
+	for (int kk = k0 + 1; kk < num_osc; ++kk)	{
+		for (int k_1 = 1 + kk; k_1 < 2*num_osc; ++k_1)	{
 			// Get correct k1 value
-			if(k_1 < n) {
-				k1 = -n + k_1;
+			if(k_1 < num_osc) {
+				k1 = -num_osc + k_1;
 			} else {
-				k1 = k_1 - n;
+				k1 = k_1 - num_osc;
 			}
 			if (k1 < 0) {
 				convo[kk] += conj(u_z[abs(k1)])*u_z[kk - k1]; 	

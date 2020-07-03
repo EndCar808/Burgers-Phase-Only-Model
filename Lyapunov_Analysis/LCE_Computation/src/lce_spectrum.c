@@ -163,7 +163,7 @@ void jacobian(double* jac, fftw_complex* u_z, int n, int num_osc, int k0) {
 	conv = (fftw_complex* ) fftw_malloc(num_osc*sizeof(fftw_complex));
 	
 	// Call convolution for diagonal elements
-	conv_direct(conv, u_z, n, k0);
+	conv_direct(conv, u_z, num_osc, k0);
 
 	// Loop through k and k'
 	for (int kk = k0 + 1; kk < num_osc; ++kk) {
@@ -216,7 +216,7 @@ double trace(fftw_complex* u_z, int n, int num_osc, int k0) {
 	conv = (fftw_complex* ) fftw_malloc(num_osc*sizeof(fftw_complex));
 	
 	// Call convolution for diagonal elements
-	conv_direct(conv, u_z, n, k0);
+	conv_direct(conv, u_z, num_osc, k0);
 
 	tra = 0;
 	for (int i = k0 + 1; i < num_osc; ++i)	{

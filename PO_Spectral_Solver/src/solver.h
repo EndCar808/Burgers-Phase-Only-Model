@@ -19,7 +19,7 @@
 //  Function Prototypes
 // ---------------------------------------------------------------------
 
-void initial_condition(double* phi, double* amp, fftw_complex* u_z, int* kx, int num_osc, int k0, double a, double b);
+void initial_condition(double* phi, double* amp, fftw_complex* u_z, int* kx, int num_osc, int k0, double a, double b, char* IC);
 void max(double* a, int n, int k0, double* max_val);
 void min(double* a, int n, int k0, double* min_val);
 

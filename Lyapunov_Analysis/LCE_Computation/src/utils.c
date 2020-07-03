@@ -105,7 +105,7 @@ void max(double* a, int n, int k0, double* max_val) {
 	*max_val = max;
 }
 
-void conv_direct(fftw_complex* convo, fftw_complex* u_z, int n, int k0) {
+void conv_direct(fftw_complex* convo, fftw_complex* u_z, int num_osc, int k0) {
 	
 	// Set the 0 to k0 modes to 0;
 	for (int i = 0; i <= k0; ++i) {
@@ -114,13 +114,13 @@ void conv_direct(fftw_complex* convo, fftw_complex* u_z, int n, int k0) {
 	
 	// Compute the convolution on the remaining wavenumbers
 	int k1;
-	for (int kk = k0 + 1; kk < n; ++kk)	{
-		for (int k_1 = 1 + kk; k_1 < 2*n; ++k_1)	{
+	for (int kk = k0 + 1; kk < num_osc; ++kk)	{
+		for (int k_1 = 1 + kk; k_1 < 2*num_osc; ++k_1)	{
 			// Get correct k1 value
-			if(k_1 < n) {
-				k1 = -n + k_1;
+			if(k_1 < num_osc) {
+				k1 = -num_osc + k_1;
 			} else {
-				k1 = k_1 - n;
+				k1 = k_1 - num_osc;
 			}
 			if (k1 < 0) {
 				convo[kk] += conj(u_z[abs(k1)])*u_z[kk - k1]; 	

@@ -4,8 +4,8 @@ import numpy as np
 import re
 
 # Values to run for
-k0    = 2
-N     = [64, 128, 256]
+k0    = 1
+N     = [64, 128, 256, 512]
 alpha = np.arange(1.25, 2.5, 0.25)
 beta  = [0.0, 1.0]
 iters = 400000

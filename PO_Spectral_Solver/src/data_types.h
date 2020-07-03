@@ -22,7 +22,7 @@
 // ---------------------------------------------------------------------
 //  Datasets
 // ---------------------------------------------------------------------
-#define __TRIADS
+// #define __TRIADS
 #define __MODES
 #define __REALSPACE
 #define __TRANSIENTS
@@ -33,7 +33,7 @@
 // ---------------------------------------------------------------------
 //  Global Variables
 // ---------------------------------------------------------------------
-#define SAVE_DATA_STEP 100	// Parameter to determine after how many integrations steps data should be saved to output
+#define SAVE_DATA_STEP 1000	// Parameter to determine after how many integrations steps data should be saved to output
 
 
 

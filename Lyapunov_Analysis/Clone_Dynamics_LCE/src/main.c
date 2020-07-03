@@ -46,17 +46,17 @@ int main(int argc, char** argv) {
 	
 
 	// Spectrum variables
-	int k0 = 0;
-	double alpha = 1.0;
-	double beta  = 1.0;
-
+	int k0 = 1;
+	double alpha = atof(argv[2]);
+	double beta  = atof(argv[3]);
+	
 
 	// Integration parameters
-	int m_end  = 8000;
-	int m_iter = 10;
+	int m_end  = 1000;
+	int m_iter = 20;
 
 	// Perturbation
-	double pert = 10;
+	double pert = 1e-8;
 
 
 

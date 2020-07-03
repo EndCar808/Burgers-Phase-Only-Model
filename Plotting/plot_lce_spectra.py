@@ -53,7 +53,7 @@ else:
 ######################
 ##  Input & Output Dirs
 ######################
-input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Output"
+input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Output/LCE"
 output_dir = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Snapshots/Spectra"
 
 
@@ -160,7 +160,8 @@ for n in range(0, len(N)):
         cax = plt.colorbar(cmap, ticks = [0.0, 0.5, 1.0, 1.5, 2.0, 2.45])
         cax.set_label(r'$\alpha$')
 
-    plt.savefig(output_dir + "/SPECTRUM_N[{}]_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(N[n], beta, k0, iters), format='png', dpi = 800)  
+    # plt.savefig(output_dir + "/SPECTRUM_N[{}]_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(N[n], beta, k0, iters), format='png', dpi = 800)  
+    plt.savefig(output_dir + "/SPECTRUM_N[{}]_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].pdf".format(N[n], beta, k0, iters))  
     plt.close()
 
     # Symmetry
@@ -174,7 +175,8 @@ for n in range(0, len(N)):
     plt.title(r'Spectrum Symmetry for $N = {} \quad k_0 = {} \quad \beta = {}$'.format(N[n], k0, beta))
     cax = plt.colorbar(cmap, ticks = [0.0, 0.5, 1.0, 1.5, 2.0, 2.45])
     cax.set_label(r'$\alpha$')
-    plt.savefig(output_dir + "/SPECTRUM_SYMETRY_N[{}]_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(N[n], beta, k0, iters), format='png', dpi = 800)  
+    plt.savefig(output_dir + "/SPECTRUM_SYMETRY_N[{}]_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(N[n], beta, k0, iters))
+    # plt.savefig(output_dir + "/SPECTRUM_SYMETRY_N[{}]_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(N[n], beta, k0, iters), format='png', dpi = 800)  
     plt.close()
 
 
@@ -192,12 +194,15 @@ plt.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
 plt.xlabel(r"$\alpha$")
 plt.title(r'Entropy Production - $k_0 = {} \quad \beta = {}$'.format(k0, beta))
 plt.legend([r"$N = {val}$".format(val = nn) for nn in N])
-plt.savefig(output_dir + "/ENTROPY_PROD_LOG_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800)  
+plt.savefig(output_dir + "/ENTROPY_PROD_LOG_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].pdf".format(beta, k0, iters))  
+# plt.savefig(output_dir + "/ENTROPY_PROD_LOG_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800)  
+
 
 plt.yscale('linear')
 plt.ylim(-0.5, 3e2)
 plt.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
-plt.savefig(output_dir + "/ENTROPY_PROD_LIN_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800)  
+plt.savefig(output_dir + "/ENTROPY_PROD_LIN_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].pdf".format(beta, k0, iters))  
+# plt.savefig(output_dir + "/ENTROPY_PROD_LIN_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800)  
 plt.close()
 
 # Kaplan-Yorke Dimension - LOG
@@ -211,7 +216,8 @@ plt.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
 plt.xlabel(r"$\alpha$")
 plt.title(r'Kaplan-Yorke Dimension - $k_0 = {} \quad \beta = {}$'.format(k0, beta))
 plt.legend([r"$N = {val}$".format(val = nn) for nn in N])
-plt.savefig(output_dir + "/KAPLANYORKE_LOG_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800)  
+plt.savefig(output_dir + "/KAPLANYORKE_LOG_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].pdf".format(beta, k0, iters))  
+# plt.savefig(output_dir + "/KAPLANYORKE_LOG_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800)  
 
 # Kaplan-Yorke Dimension - LIN
 plt.figure()
@@ -224,7 +230,8 @@ plt.xlabel(r"$\alpha$")
 plt.gca().set_ylim(bottom = -0.5)
 plt.title(r'Kaplan-Yorke Dimension - $k_0 = {} \quad \beta = {}$'.format(k0, beta))
 plt.legend([r"$N = {val}$".format(val = nn) for nn in N])
-plt.savefig(output_dir + "/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800)  
+plt.savefig(output_dir + "/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].pdf".format(beta, k0, iters))  
+# plt.savefig(output_dir + "/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800)  
 plt.close()
 
 # Proportion of Positive LCE
@@ -236,7 +243,8 @@ plt.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
 plt.xlabel(r"$\alpha$")
 plt.title(r'Proportion of Positive Lyapunov Epxonents - $k_0 = {} \quad \beta = {}$'.format(k0, beta))
 plt.legend([r"$N = {val}$".format(val = nn) for nn in N])
-plt.savefig(output_dir + "/PROPORTION_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800)  
+plt.savefig(output_dir + "/PROPORTION_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].pdf".format(beta, k0, iters))
+# plt.savefig(output_dir + "/PROPORTION_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800)  
 plt.close()
 
 # Number of Positive LCE
@@ -248,7 +256,8 @@ plt.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
 plt.xlabel(r"$\alpha$")
 plt.title(r'Number of Positive Lyapunov Epxonents - $k_0 = {} \quad \beta = {}$'.format(k0, beta))
 plt.legend([r"$N = {val}$".format(val = nn) for nn in N])
-plt.savefig(output_dir + "/NUM_POS_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800)  
+plt.savefig(output_dir + "/NUM_POS_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].pdf".format(beta, k0, iters))
+# plt.savefig(output_dir + "/NUM_POS_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800)  
 plt.close()
 
 # Sum of LCE - Log
@@ -262,7 +271,8 @@ plt.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
 plt.xlabel(r"$\alpha$")
 plt.title(r'Sum of Lyapunov Epxonents - $k_0 = {} \quad \beta = {}$'.format(k0, beta))
 plt.legend([r"$N = {val}$".format(val = nn) for nn in N])
-plt.savefig(output_dir + "/SUM_LOGY_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800)  
+plt.savefig(output_dir + "/SUM_LOGY_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].pdf".format(beta, k0, iters))  
+# plt.savefig(output_dir + "/SUM_LOGY_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800) 
 plt.close()
 
 # Sum of LCE - Linear
@@ -276,5 +286,6 @@ plt.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
 plt.xlabel(r"$\alpha$")
 plt.title(r'Sum of Lyapunov Epxonents - $k_0 = {} \quad \beta = {}$'.format(k0, beta))
 plt.legend([r"$N = {val}$".format(val = nn) for nn in N])
-plt.savefig(output_dir + "/SUM_LIN_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800)  
+plt.savefig(output_dir + "/SUM_LIN_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].pdf".format(beta, k0, iters)) 
+# plt.savefig(output_dir + "/SUM_LIN_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800)  
 plt.close()

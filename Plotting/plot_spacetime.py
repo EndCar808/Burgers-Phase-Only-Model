@@ -28,6 +28,8 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import multiprocessing as mprocs
 from itertools import zip_longest
 from subprocess import Popen, PIPE
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from matplotlib.gridspec import GridSpec
 import numpy as np
 np.set_printoptions(threshold=sys.maxsize)
 
@@ -37,25 +39,34 @@ np.set_printoptions(threshold=sys.maxsize)
 ######################
 ##	Real Space Function Defs
 ######################
-def compute_realspace(amps, phases, N):
-	print("\nCreating Real Space Soln\n")
-
-	amps_full   = np.append(amps[0, :], np.flipud(amps[0, :-2]))
-	phases_full = np.concatenate((phases[:, :], -np.fliplr(phases[:, :-2])), axis = 1)
-	u_z         = amps_full * np.exp(np.complex(0.0, 1.0) * phases_full)
-	u           = np.real(np.fft.ifft(u_z, axis = 1))
-	u_rms       = np.sqrt(np.mean(u[:, :]**2, axis = 1))
-	u_urms      = np.array([u[i, :] / u_rms[i] for i in range(u.shape[0])])
-	x   = np.arange(0, 2*np.pi, 2*np.pi/N)
-
-	return x, u_urms, u_z
-
-
 def compute_phases_rms(phases):
 	phases_rms  = np.sqrt(np.mean(phases[:, :]**2, axis = 1))
 	phases_prms = np.array([phases[i, :] / phases_rms[i] for i in range(phases.shape[0])])
 
 	return phases_prms
+
+
+## Real Space Data
+def compute_realspace(amps, phases, N):
+	print("\n...Creating Real Space Soln...\n")
+
+	# Create full set of amps and phases
+	amps_full   = np.append(amps[0, :], np.flipud(amps[0, 1:-1]))
+	phases_full = np.concatenate((phases[:, :], -np.fliplr(phases[:, 1:-1])), axis = 1)
+
+	# Construct modes and realspace soln
+	u_z = amps_full * np.exp(np.complex(0.0, 1.0) * phases_full)
+	u   = np.real(np.fft.ifft(u_z, axis = 1))
+
+	# Compute normalized realspace soln
+	u_rms  = np.sqrt(np.mean(u[:, :]**2, axis = 1))
+	u_urms = np.array([u[i, :] / u_rms[i] for i in range(u.shape[0])])
+
+	x = np.arange(0, 2*np.pi, 2*np.pi/N)
+	
+	return u, u_urms, x, u_z
+
+
 
 
 def compute_gradient(u_z, kmin, kmax):
@@ -70,11 +81,10 @@ def compute_gradient(u_z, kmin, kmax):
 
 
 
-
 ######################
 ##	Plotting Function Defs
 ######################
-def plot_spacetime(x, u_urms, time, phases_rms, N, alpha, beta, k0):
+def plot_spacetime(x, u_urms, time, phases, N, alpha, beta, k0):
 	fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 9))
 	fig.suptitle(r'$N = {} \quad \alpha = {} \quad \beta = {} \quad k_0 = {}$'.format(N, alpha, beta, k0))
 
@@ -92,7 +102,7 @@ def plot_spacetime(x, u_urms, time, phases_rms, N, alpha, beta, k0):
 	cb1.set_label(r"$u(x, t) / u^{rms}(x, t)$")
 
 	## PHASES
-	im2  = ax2.imshow(phases, cmap = "bwr")
+	im2  = ax2.imshow(np.mod(phases, 2.0*np.pi), cmap = "bwr")
 	ax2.set_aspect('auto')
 	ax2.set_title(r"Phases")
 	ax2.set_xlabel(r"$k$")
@@ -156,7 +166,7 @@ if __name__ == '__main__':
 	##	Get Input Parameters
 	######################
 	if (len(sys.argv) != 6):
-	    print("No Input Provided, Error.\nProvide k0, Beta and Iteration Values!\n")
+	    print("No Input Provided, Error.\nProvide: \nk0\nAlpha\nBeta\nIterations\nN\n")
 	    sys.exit()
 	else: 
 	    k0    = int(sys.argv[1])
@@ -169,7 +179,7 @@ if __name__ == '__main__':
 	######################
 	##	Input & Output Dir
 	######################
-	input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Output"
+	input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Output/LCE"
 	output_dir = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Snapshots/TriadDynamics" + filename
 
 	if os.path.isdir(output_dir) != True:
@@ -212,7 +222,7 @@ if __name__ == '__main__':
 	## Compute Real Space vel
 	x, u_urms, u_z = compute_realspace(amps, phases, N)
 	
-	## Compute Real Space vel
+	## Compute phases
 	phases_rms = compute_phases_rms(phases)
 
 	## Compute Real Space vel
@@ -227,11 +237,12 @@ if __name__ == '__main__':
 
 
 	## Plot space-time
-	plot_spacetime(x, u_urms, time, phases_rms, N, alpha, beta, k0)
+	plot_spacetime(x, u_urms, time, phases, N, alpha, beta, k0)
 
 
 	## Plot space-time
 	plot_grad_realspace(x, u_urms, du_x_rms, N, alpha, beta, k0)
 
 
-	print("Finished!! \n\n")
+
+	print("Finished!!\n\n")

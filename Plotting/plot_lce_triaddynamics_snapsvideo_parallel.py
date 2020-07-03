@@ -27,6 +27,7 @@ import multiprocessing as mprocs
 from threading import Thread
 from subprocess import Popen, PIPE
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from itertools import zip_longest
 from matplotlib.gridspec import GridSpec
 from matplotlib.pyplot import cm 
 import numpy as np
@@ -34,6 +35,9 @@ np.set_printoptions(threshold=sys.maxsize)
 from numba import jit
 
 
+###########################
+##	Function Definitions
+###########################
 ###########################
 ##	Function Definitions
 ###########################
@@ -217,8 +221,10 @@ def compute_gradient(u_z, kmin, kmax):
 
 
 
-if __name__ == '__main__':
 
+
+
+if __name__ == '__main__':
 	#########################
 	##	Get Input Parameters
 	#########################
@@ -261,7 +267,8 @@ if __name__ == '__main__':
 	phases = HDFfileData['Phases'][:, :]
 	time   = HDFfileData['Time'][:, :]
 	amps   = HDFfileData['Amps'][:, :]
-	lce    = HDFfileData['LCE'][:, :]
+	# u_z    = HDFfileData['Modes'][:, :]
+	# lce    = HDFfileData['LCE'][:, :]
 
 
 
@@ -296,7 +303,6 @@ if __name__ == '__main__':
 
 
 
-
 	######################
 	##	ColourMaps
 	######################
@@ -315,6 +321,7 @@ if __name__ == '__main__':
 
 
 
+
 	######################
 	##	Plot Data
 	######################
@@ -324,18 +331,31 @@ if __name__ == '__main__':
 	## Compute Real Space velocity Gradient
 	du_x, du_x_rms = compute_gradient(u_z, k0, kmax)
 
+
+	## Plot in parallel
+	## Create Process list	
+	procLim  = 10
+
+	## Create iterable group of processess
+	if triads_exist == 0:
+		groups_args = [(mprocs.Process(target = plot_snaps, args = (i, x, u_urms[i, :], du_x_rms[i, :], time[i, 0], triads[:, :, i], kmin, kmax, phases[i, kmin:], R[0:i, 0], Phi[0:i, 0], time[0, 0], time[-1, 0], time[0:i, 0])) for i in range(time.shape[0]))] * procLim
+	else:
+	 	groups_args = [(mprocs.Process(target = plot_snaps, args = (i, x, u_urms[i, :], du_x_rms[i, :], time[i, 0], triads[i, :, :], kmin, kmax, phases[i, kmin:], R[0:i, 0], Phi[0:i, 0], time[0, 0], time[-1, 0], time[0:i, 0])) for i in range(time.shape[0]))] * procLim
+
+
 	## Start timer
 	start = TIME.perf_counter()
-	
-	# print(triads[:, :, 175])
 
-	## Plot in serial
-	for i in range(time.shape[0]):
-		if triads_exist == 0:
-			plot_snaps(i, x, u_urms[i, :], du_x_rms[i, :], time[i, 0], triads[:, :, i], kmin, kmax, phases[i, kmin:], R[0:i, 0], Phi[0:i, 0], time[0, 0], time[-1, 0], time[0:i, 0])
-		else:
-			plot_snaps(i, x, u_urms[i, :], du_x_rms[i, :], time[i, 0], triads[i, :, :], kmin, kmax, phases[i, kmin:], R[0:i, 0], Phi[0:i, 0], time[0, 0], time[-1, 0], time[0:i, 0])
-	 	
+	## Loop of grouped iterable
+	for procs in zip_longest(*groups_args): 
+		processes = []
+		for p in filter(None, procs):
+			processes.append(p)
+			p.start()
+
+		for process in processes:
+			process.join()
+
 
 	# Start timer
 	end = TIME.perf_counter()
@@ -343,13 +363,12 @@ if __name__ == '__main__':
 	print("\n\nTime: {:5.8f}s\n\n".format(end - start))
 
 
-
 	######################
 	##	Make Video From Snaps
 	######################
 	framesPerSec = 25
 	inputFile    = output_dir + "/SNAPS/Triad_SNAPS_%05d.png"
-	videoName    = output_dir + "/SNAPS/Triad_Dynamics5.mp4"
+	videoName    = output_dir + "/SNAPS/Triad_Dynamics4.mp4"
 	cmd = "ffmpeg -r {} -f image2 -s 1920x1080 -i {} -vcodec libx264 -crf 25 -pix_fmt yuv420p {}".format(framesPerSec, inputFile, videoName)
 
 

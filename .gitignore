@@ -12,6 +12,8 @@
 *.jpg
 *.mp4
 *.fig
+*.pdf
+*.hdf5
 
 # Data Folders
 ./Data/

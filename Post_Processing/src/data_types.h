@@ -30,6 +30,7 @@
 //  Datatype Flag Definitions
 // ---------------------------------------------------------------------
 #define NBINS_VELINC 100
+#define NUM_STR_P 5
 #define NUM_VEL_INC 5
 #define NBINS_TRIAD_LOCAL 100
 #define NBINS_TRIAD_GLOBAL 10000
@@ -48,6 +49,8 @@ typedef struct system_vars {
 	int k0;
 	int kmin;
 	int kmax;
+	int k3_range;
+	int k1_range;
 	double alpha;
 	double beta;
 	// Integration variables
@@ -71,11 +74,17 @@ typedef struct runtime_data {
 	fftw_complex* u_z_pad;
 	double* phi;
 	double* amp;
+	double* triads;
 } runtime_data_struct;
 
 // Running Stats Variables
 typedef struct runstat_vars {
-	double VelInc_Stats[NUM_VEL_INC][5];
+	double* du_r_small;
+	double* du_r_mid;
+	double* du_r_large;
+	double* struc_p[NUM_VEL_INC][NUM_STR_P];
+	double* dudx;
+	double* VelInc_Stats[NUM_VEL_INC][5];
 	gsl_rstat_workspace* RunVelStats;
 } runstat_vars_struct;
 
@@ -91,6 +100,9 @@ typedef struct HDF_file_info {
 	char output_file_name[512];
 	hid_t input_file_handle;
 	hid_t output_file_handle;
+
+	// Complex datatype param
+	hid_t C_dtype;
 } HDF_file_info_struct;
 
 // Create compound datatype for complex numbers

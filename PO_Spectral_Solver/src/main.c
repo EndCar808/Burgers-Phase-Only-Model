@@ -48,11 +48,14 @@ int main(int argc, char** argv) {
 	double alpha = atof(argv[2]);
 	double beta  = atof(argv[3]);
 
-	int tsteps     = 1e6;
+	int tsteps     = 5e6;
 	int save_steps = SAVE_DATA_STEP;
 
+	// Initial Condition
+	char u0[128] = "RANDOM";
 
-	// // Get the number of threads 
+
+	// Get the number of threads 
 	int n_threads = 1;
 
 
@@ -69,7 +72,7 @@ int main(int argc, char** argv) {
 	// ------------------------------
 	//  Call Solver Here
 	// ------------------------------
-	solver(N, k0, alpha, beta, tsteps, save_steps, "ALIGNED");
+	solver(N, k0, alpha, beta, tsteps, save_steps, u0);
 	// ------------------------------
 	//  Call Solver Here
 	// ------------------------------

@@ -350,7 +350,7 @@ void orthonormalize(double* pert, double* znorm, int num_osc, int kmin) {
 
 }
 
-double* pert_solver(double* phi_base, double* amp, int* kx, fftw_plan fftw_plan_c2r, fftw_plan fftw_plan_r2c, int N, int k0,  int iters, int m, double pert, int pert_dir) {
+double* pert_solver(double* phi_base, double* pertMat, double* amp, int* kx, fftw_plan fftw_plan_c2r, fftw_plan fftw_plan_r2c, int N, int k0,  int iters, int m, double pert, int pert_dir) {
 
 	// ------------------------------
 	//  Variable Definitions
@@ -405,15 +405,15 @@ double* pert_solver(double* phi_base, double* amp, int* kx, fftw_plan fftw_plan_
 	if (m == 1) {
 		phi[pert_dir] += pert;
 	} else {
-		// for (int i = 0; i < num_osc; ++i) {
-		// 	// phi_pert[i] = 
-		// }
+		for (int i = kmin; i < num_osc; ++i) {
+			phi[i] =  phi_base[i] + pert * pertMat[(i - kmin) * (num_osc - kmin) + (pert_dir - kmin)];
+		}
 	}
 
-	for (int i = 0; i < num_osc; ++i) {
-		printf("phi[%d]: %5.16lf \n", i, phi[i]);
-	}
-	printf("\n\n");
+	// for (int i = 0; i < num_osc; ++i) {
+	// 	printf("phi[%d]: %5.16lf \n", i, phi[i]);
+	// }
+	// printf("\n\n");
 		
 
 	// ------------------------------
@@ -520,8 +520,7 @@ void compute_spectrum(int N, int k0, double a, double b, int m_end, int m_iter, 
 	int pert_dir;
 
 	// print update every x iterations
-	int print_every = 1; 
-	// = (m_end >= 10 ) ? (int)((double)m_end * 0.1) : 10;
+	int print_every = (m_end >= 10 ) ? (int)((double)m_end * 0.1) : 10;
 
 
 	int save_step = 1;
@@ -590,13 +589,13 @@ void compute_spectrum(int N, int k0, double a, double b, int m_end, int m_iter, 
 	// Perturbed trajectory arrays
 	double *phi_base   = (double* )malloc(sizeof(double) * num_osc);
 	double *phi_tmp    = (double* )malloc(sizeof(double) * num_osc);
-	double *phi_tracjs = (double* )malloc(sizeof(double) * num_osc * (num_osc - k0 - 1)); 
+	double *phi_tracjs = (double* )malloc(sizeof(double) * num_osc * (num_osc - kmin)); 
 
 	// LCE spectrum arrays
-	double *pertMat  = (double* )malloc(sizeof(double) * (num_osc - k0 - 1) * (num_osc - k0 - 1));
-	double *znorm    = (double* )malloc(sizeof(double) * (num_osc - k0 - 1));
-	double* lce      = (double* )malloc(sizeof(double) * (num_osc - k0 - 1));
-	double* run_sum  = (double* )malloc(sizeof(double) * (num_osc - k0 - 1));	
+	double *pertMat  = (double* )malloc(sizeof(double) * (num_osc - kmin) * (num_osc - kmin));
+	double *znorm    = (double* )malloc(sizeof(double) * (num_osc - kmin));
+	double* lce      = (double* )malloc(sizeof(double) * (num_osc - kmin));
+	double* run_sum  = (double* )malloc(sizeof(double) * (num_osc - kmin));	
 
 	
 
@@ -714,7 +713,7 @@ void compute_spectrum(int N, int k0, double a, double b, int m_end, int m_iter, 
 	// ------------------------------
 	//  Begin Integration
 	// ------------------------------
-	while (m <= 1) {
+	while (m <= m_end) {
 
 		// ------------------------------
 		//  Integrate Base System Forward
@@ -726,10 +725,10 @@ void compute_spectrum(int N, int k0, double a, double b, int m_end, int m_iter, 
 				u_z_tmp[i] = amp[i] * cexp(I * phi[i]);
 			}
 
-			// Print Update - Energy and Enstrophy
-			if (iter % (int)((m_iter * m_end) * 0.1) == 0) {
-				printf("Iter: %d/%d | t = %4.4lf |\n", iter, (m_iter * m_end), t);
-			}		
+			// // Print Update - Energy and Enstrophy
+			// if (iter % (int)((m_iter * m_end) * 0.1) == 0) {
+			// 	printf("Iter: %d/%d | t = %4.4lf |\n", iter, (m_iter * m_end), t);
+			// }		
 
 
 			//////////////
@@ -801,76 +800,89 @@ void compute_spectrum(int N, int k0, double a, double b, int m_end, int m_iter, 
 		// ------------------------------
 		//  Integrate Perturbed Trajectories
 		// ------------------------------
-		// for (int j = 0; j < num_osc - k0 - 1; ++j) {
-		// 	// Set the pertubation direction
-		// 	pert_dir = k0 + 1 + j;
+		for (int j = 0; j < num_osc - kmin; ++j) {
+			// Set the pertubation direction
+			pert_dir = k0 + 1 + j;
 
-			
-		// 	// Call solver for current pertubed trajectory
-		// 	phi_tmp = pert_solver(phi_base, amp, kx, fftw_plan_c2r, fftw_plan_r2c, N, k0, m_iter, m, pert, pert_dir);
+			// Call solver for current pertubed trajectory
+			phi_tmp = pert_solver(phi_base, pertMat, amp, kx, fftw_plan_c2r, fftw_plan_r2c, N, k0, m_iter, m, pert, pert_dir);
 
-		// 	// Save Output
-		// 	for (int i = 0; i < num_osc; ++i)	{
-		// 		index = i * (num_osc - k0 - 1) + j;
+			// Save Output
+			for (int i = 0; i < num_osc; ++i)	{
+				index = i * (num_osc - kmin) + j;
 
-		// 		phi_tracjs[index] = phi_tmp[i];
+				phi_tracjs[index] = phi_tmp[i];
 
-		// 		printf("p[%d]: %5.16lf\t", index, phi_tracjs[index]);
+				// printf("p[%d]: %5.16lf\t", index, phi_tracjs[index]);
 
-		// 		// Create Perturbation Matrix
-		// 		if (i > k0) {
-		// 			pertMat[(i - k0 - 1) * (num_osc - k0 - 1) + j] = phi[i] - phi_tmp[i];
-		// 		}
+				// Create Perturbation Matrix
+				if (i > k0) {
+					pertMat[(i - kmin) * (num_osc - kmin) + j] = phi[i] - phi_tmp[i];
+				}
+			}
+			// printf("\n\n");
+		}
+
+
+		// for (int i = 0; i < num_osc - kmin; ++i)
+		// {
+		// 	for (int j = 0; j < num_osc - kmin; ++j)
+		// 	{
+		// 		printf("pertM[%d]: %5.16lf \t", i*(num_osc - kmin) + j, pertMat[i*(num_osc - kmin) + j]);
 		// 	}
-		// 	printf("\n\n");
+		// 	printf("\n");
 		// }
+		// printf("\n\n");
 
 
-
-
-
-
-		// // ------------------------------
-		// //  Orthonormalize 
-		// // ------------------------------
-		// orthonormalize(pertMat, znorm, num_osc, k0 + 1);
+		// ------------------------------
+		//  Orthonormalize 
+		// ------------------------------
+		orthonormalize(pertMat, znorm, num_osc, k0 + 1);
 
 		
-		// // ------------------------------
-		// //  Compute LCEs & Write To File
-		// // ------------------------------
-		// for (int i = 0; i < num_osc - k0 - 1; ++i) {
-		// 	// Compute LCE
-		// 	run_sum[i] = run_sum[i] + log(znorm[i]) / pert;
-		// 	lce[i]     = run_sum[i] / (t - t0);
+		// ------------------------------
+		//  Compute LCEs & Write To File
+		// ------------------------------
+		for (int i = 0; i < num_osc - kmin; ++i) {
+			// Compute LCE
+			run_sum[i] = run_sum[i] + log(znorm[i] / pert);
+			lce[i]     = run_sum[i] / (t - t0);
+		}
+
+		// // then write the current LCEs to this hyperslab
+		// if (m % SAVE_LCE_STEP == 0) {			
+		// 	write_hyperslab_data_d(HDF_file_space[2], HDF_data_set[2], HDF_mem_space[2], lce, "lce", num_osc - kmin, save_lce_indx - 1);
 		// }
 
-		// // // then write the current LCEs to this hyperslab
-		// // if (m % SAVE_LCE_STEP == 0) {			
-		// // 	write_hyperslab_data_d(HDF_file_space[2], HDF_data_set[2], HDF_mem_space[2], lce, "lce", num_osc - k0 - 1, save_lce_indx - 1);
-		// // }
+		// Print update to screen
+		if (m % print_every == 0) {
+			double lce_sum = 0.0;
 
-		// // Print update to screen
-		// if (m % print_every == 0) {
-		// 	double lce_sum = 0.0;
-
-		// 	for (int i = 0; i < num_osc - k0 - 1; ++i) {
-		// 		lce_sum += lce[i];
-		// 	}
+			for (int i = 0; i < num_osc - kmin; ++i) {
+				lce_sum += lce[i];
+			}
 			
-		// 	printf("Iter: %d / %d | t: %5.6lf tsteps: %d | k0:%d alpha: %5.6lf beta: %5.6lf | Sum: %5.9lf\n", m, m_end, t, m_end * m_iter, k0, a, b, lce_sum);
-		// 	printf("k: \n");
+			printf("Iter: %d / %d | t: %5.6lf tsteps: %d | k0:%d alpha: %5.6lf beta: %5.6lf | Sum: %5.9lf\n", m, m_end, t, m_end * m_iter, k0, a, b, lce_sum);
+			printf("k: \n");
 			
-		// 	for (int j = 0; j < num_osc - k0 - 1; ++j) {
-		// 		printf("%5.6lf ", lce[j]);
-		// 	}
-		// 	printf("\n\n");
-		// }
+			for (int j = 0; j < num_osc - kmin; ++j) {
+				printf("%5.6lf ", lce[j]);
+			}
+			printf("\n\n");
+		}
 
 
 		// ------------------------------
 		//  Update For Next Iteration
 		// ------------------------------
+		// Update Base trajectory 
+		for (int i = 0; i < num_osc; ++i)
+		{
+			phi_base[i] = phi[i];
+		}
+
+		// Update Iterators
 		T = T + m_iter * dt;
 		m += 1;
 	}
@@ -883,27 +895,27 @@ void compute_spectrum(int N, int k0, double a, double b, int m_end, int m_iter, 
 	// Write amplitudes
 	D2dims[0] = 1;
 	D2dims[1] = num_osc;
-	if ( (H5LTmake_dataset(HDF_Outputfile_handle, "Amps", D2, D2dims, H5T_NATIVE_DOUBLE, amp)) < 0){
+	if ( (H5LTmake_dataset(HDF_file_handle, "Amps", D2, D2dims, H5T_NATIVE_DOUBLE, amp)) < 0){
 		printf("\n\n!!Failed to make - Amps - Dataset!!\n\n");
 	}
 	
 	// Wtie time
-	D2dims[0] = ntsteps + 1;
+	D2dims[0] = tot_t_save_steps + 1;
 	D2dims[1] = 1;
-	if ( (H5LTmake_dataset(HDF_Outputfile_handle, "Time", D2, D2dims, H5T_NATIVE_DOUBLE, time_array)) < 0) {
+	if ( (H5LTmake_dataset(HDF_file_handle, "Time", D2, D2dims, H5T_NATIVE_DOUBLE, time_array)) < 0) {
 		printf("\n\n!!Failed to make - Time - Dataset!!\n\n");
 	}
 	
 	// Write Phase Order R
-	D2dims[0] = ntsteps + 1;
+	D2dims[0] = tot_t_save_steps + 1;
 	D2dims[1] = 1;
-	if ( (H5LTmake_dataset(HDF_Outputfile_handle, "PhaseOrderR", D2, D2dims, H5T_NATIVE_DOUBLE, phase_order_R)) < 0) {
+	if ( (H5LTmake_dataset(HDF_file_handle, "PhaseOrderR", D2, D2dims, H5T_NATIVE_DOUBLE, phase_order_R)) < 0) {
 		printf("\n\n!!Failed to make - PhaseOrderR - Dataset!!\n\n");
 	}
 	// Write Phase Order Phi
-	D2dims[0] = ntsteps + 1;
+	D2dims[0] = tot_t_save_steps + 1;
 	D2dims[1] = 1;
-	if ( (H5LTmake_dataset(HDF_Outputfile_handle, "PhaseOrderPhi", D2, D2dims, H5T_NATIVE_DOUBLE, phase_order_Phi)) < 0) {
+	if ( (H5LTmake_dataset(HDF_file_handle, "PhaseOrderPhi", D2, D2dims, H5T_NATIVE_DOUBLE, phase_order_Phi)) < 0) {
 		printf("\n\n!!Failed to make - PhaseOrderPhi - Dataset!!\n\n");
 	}
 
@@ -940,7 +952,7 @@ void compute_spectrum(int N, int k0, double a, double b, int m_end, int m_iter, 
 	H5Sclose( HDF_file_space[1] );
 
 	// Close pipeline to output file
-	H5Fclose(HDF_Outputfile_handle);
+	H5Fclose(HDF_file_handle);
 }
 // ---------------------------------------------------------------------
 //  End of File

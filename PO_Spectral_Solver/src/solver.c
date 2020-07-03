@@ -41,7 +41,7 @@
  * @param dx         Value of increment in space
  * @param N          Value of the number of modes in the system
  */
-void initial_condition(double* phi, double* amp, fftw_complex* u_z, int* kx, int num_osc, int k0, double a, double b) {
+void initial_condition(double* phi, double* amp, fftw_complex* u_z, int* kx, int num_osc, int k0, double a, double b, char* IC) {
 
 	// set the seed for the random number generator
 	srand(123456789);
@@ -55,15 +55,49 @@ void initial_condition(double* phi, double* amp, fftw_complex* u_z, int* kx, int
 		kx[i] = i;
 
 		// fill amp and phi arrays
-		if(i <= k0) {
-			amp[i] = 0.0;
-			phi[i] = 0.0;
-			u_z[i] = 0.0 + 0.0 * I;
-		} else {
-			amp[i] = pow((double)i, -a) * exp(-b * pow((double) kx[i]/cutoff, 2) );
-			phi[i] = (M_PI / 2.0) * (1.0 + 1e-10 * pow((double) i, 0.9));	
-			// phi[i] = M_PI*( (double) rand() / (double) RAND_MAX);	
-			u_z[i] = amp[i] * exp(I * phi[i]);
+		if (strcmp(IC, "ALIGNED") == 0) {
+			if(i <= k0) {
+				amp[i] = 0.0;
+				phi[i] = 0.0;
+				u_z[i] = 0.0 + 0.0 * I;
+			} else {
+				amp[i] = pow((double)i, -a) * exp(-b * pow((double) kx[i]/cutoff, 2) );
+				phi[i] = (M_PI / 2.0) * (1.0 + 1e-10 * pow((double) i, 0.9));		
+				u_z[i] = amp[i] * exp(I * phi[i]);
+			}
+		} 
+		else if (strcmp(IC, "NEW") == 0) {
+			if(i <= k0) {
+				amp[i] = 0.0;
+				phi[i] = 0.0;
+				u_z[i] = 0.0 + 0.0 * I;
+			} 
+			else if (i % 3 == 0){
+				amp[i] = pow((double)i, -a) * exp(-b * pow((double) kx[i]/cutoff, 2) );
+				phi[i] = (M_PI / 2.0) * (1.0 + 1e-10 * pow((double) i, 0.9));	
+				u_z[i] = amp[i] * exp(I * phi[i]);
+			} 
+			else if (i % 3 == 1) {
+				amp[i] = pow((double)i, -a) * exp(-b * pow((double) kx[i]/cutoff, 2) );
+				phi[i] = (M_PI / 6.0) * (1.0 + 1e-10 * pow((double) i, 0.9));	
+				u_z[i] = amp[i] * exp(I * phi[i]);
+			}
+			else if (i % 3 == 2) {
+				amp[i] = pow((double)i, -a) * exp(-b * pow((double) kx[i]/cutoff, 2) );
+				phi[i] = (5.0 * M_PI / 6.0) * (1.0 + 1e-10 * pow((double) i, 0.9));	
+				u_z[i] = amp[i] * exp(I * phi[i]);
+			}
+		}
+		else if (strcmp(IC, "RANDOM") == 0) {
+			if(i <= k0) {
+				amp[i] = 0.0;
+				phi[i] = 0.0;
+				u_z[i] = 0.0 + 0.0 * I;
+			} else {
+				amp[i] = pow((double)i, -a) * exp(-b * pow((double) kx[i]/cutoff, 2) );	
+				phi[i] = M_PI * ( (double) rand() / (double) RAND_MAX);	
+				u_z[i] = amp[i] * exp(I * phi[i]);
+			}
 		}
 	}
 }
@@ -754,7 +788,7 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 	// ------------------------------
 	//  Generate Initial Conditions
 	// ------------------------------
-	initial_condition(phi, amp, u_z, kx, num_osc, k0, a, b);
+	initial_condition(phi, amp, u_z, kx, num_osc, k0, a, b, u0);
 	
 	// Print IC if small system size
 	if (N <= 32) {
@@ -1030,8 +1064,10 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 	//  Clean Up
 	// ------------------------------
 	// destroy fftw plans
+	#ifdef __REALSPACE
 	fftw_destroy_plan(fftw_plan_r2c);
 	fftw_destroy_plan(fftw_plan_c2r);
+	#endif
 	fftw_destroy_plan(fftw_plan_r2c_pad);
 	fftw_destroy_plan(fftw_plan_c2r_pad);
 
@@ -1064,12 +1100,16 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 	H5Sclose( HDF_mem_space[1] );
 	H5Dclose( HDF_data_set[1] );
 	H5Sclose( HDF_file_space[1] );
+	#ifdef __MODES
 	H5Sclose( HDF_mem_space[2] );
 	H5Dclose( HDF_data_set[2] );
 	H5Sclose( HDF_file_space[2] );
+	#endif 
+	#ifdef __REALSPACE
 	H5Sclose( HDF_mem_space[3] );
 	H5Dclose( HDF_data_set[3] );
 	H5Sclose( HDF_file_space[3] );
+	#endif
 
 	// Close pipeline to output file
 	H5Fclose(HDF_Outputfile_handle);
