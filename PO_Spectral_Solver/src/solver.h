@@ -23,7 +23,9 @@ void initial_condition(double* phi, double* amp, fftw_complex* u_z, int* kx, int
 void max(double* a, int n, int k0, double* max_val);
 void min(double* a, int n, int k0, double* min_val);
 
+void get_output_file_name(char* output_file_name, int N, int k0, double a, double b, char* u0, int ntsteps, int trans_iters);
 hid_t create_complex_datatype(hid_t dtype);
+
 void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_name, hid_t* file_space, hid_t* data_set, hid_t* mem_space, hid_t dtype, int num_t_steps, int num_osc, int k_range, int k1_range);
 void write_hyperslab_data(hid_t file_space, hid_t data_set, hid_t mem_space, hid_t dtype, double* data, char* data_name, int n, int index);
 

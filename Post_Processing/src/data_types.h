@@ -21,7 +21,7 @@
 // ---------------------------------------------------------------------
 // These definitions control which analysis is to be performed
 #define __STATS
-#define __TRIADS
+// #define __TRIADS
 #define __PHASE_ORDER
 #define __DERIVATIVE
 
@@ -86,20 +86,29 @@ typedef struct runstat_vars {
 	double* dudx;
 	double* VelInc_Stats[NUM_VEL_INC][5];
 	gsl_rstat_workspace* RunVelStats;
+	gsl_histogram* VelIncPDF;
+
+	// Outputfile Data
+	char output_file_name[512];
+	hid_t output_file_handle;
 } runstat_vars_struct;
 
 // Phase Order Variables
 typedef struct phaseorder_vars {
 	gsl_histogram* TriadGlobal;
 	gsl_histogram* TriadLocal;
+
+	// Outputfile Data
+	char output_file_name[512];
+	hid_t output_file_handle;
 } phaseorder_vars_struct;
 
 // HDF File infor struct 
 typedef struct HDF_file_info {
 	char input_file_name[512];
 	char output_file_name[512];
+	char output_dir[512];
 	hid_t input_file_handle;
-	hid_t output_file_handle;
 
 	// Complex datatype param
 	hid_t C_dtype;
@@ -118,7 +127,7 @@ typedef struct complex_type {
 extern system_vars_struct   	*sys_vars;               // Global pointer to system parameters struct 
 extern runtime_data_struct  	*run_data;               // Global pointer to system runtime data struct 
 extern runstat_vars_struct 	   *stat_vars;	             // Global pointer to statistics analysis parameters struct
-extern phaseorder_vars_struct  *phase_vars;			     // Global pointer to the phase order analysis parameters struct
+extern phaseorder_vars_struct *phase_vars;			     // Global pointer to the phase order analysis parameters struct
 extern HDF_file_info_struct    *file_info;	             // Global pointer to the input/output hdf5 file info
 
 

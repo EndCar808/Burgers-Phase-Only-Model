@@ -53,11 +53,11 @@ int main(int argc, char** argv) {
 	int k0 = 1;
 
 	// Specify initial condition
-	char* u0 = "ALIGNED";
+	char* u0 = "ZERO";
 
 	// Integration parameters
-	int m_end  = 1000;
-	int m_iter = 20;
+	int m_end  = 8000;
+	int m_iter = 50;
 
 
 	// ------------------------------

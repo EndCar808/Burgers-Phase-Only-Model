@@ -33,8 +33,8 @@
 // ---------------------------------------------------------------------
 int get_args(int argc, char** argv) {
 
-	if(argc != 7) {
-		fprintf(stderr, "ERROR: Not enough input parameters specified.\nLooking for:\nN\nk0\nAlpha\nBeta\nSaving Iters\nTransient Iters\n");
+	if(argc != 8) {
+		fprintf(stderr, "ERROR: Not enough input parameters specified.\nLooking for:\nN\nk0\nAlpha\nBeta\nSaving Iters\nTransient Iters\nInitial Condition\n");
 		exit(1);
 	} 
 	
@@ -44,7 +44,8 @@ int get_args(int argc, char** argv) {
 	sys_vars->alpha    = atof(argv[3]);
 	sys_vars->beta     = atof(argv[4]);
 	sys_vars->post_trans_iters = atoi(argv[5]);
-	sys_vars->trans_iters     = atoi(argv[6]);
+	sys_vars->trans_iters      = atoi(argv[6]);
+	strcpy(sys_vars->u0, argv[7]);          
 
 	// Other variables
 	sys_vars->M       = 2 * sys_vars->N;
@@ -95,12 +96,17 @@ hid_t create_complex_datatype() {
 
 void open_input_file() {
 
-	// Initialize variables
-	strncpy((file_info->input_file_name), "../Data/Output/Stats/Runtime_Data", 512);
-	char Input_file_data[512];
-
+	// Initialize Input filename and Output dir
+	// strncpy((file_info->input_file_name), "../Data/Output/Stats/Runtime_Data", 512);
+	// 
+	sprintf(file_info->output_dir,  "../Data/RESULTS/RESULTS_N[%d]_k0[%d]_ALPHA[%1.3lf]_BETA[%1.3lf]_u0[%s]", sys_vars->N, sys_vars->k0, sys_vars->alpha, sys_vars->beta, sys_vars->u0);
+	strcpy((file_info->input_file_name), (file_info->output_dir));
+	
 	// Form the input file path
-	sprintf(Input_file_data,  "_N[%d]_k0[%d]_ALPHA[%1.3lf]_BETA[%1.3lf]_u0[%s]_ITERS[%d]_TRANS[%d].h5", sys_vars->N, sys_vars->k0, sys_vars->alpha, sys_vars->beta, "ALIGNED", sys_vars->post_trans_iters, sys_vars->trans_iters);
+	char Input_file_data[512];
+	// sprintf(Input_file_data,  "_N[%d]_k0[%d]_ALPHA[%1.3lf]_BETA[%1.3lf]_u0[%s]_ITERS[%d]_TRANS[%d].h5", sys_vars->N, sys_vars->k0, sys_vars->alpha, sys_vars->beta, sys_vars->u0, sys_vars->post_trans_iters, sys_vars->trans_iters);
+	// strcat(file_info->input_file_name, Input_file_data);
+	sprintf(Input_file_data,  "/SolverData_ITERS[%d]_TRANS[%d].h5", sys_vars->post_trans_iters, sys_vars->trans_iters);
 	strcat(file_info->input_file_name, Input_file_data);
 	
 	// Print file path to screen
@@ -257,6 +263,7 @@ void read_input_data() {
 	//--------------- AMPS ------------- //
 	///////////////////////////////////////
 
+	#ifdef __TRIADS
 	///////////////////////////////////////
 	//-------------- TRIADS ------------ //
 	///////////////////////////////////////
@@ -293,6 +300,7 @@ void read_input_data() {
 	///////////////////////////////////////
 	//-------------- TRIADS ------------ //
 	///////////////////////////////////////
+	#endif
 	#endif
 
 

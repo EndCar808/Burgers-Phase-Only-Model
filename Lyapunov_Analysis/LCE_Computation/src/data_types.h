@@ -12,7 +12,7 @@
 // #define __MODES
 // #define __REALSPACE
 // #define __LCE_ERROR
-// #define TRANSIENT			// Turn on transient iterations - these iterations are ignored in the calculation
+// #define __TRANSIENTS			// Turn on transient iterations - these iterations are ignored in the calculation
 
 
 

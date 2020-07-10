@@ -4,14 +4,14 @@ import numpy as np
 import re
 
 # Values to run for
-# n = [64, 128, 256]
-n = [1024]
+n = [64, 128, 256, 512]
+
 # a = np.append(np.append(np.arange(0.0, 1.0, 0.05), np.arange(1.0, 2.0, 0.025)), np.arange(2.0, 2.5, 0.05))
 a = np.arange(0.0, 2.5, 0.05)
 print(a)
 print(a.shape)
 
-beta = 1.0;
+beta = 0.0;
 
 ######################
 ##	Create command list

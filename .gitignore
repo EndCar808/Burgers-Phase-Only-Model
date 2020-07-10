@@ -15,8 +15,17 @@
 *.pdf
 *.hdf5
 
+# Jupyter Stuff
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+
 # Data Folders
 ./Data/
 .Data/
 ./Libraries/
 Libraries/
+
+# Misc
+.nfs000000000009716800000001
+PO_Spectral_Solver/bin/.nfs000000000009716800000001

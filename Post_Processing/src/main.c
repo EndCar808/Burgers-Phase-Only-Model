@@ -89,7 +89,6 @@ int main(int argc, char** argv) {
 	// ------------------------------
 	//  Open Input filename 
 	// ------------------------------
-	
 	open_input_file();
 
 
@@ -165,14 +164,19 @@ int main(int argc, char** argv) {
 	
 	free(run_data->amp);
 	free(run_data->phi);
+	#ifdef __TRIADS
 	free(run_data->triads);
+	#endif
 	#endif
 
 
 
 
 	// // Close pipeline to output file
-	H5Fclose(file_info->input_file_handle);
+	if((H5Fclose(file_info->input_file_handle)) < 0 ) {
+		fprintf(stderr, "\nERROR!! | in file:%s @line:%d | unable to close input file [%s], check input filename and HDF5 parameters.\n", __FILE__, __LINE__, file_info->input_file_name);		
+		exit(1);
+	}
 
 
 	

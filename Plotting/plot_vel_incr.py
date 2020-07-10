@@ -29,7 +29,7 @@ from subprocess import Popen, PIPE
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.gridspec import GridSpec
 from matplotlib.pyplot import cm 
-import numpy as np
+import numpy as np 
 np.set_printoptions(threshold=sys.maxsize)
 from numba import jit
 
@@ -108,20 +108,49 @@ def compute_str_p(du_r, rlen):
 
 
 
-# @jit(nopython = True)
-# def compute_velinc_rms(u_rms):
-# 	du_r   = np.zeros((u_rms.shape[0], u_rms.shape[1], 1))
+## Real Space Data
+def compute_realspace(amps, phases, N):
+	print("\n...Creating Real Space Soln...\n")
 
-# 	rList  = [1]
-# 	# , kmax/4, 2 * kmax/4, 3*kmax/4, kmax]
+	# Create full set of amps and phases
+	amps_full   = np.append(amps[0, :], np.flipud(amps[0, 1:-1]))
+	phases_full = np.concatenate((phases[:, :], -np.fliplr(phases[:, 1:-1])), axis = 1)
 
-# 	for i in range(u_rms.shape[0]):
-# 		for j in range(u_rms.shape[1]):
-# 			for k, r in enumerate(rList):
-# 				du_r[i, j, k] = u_rms[i, np.mod(j + r, u_rms.shape[1])] - u_rms[i, j]
+	# Construct modes and realspace soln
+	u_z = amps_full * np.exp(np.complex(0.0, 1.0) * phases_full)
+	u   = np.real(np.fft.ifft(u_z, axis = 1))
+
+	# Compute normalized realspace soln
+	u_rms  = np.sqrt(np.mean(u[:, :]**2, axis = 1))
+	u_urms = np.array([u[i, :] / u_rms[i] for i in range(u.shape[0])])
+
+	x = np.arange(0, 2*np.pi, 2*np.pi/N)
+	
+	return u, u_urms, x, u_z
 
 
-# 	return du_r
+# # @jit(nopython = True)
+# def compute_deriv(u_z, NUM_OSC):
+
+# 	k    = np.arange(NUM_OSC)
+# 	dudx = np.zeros((u_z.shape))
+
+# 	k_full = np.append(k, np.flipud(k[1:-1]))
+
+# 	dudx   = np.fft.ifft(np.complex(0.0, 1.0) * k_full * u_z,  axis = 1)
+
+# 	return np.real(dudx)
+
+def compute_gradient(u_z, kmin, kmax):
+	print("\nCreating Gradient\n")
+	k            = np.concatenate((np.zeros((kmin)), np.arange(kmin, kmax + 1), -np.flip(np.arange(kmin, kmax)), np.zeros((kmin - 1))))
+	grad_u_z     = np.complex(0.0, 1.0) * k * u_z
+	du_x         = np.real(np.fft.ifft(grad_u_z, axis = 1))
+	du_x_rms_tmp = np.sqrt(np.mean(du_x ** 2, axis = 1))
+	du_x_rms     = np.array([du_x[i, :] / du_x_rms_tmp[i] for i in range(u_z.shape[0])])
+
+	return du_x, du_x_rms
+
 
 
 if __name__ == '__main__':
@@ -129,7 +158,7 @@ if __name__ == '__main__':
 	#########################
 	##	Get Input Parameters
 	#########################
-	if (len(sys.argv) != 7):
+	if (len(sys.argv) != 8):
 	    print("No Input Provided, Error.\nProvide: \nk0\nAlpha\nBeta\nIterations\nTransient Iterations\nN\n")
 	    sys.exit()
 	else: 
@@ -139,7 +168,9 @@ if __name__ == '__main__':
 	    iters = int(sys.argv[4])
 	    trans = int(sys.argv[5])
 	    N     = int(sys.argv[6])
-	filename = "/Runtime_Data_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[ALIGNED]_ITERS[{}]_TRANS[{}]".format(N, k0, alpha, beta, iters, trans)
+	    u0    = str(sys.argv[7])
+
+	filename = "/Runtime_Data_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]_ITERS[{}]_TRANS[{}]".format(N, k0, alpha, beta, u0, iters, trans)
 
 	######################
 	##	Input & Output Dir
@@ -164,7 +195,7 @@ if __name__ == '__main__':
 	######################
 	##	Read in Datasets
 	######################
-	# phases = HDFfileData['Phases'][:, :]
+	phases = HDFfileData['Phases'][:, :]
 	time   = HDFfileData['Time'][:, :]
 	amps   = HDFfileData['Amps'][:, :]
 	# lce    = HDFfileData['LCE'][:, :]
@@ -172,8 +203,8 @@ if __name__ == '__main__':
 	vel_inc_s = HDFfileData['VelIncSmall'][:, :]
 	vel_inc_m = HDFfileData['VelIncMid'][:, :]
 	vel_inc_l = HDFfileData['VelIncLarge'][:, :]
-	deriv    = HDFfileData['Derivative'][:, :]
-	u    = HDFfileData['RealSpace'][:, :]
+	deriv = HDFfileData['Derivative'][:, :]
+	u     = HDFfileData['RealSpace'][:, :]
 
 	######################
 	##	Preliminary Calcs
@@ -214,10 +245,10 @@ if __name__ == '__main__':
 	vflat_s = VelIncsSmall.flatten() / np.std(VelIncsMid.flatten())
 	vflat_m = VelIncsMid.flatten() / np.std(VelIncsMid.flatten())
 	vflat_l = VelIncsLarge.flatten() / np.std(VelIncsMid.flatten())
-	d_flat = Deriv.flatten() / np.std(Deriv.flatten())
+	d_flat  = Deriv.flatten() / np.std(Deriv.flatten() )
 
 	Den = False
-	numbin = 10000
+	numbin = 1000
 	hist, bins  = np.histogram(vflat_s, bins = numbin, density = Den);
 	bin_centers = (bins[1:] + bins[:-1]) * 0.5
 	plt.plot(bin_centers, hist)
@@ -239,23 +270,11 @@ if __name__ == '__main__':
 	plt.close()
 
 
+
 	
-	plt.figure()
-	hist, bins  = np.histogram( (2.0 * np.pi / N)*d_flat, bins = numbin, density = Den);
-	bin_centers = (bins[1:] + bins[:-1]) * 0.5
-	plt.plot(bin_centers, hist)
-	plt.yscale('symlog')
-	plt.grid(True)
-
-	plt.savefig(output_dir + "/Derivative_flat.png", format='png', dpi = 400)  
-	plt.close()
-
-
-
-
-	##
+	##################################
 	rlen = 2
-	du_r, rList = compute_velinc(N * u, rlen)
+	du_r, rList = compute_velinc( u, rlen)
 
 	plt.figure()
 	hist, bins  = np.histogram(d_flat, bins = numbin, density = Den);
@@ -270,7 +289,7 @@ if __name__ == '__main__':
 	plt.yscale('symlog')
 	plt.grid(True)
 
-	plt.savefig(output_dir + "/Derivative_and_Smallscles.png", format='png', dpi = 400)  
+	plt.savefig(output_dir + "/Derivative_and_SmallsclesPyhton.png", format='png', dpi = 400)  
 	plt.close()
 
 	# str_p, str_p_abs = compute_str_p(du_r, rlen)
@@ -298,4 +317,41 @@ if __name__ == '__main__':
 	# plt.legend([r"$p = {}$".format(p) for p in range(str_p.shape[0])])
 
 	# plt.savefig(output_dir + "/AbsStructureFunc.png", format='png', dpi = 400)  
+	# plt.close()
+	
+
+
+
+	##################################
+	u_py, u_urms, x, u_z = compute_realspace(amps, phases, N)
+
+	# plt.figure()
+	# plt.plot(x, u[100, :] / N)
+	# plt.plot(x, u_py[100, :])
+	# plt.legend(["C", "Python"])
+	# plt.savefig(output_dir + "/RealSpaceCompare.png", format='png', dpi = 400)  
+	# plt.close()
+
+	deriv_py deriv_py_rms = compute_deriv(u_z, num_osc)
+	deriv_py_flat = deriv_py.flatten() / np.std(deriv_py.flatten())
+
+	print(deriv_py[100, :])
+
+	plt.figure()
+	# plt.plot(x, Deriv[100, :])
+	plt.plot(x, deriv_py[100, :])
+	plt.legend(["C", "Python"])
+	plt.savefig(output_dir + "/DerivCompare.png", format='png', dpi = 400)  
+	plt.close()
+	
+
+	# plt.figure()
+	# hist, bins  = np.histogram(d_flat / N, bins = numbin, density = Den);
+	# bin_centers = (bins[1:] + bins[:-1]) * 0.5
+	# plt.plot(bin_centers, hist)
+	# hist, bins  = np.histogram(deriv_py_flat, bins = numbin, density = Den);
+	# bin_centers = (bins[1:] + bins[:-1]) * 0.5
+	# plt.plot(bin_centers, hist)
+	# plt.legend(["C", "Python"])
+	# plt.savefig(output_dir + "/DerivPDFCompare.png", format='png', dpi = 400)  
 	# plt.close()

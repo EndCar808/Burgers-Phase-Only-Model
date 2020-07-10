@@ -34,7 +34,6 @@
 // ---------------------------------------------------------------------
 //  Function Definitions
 // ---------------------------------------------------------------------
-
 void po_rhs_extended(double* rhs, double* rhs_ext, fftw_complex* u_z, double* pert, fftw_plan *plan_c2r_pad, fftw_plan *plan_r2c_pad, int* kx, int n, int num_osc, int k0) {
 
 
@@ -49,15 +48,19 @@ void po_rhs_extended(double* rhs, double* rhs_ext, fftw_complex* u_z, double* pe
 
 	// Allocate temporary arrays
 	double* u_tmp   = (double* ) malloc(m*sizeof(double));
+	mem_chk(u_tmp, "u_tmp");
 	double* jac_tmp = (double* ) malloc((num_osc - (k0 + 1)) * (num_osc - (k0 + 1)) *sizeof(double));
+	mem_chk(jac_tmp, "jac_tmp");
 
 	fftw_complex* conv    = (fftw_complex* ) fftw_malloc(num_osc * sizeof(fftw_complex));
-	fftw_complex* u_z_tmp = (fftw_complex* ) fftw_malloc(2 * num_osc * sizeof(fftw_complex));
+	mem_chk(conv, "conv");
+	fftw_complex* u_z_tmp = (fftw_complex* ) fftw_malloc((2 * num_osc - 1) * sizeof(fftw_complex));
+	mem_chk(u_z_tmp, "u_z_tmp");
 	
 
 
 	// Write data to padded array
-	for (int i = 0; i < 2*num_osc; ++i)	{
+	for (int i = 0; i < (2 * num_osc - 1); ++i)	{
 		if(i < num_osc){
 			u_z_tmp[i] = u_z[i];
 		} else {
@@ -127,7 +130,7 @@ void po_rhs_extended(double* rhs, double* rhs_ext, fftw_complex* u_z, double* pe
 			}
 		}
 	}
-
+		
 
 	// Call matrix matrix multiplication - C = alpha*A*B + beta*C => rhs_ext = alpha*jac_tmp*pert + 0.0*C
 	// variables setup
@@ -159,8 +162,8 @@ void jacobian(double* jac, fftw_complex* u_z, int n, int num_osc, int k0) {
 	int index;
 
 	// initialize array for the convolution
-	fftw_complex* conv;
-	conv = (fftw_complex* ) fftw_malloc(num_osc*sizeof(fftw_complex));
+	fftw_complex* conv = (fftw_complex* ) fftw_malloc(num_osc*sizeof(fftw_complex));
+	mem_chk(conv, "conv");
 	
 	// Call convolution for diagonal elements
 	conv_direct(conv, u_z, num_osc, k0);
@@ -212,8 +215,8 @@ double trace(fftw_complex* u_z, int n, int num_osc, int k0) {
 	double tra;
 
 	// initialize array for the convolution
-	fftw_complex* conv;
-	conv = (fftw_complex* ) fftw_malloc(num_osc*sizeof(fftw_complex));
+	fftw_complex* conv = (fftw_complex* ) fftw_malloc(num_osc*sizeof(fftw_complex));
+	mem_chk(conv, "conv");
 	
 	// Call convolution for diagonal elements
 	conv_direct(conv, u_z, num_osc, k0);
@@ -299,9 +302,12 @@ void orthonormalize(double* pert, double* znorm, int num_osc, int kmin) {
 	int ldc = kdim;  // leading dim of C
 	
 	// Allocate temporary memory
-	double* tau        = (double* )malloc(sizeof(double) * kdim);	
+	double* tau        = (double* )malloc(sizeof(double) * kdim);
+	mem_chk(tau, "tau");	
 	double* col_change =  (double* )malloc(sizeof(double) * (kdim) * (kdim));
+	mem_chk(col_change, "col_change");
 	double* rhs_pert   =  (double* )malloc(sizeof(double) * (kdim) * (kdim));
+	mem_chk(rhs_pert, "rhs_pert");
 
 	// Initialize col_change matrix
 	for (int i = 0; i < kdim; ++i) {
@@ -368,6 +374,7 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 
 	// print update every x iterations
 	int print_every = (m_end >= 10 ) ? (int)((double)m_end * 0.1) : 10;
+	
 
 	// Looping variables
 	int tmp;
@@ -378,24 +385,36 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	// ------------------------------
 	// Allocate mode related arrays
 	int* kx  = (int* ) malloc(num_osc * sizeof(int));
+	mem_chk(kx, "kx");
 	double* amp   = (double* ) malloc(num_osc * sizeof(double));
+	mem_chk(amp, "amp");
 	double* phi   = (double* ) malloc(num_osc * sizeof(double));
+	mem_chk(phi, "phi");
 	double* u_pad = (double* ) malloc(M * sizeof(double));
+	mem_chk(u_pad, "u_pad");
 	fftw_complex* u_z = (fftw_complex* ) fftw_malloc(num_osc * sizeof(fftw_complex));
-	fftw_complex* u_z_pad = (fftw_complex* ) fftw_malloc(2 * num_osc * sizeof(fftw_complex));
+	mem_chk(u_z, "u_z");
+	fftw_complex* u_z_pad = (fftw_complex* ) fftw_malloc((2 * num_osc - 1) * sizeof(fftw_complex));
+	mem_chk(u_z_pad, "u_z_pad");
 
 	// LCE Spectrum Arrays
 	double* znorm    = (double* )malloc(sizeof(double) * (num_osc - kmin));	
+	mem_chk(znorm, "znorm");
 	double* lce      = (double* )malloc(sizeof(double) * (num_osc - kmin));
+	mem_chk(lce, "lce");
 	double* run_sum  = (double* )malloc(sizeof(double) * (num_osc - kmin));
+	mem_chk(run_sum, "run_sum");
 	#ifdef __LCE_ERROR
 	double* lce_last = (double* )malloc(sizeof(double) * (num_osc - kmin));
+	mem_chk(lce_last, "lce_last");
 	double* abs_err  = (double* )malloc(sizeof(double) * (num_osc - kmin));
+	mem_chk(abs_err, "abs_err");
 	#endif
 
 	#ifdef __TRIADS
 	// Allocate array for triads
 	double* triads = (double* )malloc(k_range * k1_range * sizeof(double));
+	mem_chk(triads, "triads");
 	
 	// initialize triad array to handle empty elements
 	for (int i = 0; i < k_range; ++i) {
@@ -427,9 +446,14 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	RK2 = (double* )fftw_malloc(num_osc*sizeof(double));
 	RK3 = (double* )fftw_malloc(num_osc*sizeof(double));
 	RK4 = (double* )fftw_malloc(num_osc*sizeof(double));
+	mem_chk(RK1, "RK1");
+	mem_chk(RK2, "RK2");
+	mem_chk(RK3, "RK3");
+	mem_chk(RK4, "RK4");
 
 	// Temp array for intermediate modes
 	fftw_complex* u_z_tmp = (fftw_complex* )fftw_malloc(num_osc*sizeof(fftw_complex));
+	mem_chk(u_z_tmp, "u_z_tmp");
 
 	// Memory for the four RHS evalutions for the perturbed system
 	double* RK1_pert, *RK2_pert, *RK3_pert, *RK4_pert;
@@ -437,11 +461,16 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	RK2_pert = (double* )fftw_malloc((num_osc - kmin)*(num_osc - kmin)*sizeof(double));
 	RK3_pert = (double* )fftw_malloc((num_osc - kmin)*(num_osc - kmin)*sizeof(double));
 	RK4_pert = (double* )fftw_malloc((num_osc - kmin)*(num_osc - kmin)*sizeof(double));
+	mem_chk(RK1_pert, "RK1_pert");
+	mem_chk(RK2_pert, "RK2_pert");
+	mem_chk(RK3_pert, "RK3_pert");
+	mem_chk(RK4_pert, "RK4_pert");
 
 	// Memory for the solution to the perturbed system
 	double* pert     = (double* ) malloc((num_osc - kmin)*(num_osc - kmin)*sizeof(double));
+	mem_chk(pert, "pert");
 	double* pert_tmp = (double* ) malloc((num_osc - kmin)*(num_osc - kmin)*sizeof(double));
-
+	mem_chk(pert_tmp, "pert_tmp");
 
 	// ------------------------------
 	//  Create FFTW plans
@@ -460,12 +489,14 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	//  Get Initial Condition
 	// ------------------------------
 	// Set the initial condition of the perturb system to the identity matrix
-	initial_conditions_lce(pert, phi, amp, kx, num_osc, k0, kmin, a, b);
+	initial_conditions_lce(pert, phi, amp, u_z, kx, num_osc, k0, kmin, a, b, u0);
 
-	for (int i = 0; i < num_osc; ++i) {
-		printf("k[%d]: %d | a: %5.15lf   p: %5.16lf   | u_z[%d]: %5.16lf  %5.16lfI \n", i, kx[i], amp[i], phi[i], i, creal(amp[i] * cexp(I * phi[i])), cimag(amp[i] * cexp(I * phi[i])));
+	if (num_osc <= 32) {
+		for (int i = 0; i < num_osc; ++i) {
+			printf("k[%d]: %d | a: %5.15lf   p: %5.16lf   | u_z[%d]: %5.16lf  %5.16lfI \n", i, kx[i], amp[i], phi[i], i, creal(amp[i] * cexp(I * phi[i])), cimag(amp[i] * cexp(I * phi[i])));
+		}
+		printf("\n\n");
 	}
-	printf("\n\n");
 
 
 	// ------------------------------
@@ -473,13 +504,10 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	// ------------------------------
 	double dt = get_timestep(amp, fftw_plan_c2r, fftw_plan_r2c, kx, N, num_osc, k0);
 
-	#ifdef TRANSIENT
-	int trans_iters;
-	// trans_iters = TRANS_STEPS;
-	trans_iters = get_transient_iters(amp, fftw_plan_c2r, fftw_plan_r2c, kx, N, num_osc, k0);
+	#ifdef __TRANSIENTS
+	int trans_iters = get_transient_iters(amp, fftw_plan_c2r, fftw_plan_r2c, kx, N, num_osc, k0);
 	#else
-	int trans_iters;
-	trans_iters = 0;
+	int trans_iters = 0;
 	#endif
 
 	// ------------------------------
@@ -491,7 +519,7 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 
 	// LCE algorithm varibales
 	int m = 1;
-	#ifdef TRANSIENT
+	#ifdef __TRANSIENTS
 	int trans_m = (int) ceil(trans_iters / m_iter);
 	#else
 	int trans_m = 0;
@@ -504,10 +532,6 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	double T       = t0 + m_iter * dt;	
 
 
-	printf("\n\nTrans: %d | trans_m: %d | Tot_t: %d - Tot_m: %d - Max_m: %d | Printevery: %d \n", trans_iters, trans_m, tot_t_save_steps, tot_m_save_steps, max_m_iters, print_every);
-
-
-	
 	// ------------------------------
 	//  HDF5 File Create
 	// ------------------------------
@@ -520,26 +544,22 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	hid_t HDF_data_set[4];
 	hid_t HDF_mem_space[4];
 
-	// // define filename - const because it doesnt change
-	char output_file_name[128] = "../../Data/Output/LCE/LCE_Runtime_Data";
-	char output_file_data[128];
+	// get output file name
+	char output_file_name[512];
+	get_output_file_name(output_file_name, N, k0, a, b, u0, (m_iter * m_end), trans_iters);
 
-	// form the filename of the output file
-	sprintf(output_file_data,  "_N[%d]_k0[%d]_ALPHA[%1.3lf]_BETA[%1.3lf]_u0[%s]_ITERS[%d].h5", N, k0, a, b, u0, m_iter * m_end);
-	strcat(output_file_name, output_file_data);
 	
-	// Print file name to screen
-	printf("\nOutput File: %s \n\n", output_file_name);
-
-
 	// open output file and create hyperslabbed datasets 
 	open_output_create_slabbed_datasets_lce(&HDF_file_handle, output_file_name, HDF_file_space, HDF_data_set, HDF_mem_space, tot_t_save_steps, tot_m_save_steps, num_osc, k_range, k1_range, kmin);
 
 
 	// Create arrays for time and phase order to save after algorithm is finished
 	double* time_array      = (double* )malloc(sizeof(double) * (tot_t_save_steps + 1));
+	mem_chk(time_array, "time_array");
 	double* phase_order_R   = (double* )malloc(sizeof(double) * (tot_t_save_steps + 1));
+	mem_chk(phase_order_R, "phase_order_R");
 	double* phase_order_Phi = (double* )malloc(sizeof(double) * (tot_t_save_steps + 1));
+	mem_chk(phase_order_Phi, "phase_order_Phi");
 
 	// ------------------------------
 	//  Write Initial Conditions to File
@@ -559,7 +579,7 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	#endif
 
 	// Write initial time
-	#ifdef TRANSIENT
+	#ifdef __TRANSIENTS
 	time_array[0] = trans_iters * dt;
 	#else
 	time_array[0] = 0.0;
@@ -590,9 +610,6 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 			/*---------- STAGE 1 ----------*/
 			// find RHS first and then update stage
 			po_rhs_extended(RK1, RK1_pert, u_z_tmp, pert, &fftw_plan_c2r, &fftw_plan_r2c, kx, N, num_osc, k0);
-
-			// print_array_2d_d(RK1_pert, "RK1_pert", num_osc - kmin, num_osc - kmin);
-
 			for (int i = 0; i < num_osc; ++i) {
 				u_z_tmp[i] = amp[i] * cexp(I * (phi[i] + A21 * dt * RK1[i]));
 					if (i < num_osc - kmin) {
@@ -688,14 +705,12 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 			t    = iter*dt;			
 			iter += 1;			
 		}
-
-		
 		// ------------------------------
 		//  Orthonormalize 
 		// ------------------------------
 		orthonormalize(pert, znorm, num_osc, kmin);
 
-
+	
 		// ------------------------------
 		//  Compute LCEs & Write To File
 		// ------------------------------
@@ -728,10 +743,22 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 			// Print update to screen
 			if (m % print_every == 0) {
 				double lce_sum = 0.0;
+				double dim_sum = 0.0;
+				int dim_indx   = 0;
 				for (int i = 0; i < num_osc - kmin; ++i) {
+					// Get spectrum sum
 					lce_sum += lce[i];
+
+					// Compute attractor dim
+					if (dim_sum + lce[i] > 0) {
+						dim_sum += lce[i];
+						dim_indx += 1;
+					}
+					else {
+						continue;
+					}
 				}
-				printf("Iter: %d / %d | t: %5.6lf tsteps: %d | k0:%d alpha: %5.6lf beta: %5.6lf | Sum: %5.9lf\n", m, m_end, t, m_end * m_iter, k0, a, b, lce_sum);
+				printf("Iter: %d / %d | t: %5.6lf tsteps: %d | k0:%d alpha: %5.6lf beta: %5.6lf | Sum: %5.9lf | Dim: %5.9lf\n", m, m_end, t, m_end * m_iter, k0, a, b, lce_sum, (dim_indx + (dim_sum / fabs(lce[dim_indx]))));
 				printf("k: \n");
 				for (int j = 0; j < num_osc - kmin; ++j) {
 					printf("%5.6lf ", lce[j]);
@@ -746,7 +773,7 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 		// ------------------------------
 		T = T + m_iter * dt;
 		m += 1;
-		#ifdef TRANSIENT
+		#ifdef __TRANSIENTS
 		if (m - 1 == trans_m) {
 			printf("\n\t!!Transient Iterations Complete!! - Iters: %d\n\n", iter - 1);
 		}
@@ -755,35 +782,31 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	// ------------------------------
 	//  Write 1D Arrays Using HDF5Lite
 	// ------------------------------
-	hid_t D2 = 2;
-	hid_t D2dims[D2];
+	hid_t D1 = 1;
+	hid_t D1dims[D1];
 
 	// Write amplitudes
-	D2dims[0] = 1;
-	D2dims[1] = num_osc;
-	if ( (H5LTmake_dataset(HDF_file_handle, "Amps", D2, D2dims, H5T_NATIVE_DOUBLE, amp)) < 0){
+	D1dims[0] = num_osc;
+	if ( (H5LTmake_dataset(HDF_file_handle, "Amps", D1, D1dims, H5T_NATIVE_DOUBLE, amp)) < 0){
 		printf("\n\n!!Failed to make - Amps - Dataset!!\n\n");
 	}
 
 	// Wtie time
-	D2dims[0] = tot_t_save_steps + 1;
-	D2dims[1] = 1;
-	if ( (H5LTmake_dataset(HDF_file_handle, "Time", D2, D2dims, H5T_NATIVE_DOUBLE, time_array)) < 0) {
+	D1dims[0] = tot_t_save_steps + 1;
+	if ( (H5LTmake_dataset(HDF_file_handle, "Time", D1, D1dims, H5T_NATIVE_DOUBLE, time_array)) < 0) {
 		printf("\n\n!!Failed to make - Time - Dataset!!\n\n");
 	}
 
 	#ifdef __TRIADS
 	// Write Phase Order R
-	D2dims[0] = tot_t_save_steps + 1;
-	D2dims[1] = 1;
-	if ( (H5LTmake_dataset(HDF_file_handle, "PhaseOrderR", D2, D2dims, H5T_NATIVE_DOUBLE, phase_order_R)) < 0) {
+	D1dims[0] = tot_t_save_steps + 1;
+	if ( (H5LTmake_dataset(HDF_file_handle, "PhaseOrderR", D1, D1dims, H5T_NATIVE_DOUBLE, phase_order_R)) < 0) {
 		printf("\n\n!!Failed to make - PhaseOrderR - Dataset!!\n\n");
 	}
 
 	// Write Phase Order Phi
-	D2dims[0] = tot_t_save_steps + 1;
-	D2dims[1] = 1;
-	if ( (H5LTmake_dataset(HDF_file_handle, "PhaseOrderPhi", D2, D2dims, H5T_NATIVE_DOUBLE, phase_order_Phi)) < 0) {
+	D1dims[0] = tot_t_save_steps + 1;
+	if ( (H5LTmake_dataset(HDF_file_handle, "PhaseOrderPhi", D1, D1dims, H5T_NATIVE_DOUBLE, phase_order_Phi)) < 0) {
 		printf("\n\n!!Failed to make - PhaseOrderPhi - Dataset!!\n\n");
 	}
 	#endif
@@ -846,5 +869,7 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	H5Sclose( HDF_mem_space[2] );
 	H5Dclose( HDF_data_set[2] );
 	H5Sclose( HDF_file_space[2] );
+
+	// Close output file
 	H5Fclose(HDF_file_handle);
 }

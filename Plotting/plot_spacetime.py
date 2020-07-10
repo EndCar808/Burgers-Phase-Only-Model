@@ -110,7 +110,9 @@ def plot_spacetime(x, u_urms, time, phases, N, alpha, beta, k0):
 	div2  = make_axes_locatable(ax2)
 	cbax2 = div2.append_axes("right", size = "10%", pad = 0.05)
 	cb2   = plt.colorbar(im2, cax = cbax2)
-	cb2.set_label(r"$\phi_k(t) / \phi_k^{rms}(t)$")
+	cb2.set_ticks([ 0.0, np.pi/2.0, np.pi, 3.0*np.pi/2.0, 2.0*np.pi])
+	cb2.set_ticklabels([r"$0$", r"$\frac{\pi}{2}$", r"$\pi$", r"$\frac{3\pi}{2}$", r"$2\pi$"])
+	cb2.set_label(r"$\phi_k(t)$")
 
 	plt.savefig(output_dir + "/SPACETIME_N[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(N, alpha, beta, k0, iters), format='png', dpi = 400)  
 	plt.close()
@@ -135,7 +137,7 @@ def plot_grad_realspace(x, u_urms, du_x_rms, N, alpha, beta, k0):
 	ax2.set_ylabel(r"$\partial_x u(x, t) / \partial_x u^{rms}(x, t)$", color = 'red')
 
 	## FINAL TIME
-	t = 100000
+	t = -1
 	ax3.plot(x, u_urms[t, :], color = 'blue')
 	ax3.set_xlabel(r"$x$")
 	leg3 = mpl.patches.Rectangle((0, 0), 0, 0, alpha = 0.0)
@@ -165,21 +167,24 @@ if __name__ == '__main__':
 	######################
 	##	Get Input Parameters
 	######################
-	if (len(sys.argv) != 6):
-	    print("No Input Provided, Error.\nProvide: \nk0\nAlpha\nBeta\nIterations\nN\n")
+	if (len(sys.argv) != 8):
+	    print("No Input Provided, Error.\nProvide: \nk0\nAlpha\nBeta\nIterations\nTransient Iterations\nN\n")
 	    sys.exit()
 	else: 
 	    k0    = int(sys.argv[1])
 	    alpha = float(sys.argv[2])
 	    beta  = float(sys.argv[3])
 	    iters = int(sys.argv[4])
-	    N     = int(sys.argv[5])
-	filename = "/LCE_Runtime_Data_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[ALIGNED]_ITERS[{}]".format(N, k0, alpha, beta, iters)
+	    trans = int(sys.argv[5])
+	    N     = int(sys.argv[6])
+	    u0    = str(sys.argv[7])
+
+	filename = "/Runtime_Data_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]_ITERS[{}]_TRANS[{}]".format(N, k0, alpha, beta, u0, iters, trans)
 
 	######################
 	##	Input & Output Dir
 	######################
-	input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Output/LCE"
+	input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Output/Stats"
 	output_dir = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Snapshots/TriadDynamics" + filename
 
 	if os.path.isdir(output_dir) != True:
@@ -220,7 +225,7 @@ if __name__ == '__main__':
 	##	Compute Data
 	######################
 	## Compute Real Space vel
-	x, u_urms, u_z = compute_realspace(amps, phases, N)
+	u, u_urms, x, u_z = compute_realspace(amps, phases, N)
 	
 	## Compute phases
 	phases_rms = compute_phases_rms(phases)

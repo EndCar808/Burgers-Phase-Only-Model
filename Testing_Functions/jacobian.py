@@ -28,6 +28,7 @@ import shutil as shtl
 import multiprocessing as mprocs
 from threading import Thread
 from subprocess import Popen, PIPE
+
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.gridspec import GridSpec
 
@@ -343,16 +344,88 @@ def compute_stability_verus_N(nvals, Alphaval):
 	plt.close()
 
 
+def compute_stability_individual(Nval, Alphaval):
+
+	
+	N       = int(Nval)
+	NUM_OSC = int(N / 2 + 1)
+
+	## Set precision
+	mp.dps = int(N / 2)
+
+	k0 = 2
+	a  = mp.mpf(Alphaval)
+	b  = mp.mpf(0.0)
+	kmin = k0 + 1
+	kmax = NUM_OSC - 1
+
+	print(kmin)
+
+	f = h5py.File("./EigenValueData/EigenValuesData_N[{}]_ALPHA[{:0.3f}].hdf5".format(Nval, Alphaval), "w")
+
+	print("\n|----------------------------------------------------------------------------------------------------------------------------|")
+	print("|----------------------------------------------N = {}  Alpha = {:0.3f}---------------------------------------------------------|\n".format(Nval, Alphaval))
+	######################
+	##	Get Data
+	######################
+	u_z, amp, phi = fill_data(NUM_OSC, k0, a, b, 'NEW')
+
+
+	######################
+	##	Compute Jacobian
+	######################
+	jac = compute_jacobian(u_z, NUM_OSC, kmin, kmax, k0)
+
+	E, ER = mp.eig(jac)
+	E, ER = mp.eig_sort(E, ER, f = lambda x: -mp.re(x))  # sort in descending order
+	
+	## Print order eigs to screen
+	mp.nprint(E)
+	print()
+
+	## Extract real and imaginary parts
+	real_eigs = np.zeros(len(E))
+	imag_eigs = np.zeros(len(E))
+	for i in range(len(E)):
+		real_eigs[i] = E[i].real
+		imag_eigs[i] = E[i].imag
+
+
+	# Write the eigs for later analysis
+	f.create_dataset("Real", data = real_eigs)
+	f.create_dataset("Imag", data = imag_eigs)
+
+	# Remove zero eigenvalue due to translation invariance
+	min_indx = np.argmin(np.absolute(real_eigs))
+	non_zero_eigs = np.extract(real_eigs != real_eigs[min_indx], real_eigs)
+
+	# Print Non-zero eigs to screen
+	print(non_zero_eigs)
+	print()
+
+	## Compute Proportion of unstable eigenvalues
+	pos_eigs = np.extract(non_zero_eigs > 0, non_zero_eigs)
+	prop_pos = len(pos_eigs) / len(non_zero_eigs)
+
+	f.create_dataset("Prop_Pos", data = prop_pos)
+
+	print("|----------------------------------------------------------------------------------------------------------------------------|")
+	print("|----------------------------------------------------------------------------------------------------------------------------|\n")
+
+
+
+
 ######################
 ##	Main
 ######################
 if __name__ == '__main__':
 
-	Nvals = [32, 64, 128, 256, 512, 1024, 2048, 8096]
+	if (len(sys.argv) != 3):
+	    print("No Input Provided, Error.\nProvide: \nN\nAlpha\n")
+	    sys.exit()
+	else: 
+	    N     = int(sys.argv[1])
+	    alpha = float(sys.argv[2])
 
-	alpha = 1.5
-
-	compute_stability_verus_N(Nvals, alpha)
-	
-
-	
+	compute_stability_individual(N, alpha)
+	    

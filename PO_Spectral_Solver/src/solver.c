@@ -18,6 +18,8 @@
 #include <hdf5_hl.h>
 #include <omp.h>
 #include <gsl/gsl_cblas.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 
 // ---------------------------------------------------------------------
@@ -127,6 +129,35 @@ void max(double* a, int n, int k0, double* max_val) {
 	*max_val = max;
 }
 
+void get_output_file_name(char* output_file_name, int N, int k0, double a, double b, char* u0, int ntsteps, int trans_iters) {
+
+	// Create Output File Locatoin
+	char output_dir[512] = "../Data/RESULTS/RESULTS";
+	char output_dir_tmp[512];
+	sprintf(output_dir_tmp,  "_N[%d]_k0[%d]_ALPHA[%1.3lf]_BETA[%1.3lf]_u0[%s]", N, k0, a, b, u0);
+	strcat(output_dir, output_dir_tmp);
+
+	// Check if output directory exists, if not make directory
+	struct stat st = {0};
+	if (stat(output_dir, &st) == -1) {
+		  mkdir(output_dir, 0700);	  
+	}
+
+	// form the filename of the output file	
+	char output_file_data[128];
+	sprintf(output_file_data,  "/SolverData_ITERS[%d]_TRANS[%d].h5", ntsteps, trans_iters);
+	strcpy(output_file_name, output_dir);
+	strcat(output_file_name, output_file_data);
+	
+	#ifdef __STATS	
+	// Print file name to screen
+	printf("\nOutput File: %s \n\n", output_file_name);
+	printf("\n|------------- STATS RUN -------------|\n  Performing transient iterations, no data record...\n\n");
+	#else
+	// Print file name to screen
+	printf("\nOutput File: %s \n\n", output_file_name);
+	#endif	
+}
 
 void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_name, hid_t* file_space, hid_t* data_set, hid_t* mem_space, hid_t dtype, int num_t_steps, int num_osc, int k_range, int k1_range) {
 
@@ -416,8 +447,8 @@ void conv_23(fftw_complex* convo, fftw_complex* uz, fftw_plan *fftw_plan_r2c_ptr
 
 	double norm_fact = 1/((double) n);
 
-	double* u_tmp;
-	u_tmp = (double* )malloc(n*sizeof(double));
+	double* u_tmp = (double* )malloc(n*sizeof(double));
+	mem_chk(u_tmp, "u_tmp");
 
 	// transform back to Real Space
 	fftw_execute_dft_c2r((*fftw_plan_c2r_ptr_23), uz, u_tmp);
@@ -489,11 +520,11 @@ void po_rhs(double* rhs, fftw_complex* u_z, fftw_plan *plan_c2r_pad, fftw_plan *
 	fftw_complex pre_fac;
 
 	// Allocate temporary arrays
-	double* u_tmp;
-	u_tmp = (double* ) malloc( m * sizeof(double));
+	double* u_tmp = (double* ) malloc( m * sizeof(double));
+	mem_chk(u_tmp, "u_tmp");
 
-	fftw_complex* u_z_tmp;
-	u_z_tmp = (fftw_complex* ) fftw_malloc((2 * num_osc - 1) * sizeof(fftw_complex));
+	fftw_complex* u_z_tmp = (fftw_complex* ) fftw_malloc((2 * num_osc - 1) * sizeof(fftw_complex));
+	mem_chk(u_z_tmp, "u_z_tmp");
 
 	///---------------
 	/// Convolution
@@ -582,11 +613,11 @@ double get_timestep(double* amps, fftw_plan plan_c2r, fftw_plan plan_r2c, int* k
 	double max_val;
 
 	// Initialize temp memory
-	double* tmp_rhs;
-	tmp_rhs = (double* ) fftw_malloc(num_osc*sizeof(double));
+	double* tmp_rhs = (double* ) fftw_malloc(num_osc*sizeof(double));
+	mem_chk(tmp_rhs, "tmp_rhs");
 
-	fftw_complex* u_z_tmp;
-	u_z_tmp = (fftw_complex* )fftw_malloc(num_osc*sizeof(fftw_complex));
+	fftw_complex* u_z_tmp = (fftw_complex* )fftw_malloc(num_osc*sizeof(fftw_complex));
+	mem_chk(u_z_tmp, "u_z_tmp");
 
 	// Create modes for RHS evaluation
 	for (int i = 0; i < num_osc; ++i) {
@@ -623,11 +654,11 @@ int get_transient_iters(double* amps, fftw_plan plan_c2r, fftw_plan plan_r2c, in
 	int trans_mag;
 
 	// Initialize temp memory
-	double* tmp_rhs;
-	tmp_rhs = (double* ) fftw_malloc(num_osc*sizeof(double));
+	double* tmp_rhs = (double* ) fftw_malloc(num_osc*sizeof(double));
+	mem_chk(tmp_rhs, "tmp_rhs");
 
-	fftw_complex* u_z_tmp;
-	u_z_tmp = (fftw_complex* )fftw_malloc(num_osc*sizeof(fftw_complex));
+	fftw_complex* u_z_tmp = (fftw_complex* )fftw_malloc(num_osc*sizeof(fftw_complex));
+	mem_chk(u_z_tmp, "u_z_tmp");
 
 	// Create modes for RHS evaluation
 	for (int i = 0; i < num_osc; ++i) {
@@ -706,6 +737,10 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 	int kmin = k0 + 1;
 	int kmax = num_osc - 1;
 
+	// Triad phases array
+	int k_range  = kmax - kmin + 1;
+	int k1_range = (int)((kmax - kmin + 1)/ 2.0);
+
 	// print update every x iterations
 	int print_update = (iters >= 10 ) ? (int)((double)iters * 0.1) : 1;
 
@@ -717,27 +752,31 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 	// ------------------------------
 	// wavenumbers
 	int* kx = (int* ) malloc(num_osc * sizeof(int));
+	mem_chk(kx, "kx");
 
 	// Oscillator arrays
 	double* amp = (double* ) malloc(num_osc * sizeof(double));
+	mem_chk(amp, "amp");
 	double* phi = (double* ) malloc(num_osc * sizeof(double));
+	mem_chk(phi, "phi");
 
 	// modes array
 	fftw_complex* u_z = (fftw_complex* ) fftw_malloc(num_osc * sizeof(fftw_complex));
+	mem_chk(u_z, "u_z");
 	#ifdef __REALSPACE
 	double* u = (double* ) malloc(N * sizeof(double));
+	mem_chk(u, "u");
 	#endif
 
 	// padded solution arrays
 	double* u_pad = (double* ) malloc(M * sizeof(double));
+	mem_chk(u_pad, "u_pad");
 	fftw_complex* u_z_pad = (fftw_complex* ) fftw_malloc((2 * num_osc - 1) * sizeof(fftw_complex));
+	mem_chk(u_z_pad, "u_z_pad");
 
 	#ifdef __TRIADS
-	// Triad phases array
-	int k_range  = kmax - kmin + 1;
-	int k1_range = (int)((kmax - kmin + 1)/ 2.0);
-
 	double* triads = (double* )malloc(k_range * k1_range * sizeof(double));
+	mem_chk(triads, "triads");
 	// initialize triad array to handle empty elements
 	for (int i = 0; i < k_range; ++i) {
 		tmp = i * k1_range;
@@ -764,9 +803,14 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 	double* RK2 = (double* )fftw_malloc(num_osc*sizeof(double));
 	double* RK3 = (double* )fftw_malloc(num_osc*sizeof(double));
 	double* RK4 = (double* )fftw_malloc(num_osc*sizeof(double));
+	mem_chk(RK1, "RK1");
+	mem_chk(RK2, "RK2");
+	mem_chk(RK3, "RK3");
+	mem_chk(RK4, "RK4");
 
 	// temporary memory to store stages
 	fftw_complex* u_z_tmp = (fftw_complex* )fftw_malloc(num_osc*sizeof(fftw_complex));
+	mem_chk(u_z_tmp, "u_z_tmp");
 	
 
 	// ------------------------------
@@ -831,25 +875,9 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 	hid_t HDF_data_set[4];
 	hid_t HDF_mem_space[4];
 
-	// form the filename of the output file
-	#ifdef __STATS
-	char output_file_name[128] = "../Data/Output/Stats/Runtime_Data";
-	char output_file_data[128];
-	sprintf(output_file_data,  "_N[%d]_k0[%d]_ALPHA[%1.3lf]_BETA[%1.3lf]_u0[%s]_ITERS[%d]_TRANS[%d].h5", N, k0, a, b, u0, ntsteps, trans_iters);
-	strcat(output_file_name, output_file_data);
-	
-	// Print file name to screen
-	printf("\nOutput File: %s \n\n", output_file_name);
-	printf("\n|------------- STATS RUN -------------|\n  Performing transient iterations, no data record...\n\n");
-	#else
-	char output_file_name[128] = "../Data/Output/Solver/Runtime_Data";
-	char output_file_data[128];
-	sprintf(output_file_data,  "_N[%d]_k0[%d]_ALPHA[%1.3lf]_BETA[%1.3lf]_u0[%s]_ITERS[%d].h5", N, k0, a, b, u0, ntsteps);
-	strcat(output_file_name, output_file_data);
-	
-	// Print file name to screen
-	printf("\nOutput File: %s \n\n", output_file_name);
-	#endif	
+	// get output file name
+	char output_file_name[512];
+	get_output_file_name(output_file_name, N, k0, a, b, u0, ntsteps, trans_iters);
 
 	// Create complex datatype for hdf5 file if modes are being recorded
 	#ifdef __MODES
@@ -869,9 +897,12 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 	// ------------------------------
 	// Create non chunked data arrays
 	double* time_array      = (double* )malloc(sizeof(double) * (num_save_steps));
+	mem_chk(time_array, "time_array");
 	#ifdef __TRIADS
 	double* phase_order_R   = (double* )malloc(sizeof(double) * (num_save_steps));
-	double* phase_order_Phi = (double* )malloc(sizeof(double) * (num_save_steps));	
+	double* phase_order_Phi = (double* )malloc(sizeof(double) * (num_save_steps));
+	mem_chk(phase_order_R, "phase_order_R");
+	mem_chk(phase_order_Phi, "phase_order_Phi");	
 	#endif
 
 	// Write initial condition if transient iterations are not being performed
@@ -1027,34 +1058,30 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 	// ------------------------------
 	//  Write 1D Arrays Using HDF5Lite
 	// ------------------------------
-	hid_t D2 = 2;
-	hid_t D2dims[D2];
+	hid_t D1 = 1;
+	hid_t D1dims[D1];
 
 	// Write amplitudes
-	D2dims[0] = 1;
-	D2dims[1] = num_osc;
-	if ( (H5LTmake_dataset(HDF_Outputfile_handle, "Amps", D2, D2dims, H5T_NATIVE_DOUBLE, amp)) < 0){
+	D1dims[0] = num_osc;
+	if ( (H5LTmake_dataset(HDF_Outputfile_handle, "Amps", D1, D1dims, H5T_NATIVE_DOUBLE, amp)) < 0) {
 		printf("\n\n!!Failed to make - Amps - Dataset!!\n\n");
 	}
 	
 	// Wtie time
-	D2dims[0] = num_save_steps;
-	D2dims[1] = 1;
-	if ( (H5LTmake_dataset(HDF_Outputfile_handle, "Time", D2, D2dims, H5T_NATIVE_DOUBLE, time_array)) < 0) {
+	D1dims[0] = num_save_steps;
+	if ( (H5LTmake_dataset(HDF_Outputfile_handle, "Time", D1, D1dims, H5T_NATIVE_DOUBLE, time_array)) < 0) {
 		printf("\n\n!!Failed to make - Time - Dataset!!\n\n");
 	}
 	
 	#ifdef __TRIADS
 	// Write Phase Order R
-	D2dims[0] = num_save_steps;
-	D2dims[1] = 1;
-	if ( (H5LTmake_dataset(HDF_Outputfile_handle, "PhaseOrderR", D2, D2dims, H5T_NATIVE_DOUBLE, phase_order_R)) < 0) {
+	D1dims[0] = num_save_steps;
+	if ( (H5LTmake_dataset(HDF_Outputfile_handle, "PhaseOrderR", D1, D1dims, H5T_NATIVE_DOUBLE, phase_order_R)) < 0) {
 		printf("\n\n!!Failed to make - PhaseOrderR - Dataset!!\n\n");
 	}
 	// Write Phase Order Phi
-	D2dims[0] = num_save_steps;
-	D2dims[1] = 1;
-	if ( (H5LTmake_dataset(HDF_Outputfile_handle, "PhaseOrderPhi", D2, D2dims, H5T_NATIVE_DOUBLE, phase_order_Phi)) < 0) {
+	D1dims[0] = num_save_steps;
+	if ( (H5LTmake_dataset(HDF_Outputfile_handle, "PhaseOrderPhi", D1, D1dims, H5T_NATIVE_DOUBLE, phase_order_Phi)) < 0) {
 		printf("\n\n!!Failed to make - PhaseOrderPhi - Dataset!!\n\n");
 	}
 	#endif
@@ -1097,9 +1124,11 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 	H5Sclose( HDF_mem_space[0] );
 	H5Dclose( HDF_data_set[0] );
 	H5Sclose( HDF_file_space[0] );
+	#ifdef __TRIADS
 	H5Sclose( HDF_mem_space[1] );
 	H5Dclose( HDF_data_set[1] );
 	H5Sclose( HDF_file_space[1] );
+	#endif
 	#ifdef __MODES
 	H5Sclose( HDF_mem_space[2] );
 	H5Dclose( HDF_data_set[2] );

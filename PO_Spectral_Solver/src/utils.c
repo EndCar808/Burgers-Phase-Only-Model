@@ -16,7 +16,8 @@
 #include <hdf5_hl.h>
 #include <omp.h>
 #include <gsl/gsl_cblas.h>
-
+#include <sys/types.h>
+#include <sys/stat.h>
 
 // ---------------------------------------------------------------------
 //  User Libraries and Headers
@@ -28,6 +29,14 @@
 // ---------------------------------------------------------------------
 //  Function Definitions
 // ---------------------------------------------------------------------
+void mem_chk (void *arr_ptr, char *name) {
+  if (arr_ptr == NULL ) {
+    fprintf(stderr, "ERROR!! |in file \"%s\"-line:%d | Unable to malloc required memory for %s, now exiting!\n", __FILE__, __LINE__, name);
+    exit(1);
+  }
+}
+
+
 int max_indx_d(double* array, int n) {
 
 	double max = 0.0;

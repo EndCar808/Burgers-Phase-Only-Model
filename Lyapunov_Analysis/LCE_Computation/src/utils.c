@@ -21,6 +21,8 @@
 #include <omp.h>
 #include <gsl/gsl_cblas.h>
 #include <lapacke.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 
 // ---------------------------------------------------------------------
@@ -35,8 +37,7 @@
 // ---------------------------------------------------------------------
 //  Function Definitions
 // ---------------------------------------------------------------------
-
-void initial_conditions_lce(double* pert, double* phi, double* amp, int* kx, int num_osc, int k0, int kmin, double a, double b) {
+void initial_conditions_lce(double* pert, double* phi, double* amp, fftw_complex* u_z, int* kx, int num_osc, int k0, int kmin, double a, double b, char* IC) {
 
 	int tmp;
 	int indx;
@@ -54,13 +55,60 @@ void initial_conditions_lce(double* pert, double* phi, double* amp, int* kx, int
 		kx[i] = (int) i;
 
 		// fill amp and phi arrays
-		if(i <= k0) {
-			amp[i] = 0.0;
-			phi[i] = 0.0;
-		} else {
-			amp[i] = pow((double)i, -a) * exp(-b * pow((double) kx[i]/cutoff, 2) );
-			phi[i] = M_PI/2.0 * (1 + 1e-10 * pow(i, 0.9));	
-			// phi[i] = M_PI*( (double) rand() / (double) RAND_MAX);	
+		if (strcmp(IC, "ALIGNED") == 0) {
+			if(i <= k0) {
+				amp[i] = 0.0;
+				phi[i] = 0.0;
+				u_z[i] = 0.0 + 0.0 * I;
+			} else {
+				amp[i] = pow((double)i, -a) * exp(-b * pow((double) kx[i]/cutoff, 2) );
+				phi[i] = (M_PI / 2.0) * (1.0 + 1e-10 * pow((double) i, 0.9));		
+				u_z[i] = amp[i] * exp(I * phi[i]);
+			}
+		} 
+		else if (strcmp(IC, "NEW") == 0) {
+			if(i <= k0) {
+				amp[i] = 0.0;
+				phi[i] = 0.0;
+				u_z[i] = 0.0 + 0.0 * I;
+			} 
+			else if (i % 3 == 0){
+				amp[i] = pow((double)i, -a) * exp(-b * pow((double) kx[i]/cutoff, 2) );
+				phi[i] = (M_PI / 2.0) * (1.0 + 1e-10 * pow((double) i, 0.9));	
+				u_z[i] = amp[i] * exp(I * phi[i]);
+			} 
+			else if (i % 3 == 1) {
+				amp[i] = pow((double)i, -a) * exp(-b * pow((double) kx[i]/cutoff, 2) );
+				phi[i] = (M_PI / 6.0) * (1.0 + 1e-10 * pow((double) i, 0.9));	
+				u_z[i] = amp[i] * exp(I * phi[i]);
+			}
+			else if (i % 3 == 2) {
+				amp[i] = pow((double)i, -a) * exp(-b * pow((double) kx[i]/cutoff, 2) );
+				phi[i] = (5.0 * M_PI / 6.0) * (1.0 + 1e-10 * pow((double) i, 0.9));	
+				u_z[i] = amp[i] * exp(I * phi[i]);
+			}
+		}
+		else if (strcmp(IC, "RANDOM") == 0) {
+			if(i <= k0) {
+				amp[i] = 0.0;
+				phi[i] = 0.0;
+				u_z[i] = 0.0 + 0.0 * I;
+			} else {
+				amp[i] = pow((double)i, -a) * exp(-b * pow((double) kx[i]/cutoff, 2) );	
+				phi[i] = M_PI * ( (double) rand() / (double) RAND_MAX);	
+				u_z[i] = amp[i] * exp(I * phi[i]);
+			}
+		}
+		else if (strcmp(IC, "ZERO") == 0) {
+			if(i <= k0) {
+				amp[i] = 0.0;
+				phi[i] = 0.0;
+				u_z[i] = 0.0 + 0.0 * I;
+			} else {
+				amp[i] = pow((double)i, -a) * exp(-b * pow((double) kx[i]/cutoff, 2) );	
+				phi[i] = 0.0;	
+				u_z[i] = amp[i] * exp(I * phi[i]);
+			}
 		}
 
 		// fill the perturbation array
@@ -105,6 +153,13 @@ void max(double* a, int n, int k0, double* max_val) {
 	*max_val = max;
 }
 
+void mem_chk (void *arr_ptr, char *name) {
+  if (arr_ptr == NULL ) {
+    fprintf(stderr, "ERROR!! |in file \"%s\"-line:%d | Unable to malloc required memory for %s, now exiting!\n", __FILE__, __LINE__, name);
+    exit(1);
+  }
+}
+
 void conv_direct(fftw_complex* convo, fftw_complex* u_z, int num_osc, int k0) {
 	
 	// Set the 0 to k0 modes to 0;
@@ -143,13 +198,14 @@ void conv_2N_pad(fftw_complex* convo, fftw_complex* uz, fftw_plan *fftw_plan_r2c
 	double norm_fact = 1.0 / (double) m;
 
 	// Allocate temporary arrays
-	double* u_tmp;
-	u_tmp = (double*)malloc(m*sizeof(double));
-	fftw_complex* uz_pad;
-	uz_pad = (fftw_complex*)malloc(2*num_osc*sizeof(fftw_complex));
+	double* u_tmp = (double* ) malloc(m*sizeof(double));
+	mem_chk(u_tmp, "u_tmp");
+
+	fftw_complex* uz_pad = (fftw_complex* ) fftw_malloc((2 * num_osc - 1) * sizeof(fftw_complex));
+	mem_chk(uz_pad, "uz_pad");
 	
 	// write input data to padded array
-	for (int i = 0; i < 2*num_osc; ++i)	{
+	for (int i = 0; i < 2*num_osc - 1; ++i)	{
 		if(i < num_osc){
 			uz_pad[i] = uz[i];
 		} else {
@@ -194,17 +250,17 @@ void po_rhs(double* rhs, fftw_complex* u_z, fftw_plan *plan_c2r_pad, fftw_plan *
 	fftw_complex pre_fac;
 
 	// Allocate temporary arrays
-	double* u_tmp;
-	u_tmp = (double* ) malloc(m*sizeof(double));
+	double* u_tmp = (double* ) malloc(m*sizeof(double));
+	mem_chk(u_tmp, "u_tmp");
 
-	fftw_complex* u_z_tmp;
-	u_z_tmp = (fftw_complex* ) fftw_malloc(2*num_osc*sizeof(fftw_complex));
+	fftw_complex* u_z_tmp = (fftw_complex* ) fftw_malloc((2 * num_osc - 1) * sizeof(fftw_complex));
+	mem_chk(u_z_tmp, "u_z_tmp");
 
 	///---------------
 	/// Convolution
 	///---------------
 	// Write data to padded array
-	for (int i = 0; i < 2*num_osc; ++i)	{
+	for (int i = 0; i < 2*num_osc - 1; ++i)	{
 		if(i < num_osc){
 			u_z_tmp[i] = u_z[i];
 		} else {
@@ -286,11 +342,11 @@ double get_timestep(double* amps, fftw_plan plan_c2r, fftw_plan plan_r2c, int* k
 	double max_val;
 
 	// Initialize temp memory
-	double* tmp_rhs;
-	tmp_rhs = (double* ) fftw_malloc(num_osc*sizeof(double));
+	double* tmp_rhs = (double* ) fftw_malloc(num_osc*sizeof(double));
+	mem_chk(tmp_rhs, "tmp_rhs");
 
-	fftw_complex* u_z_tmp;
-	u_z_tmp = (fftw_complex* )fftw_malloc(num_osc*sizeof(fftw_complex));
+	fftw_complex* u_z_tmp = (fftw_complex* )fftw_malloc(num_osc*sizeof(fftw_complex));
+	mem_chk(u_z_tmp, "u_z_tmp");
 
 	// Create modes for RHS evaluation
 	for (int i = 0; i < num_osc; ++i) {
@@ -327,11 +383,11 @@ int get_transient_iters(double* amps, fftw_plan plan_c2r, fftw_plan plan_r2c, in
 	int trans_mag;
 
 	// Initialize temp memory
-	double* tmp_rhs;
-	tmp_rhs = (double* ) fftw_malloc(num_osc*sizeof(double));
+	double* tmp_rhs = (double* ) fftw_malloc(num_osc*sizeof(double));
+	mem_chk(tmp_rhs, "tmp_rhs");
 
-	fftw_complex* u_z_tmp;
-	u_z_tmp = (fftw_complex* )fftw_malloc(num_osc*sizeof(fftw_complex));
+	fftw_complex* u_z_tmp = (fftw_complex* )fftw_malloc(num_osc*sizeof(fftw_complex));
+	mem_chk(u_z_tmp, "u_z_tmp");
 
 	// Create modes for RHS evaluation
 	for (int i = 0; i < num_osc; ++i) {
@@ -358,9 +414,43 @@ int get_transient_iters(double* amps, fftw_plan plan_c2r, fftw_plan plan_r2c, in
 	// get the no. of iterations
 	trans_iters = pow(10, trans_mag);
 
+
+	free(tmp_rhs);
+	fftw_free(u_z_tmp);
+
 	return trans_iters;
 }
 
+
+void get_output_file_name(char* output_file_name, int N, int k0, double a, double b, char* u0, int ntsteps, int trans_iters) {
+
+	// Create Output File Locatoin
+	char output_dir[512] = "../../Data/RESULTS/RESULTS";
+	char output_dir_tmp[512];
+	sprintf(output_dir_tmp,  "_N[%d]_k0[%d]_ALPHA[%1.3lf]_BETA[%1.3lf]_u0[%s]", N, k0, a, b, u0);
+	strcat(output_dir, output_dir_tmp);
+
+	// Check if output directory exists, if not make directory
+	struct stat st = {0};
+	if (stat(output_dir, &st) == -1) {
+		  mkdir(output_dir, 0700);	  
+	}
+
+	// form the filename of the output file	
+	char output_file_data[128];
+	sprintf(output_file_data,  "/LCEData_ITERS[%d]_TRANS[%d].h5", ntsteps, trans_iters);
+	strcpy(output_file_name, output_dir);
+	strcat(output_file_name, output_file_data);
+	
+	#ifdef __TRANSIENTS	
+	// Print file name to screen
+	printf("\nOutput File: %s \n\n", output_file_name);
+	printf("\n  Performing transient iterations, no data record...\n\n");
+	#else
+	// Print file name to screen
+	printf("\nOutput File: %s \n\n", output_file_name);
+	#endif	
+}
 
 
 void open_output_create_slabbed_datasets_lce(hid_t* file_handle, char* output_file_name, hid_t* file_space, hid_t* data_set, hid_t* mem_space, int num_t_steps, int num_m_steps, int num_osc, int k_range, int k1_range, int kmin) {

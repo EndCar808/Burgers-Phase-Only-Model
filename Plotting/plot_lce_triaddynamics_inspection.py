@@ -31,7 +31,7 @@ np.set_printoptions(threshold=sys.maxsize)
 ######################
 ##	Get Input Parameters
 ######################
-if (len(sys.argv) != 6):
+if (len(sys.argv) != 8):
     print("No Input Provided, Error.\nProvide k0, Beta and Iteration Values!\n")
     sys.exit()
 else: 
@@ -39,14 +39,17 @@ else:
     alpha = float(sys.argv[2])
     beta  = float(sys.argv[3])
     iters = int(sys.argv[4])
-    N     = int(sys.argv[5])
-filename = "/LCE_Runtime_Data_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[ALIGNED]_ITERS[{}]".format(N, k0, alpha, beta, iters)
+    trans = int(sys.argv[5])
+    N     = int(sys.argv[6])
+    u0    = str(sys.argv[7])
+results_dir = "/RESULTS_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]".format(N, k0, alpha, beta, u0)
+filename    = "/LCEData_ITERS[{}]_TRANS[{}]".format(iters, trans)
 
 ######################
 ##	Input & Output Dir
 ######################
-input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Output"
-output_dir = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Snapshots/TriadDynamics/" + filename
+input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/RESULTS"
+output_dir = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/RESULTS/" + results_dir
 
 if os.path.isdir(output_dir) != True:
 	os.mkdir(output_dir)
@@ -58,7 +61,7 @@ if os.path.isdir(output_dir + '/SNAPS') != True:
 ######################
 ##	Read in Input File
 ######################
-HDFfileData = h5py.File(input_dir + filename + '.h5', 'r')
+HDFfileData = h5py.File(input_dir + results_dir + filename + '.h5', 'r')
 
 # print input file name to screen
 print("\n\nData File: %s\n" % filename)
@@ -79,39 +82,39 @@ lce    = HDFfileData['LCE']
 ntsteps = phases.shape[0];
 num_osc = phases.shape[1];
 N       = 2 * num_osc - 1 - 1;
-kmin    = np.count_nonzero(amps[0, :] == 0);
-kmax    = amps.shape[1] - 1
+kmin    = np.count_nonzero(amps[:] == 0);
+kmax    = amps.shape[0] - 1
 k0      = kmin - 1;
 
 
 ######################
 ##	Triad Data
 ######################
-if 'Triads' in list(HDFfileData.keys()):
-	R      = HDFfileData['PhaseOrderR']
-	Phi    = HDFfileData['PhaseOrderPhi']
-	triads = HDFfileData['Triads']
-	# Reshape triads
-	tdims     = triads.attrs['Triad_Dims']
-	triadsnew = np.reshape(triads, np.append(triads.shape[0], tdims[0, :]))
-else:
-	# Create the triads from the phases
-	numTriads  = 0
-	kmin       = np.count_nonzero(amps[0, :] == 0)
-	kmax       = amps.shape[1] - 1
-	triadphase = -10 *np.ones((kmax - kmin + 1, int((kmax - kmin + 1) / 2), 1)) #
-	triads     = -10 *np.ones((kmax - kmin + 1, int((kmax - kmin + 1) / 2), 1)) #
-	# phaseOrder = np.complex(0.0, 0.0)*np.ones((time.shape[0], 1))
-	# R          = np.ones((time.shape[0], 1))
-	# Phi        = np.ones((time.shape[0], 1))
-	for k in range(kmin, kmax + 1):
-	    for k1 in range(kmin, int(k/2) + 1):
-	        triadphase[k - kmin, k1 - kmin, 0] = phases[-1, k1] + phases[-1, k - k1] - phases[-1, k]
-	        triads[k - kmin, k1 - kmin, 0]     = np.mod(triadphase[k - kmin, k1 - kmin, 0], 2*np.pi)
-	        phaseOrder[:, 0] += np.exp(np.complex(0.0, 1.0)*triads[k - kmin, k1 - kmin, :])
-	        numTriads += 1
-	R[:, 0]   = np.absolute(phaseOrder[:, 0] / numTriads)
-	Phi[:, 0] = np.angle(phaseOrder[:, 0] / numTriads)
+# if 'Triads' in list(HDFfileData.keys()):
+# 	R      = HDFfileData['PhaseOrderR']
+# 	Phi    = HDFfileData['PhaseOrderPhi']
+# 	triads = HDFfileData['Triads']
+# 	# Reshape triads
+# 	tdims     = triads.attrs['Triad_Dims']
+# 	triadsnew = np.reshape(triads, np.append(triads.shape[0], tdims[0, :]))
+# else:
+# 	# Create the triads from the phases
+# 	numTriads  = 0
+# 	kmin       = np.count_nonzero(amps[:] == 0)
+# 	kmax       = amps.shape[0] - 1
+# 	triadphase = -10 *np.ones((kmax - kmin + 1, int((kmax - kmin + 1) / 2), 1)) #
+# 	triads     = -10 *np.ones((kmax - kmin + 1, int((kmax - kmin + 1) / 2), 1)) #
+# 	phaseOrder = np.complex(0.0, 0.0)*np.ones((time.shape[0]))
+# 	R          = np.ones((time.shape[0]))
+# 	Phi        = np.ones((time.shape[0]))
+# 	for k in range(kmin, kmax + 1):
+# 	    for k1 in range(kmin, int(k/2) + 1):
+# 	        triadphase[k - kmin, k1 - kmin, 0] = phases[-1, k1] + phases[-1, k - k1] - phases[-1, k]
+# 	        triads[k - kmin, k1 - kmin, 0]     = np.mod(triadphase[k - kmin, k1 - kmin, 0], 2*np.pi)
+# 	        phaseOrder[:] += np.exp(np.complex(0.0, 1.0)*triads[k - kmin, k1 - kmin, :])
+# 	        numTriads += 1
+# 	R[:]   = np.absolute(phaseOrder[:] / numTriads)
+# 	Phi[:] = np.angle(phaseOrder[:] / numTriads)
 
 
 # Print Final Time LCEs
@@ -123,19 +126,19 @@ print(lce[-1, :])
 
 
 
-######################
-##	Plot Triad Data
-######################
-for k1 in range(k0, 11):
-	# TRIAD TSERIES
-	plt.figure()
-	for i in range(k1, len(triads[:, 0, 0])):
-		plt.plot(time[:, 0], triads[i, k1, :])
-	plt.xlabel(r'$t$');
-	plt.ylabel(r'$\varphi_{{{}, k}}^{{k + {}}}$'.format(str(k1), str(k1)));
-	plt.grid(b = True);
-	plt.savefig(output_dir + "/Triad_N[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_k0[{}]_ITERS[{}]_k1[{}].png".format(N, alpha, beta, k0, iters, k1), format='png', dpi = 400)  
-	plt.close()
+# ######################
+# ##	Plot Triad Data
+# ######################
+# for k1 in range(k0, 11):
+# 	# TRIAD TSERIES
+# 	plt.figure()
+# 	for i in range(k1, len(triads[:, 0, 0])):
+# 		plt.plot(time[:], triads[i, k1, :])
+# 	plt.xlabel(r'$t$');
+# 	plt.ylabel(r'$\varphi_{{{}, k}}^{{k + {}}}$'.format(str(k1), str(k1)));
+# 	plt.grid(b = True);
+# 	plt.savefig(output_dir + "/Triad_N[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_k0[{}]_ITERS[{}]_k1[{}].png".format(N, alpha, beta, k0, iters, k1), format='png', dpi = 400)  
+# 	plt.close()
 
 
 # ######################
@@ -151,23 +154,23 @@ if 'Triads' in list(HDFfileData.keys()):
 else:
 	# Create the triads from the phases
 	numTriads  = 0
-	kmin       = np.count_nonzero(amps[0, :] == 0)
-	kmax       = amps.shape[1] - 1
+	kmin       = np.count_nonzero(amps[:] == 0)
+	kmax       = amps.shape[0] - 1
 	triadphase = -10 *np.ones((kmax - kmin + 1, int((kmax - kmin + 1) / 2), time.shape[0]))
 	triads     = -10 *np.ones((kmax - kmin + 1, int((kmax - kmin + 1) / 2), time.shape[0]))
-	phaseOrder = np.complex(0.0, 0.0)*np.ones((time.shape[0], 1))
-	R          = np.ones((time.shape[0], 1))
-	Phi        = np.ones((time.shape[0], 1))
+	phaseOrder = np.complex(0.0, 0.0)*np.ones((time.shape[0]))
+	R          = np.ones((time.shape[0]))
+	Phi        = np.ones((time.shape[0]))
 	for k in range(kmin, kmax + 1):
 	    for k1 in range(kmin, int(k/2) + 1):
 	        triadphase[k - kmin, k1 - kmin, :] = phases[:, k1] + phases[:, k - k1] - phases[:, k]
 	        triads[k - kmin, k1 - kmin, :]     = np.mod(triadphase[k - kmin, k1 - kmin], 2*np.pi)
-	        phaseOrder[:, 0] += np.exp(np.complex(0.0, 1.0)*triads[k - kmin, k1 - kmin, :])
+	        phaseOrder[:] += np.exp(np.complex(0.0, 1.0)*triads[k - kmin, k1 - kmin, :])
 	        numTriads += 1
-	R[:, 0]   = np.absolute(phaseOrder[:, 0] / numTriads)
-	Phi[:, 0] = np.angle(phaseOrder[:, 0] / numTriads)
+	R[:]   = np.absolute(phaseOrder[:] / numTriads)
+	Phi[:] = np.angle(phaseOrder[:] / numTriads)
 
-	print(triads[:, :, 0])
+	# print(triads[:, :, 0])
 
 # Create Figure with SubAxes
 fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize = [16, 9])
@@ -196,7 +199,7 @@ ax2.set_xlim(0, lce.shape[1] - 1);
 ax2.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both');
 
 # KURAMOTO PARAMETER
-ax3.plot(time[:, 0], R[:, 0], time[:, 0], Phi[:, 0])
+ax3.plot(time[:], R[:], time[:], Phi[:])
 ax3.set_ylim(0, np.pi);
 ax3.set_yticks([0.0, 0.5,  1.0, np.pi/2.0, 2.0, np.pi]);
 ax3.set_yticklabels([r"$0$", r"$0.5$", r"$1$", r"$\frac{\pi}{2}$", r"$2$", r"$\pi$"]);
@@ -206,7 +209,7 @@ ax3.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
 
 # TRIAD TSERIES
 for i in range(k0, len(triads[:, 0, 0])):
-	ax4.plot(time[:, 0], triads[i, 0, :])
+	ax4.plot(time[:], triads[i, 0, :])
 ax4.set_xlabel(r'$t$');
 ax4.set_ylabel(r'$\varphi_{{{}, k}}^{{k + {}}}$'.format(str(kmin), str(kmin)));
 ax4.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both');
@@ -219,8 +222,8 @@ plt.close()
 ######################
 ##	Plot Final Time Data
 ######################
-Create Modes
-amps_full   = np.append(amps[0, :], np.flipud(amps[0, 1:-1]))
+## Create Modes
+amps_full   = np.append(amps[:], np.flipud(amps[1:-1]))
 phases_full = np.append(phases[-1, :], -np.flipud(phases[-1, 1:-1]))
 u_z = amps_full * np.exp(np.complex(0.0, 1.0) * phases_full)
 u   = np.real(np.fft.ifft(u_z))
@@ -249,7 +252,7 @@ for i in range(50):
 #####################
 #	Plot Real Space Snaps
 ######################
-for i, t in enumerate(time[:, 0]):
+for i, t in enumerate(time[:]):
 	print(i)
 
 	phases_full = np.append(phases[i, :], -np.flipud(phases[i, :-2]))

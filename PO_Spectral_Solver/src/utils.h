@@ -15,6 +15,7 @@
 // ---------------------------------------------------------------------
 //  Function Prototypes
 // ---------------------------------------------------------------------
+void mem_chk (void *arr_ptr, char *name);
 int max_indx_d(double* array, int n);
 
 void write_array(double *A, int n, char *filename);
