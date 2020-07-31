@@ -79,28 +79,33 @@ if __name__ == '__main__':
 	######################
 	##	Get Input Parameters
 	######################
-	if (len(sys.argv) != 6):
-	    print("No Input Provided, Error.\nProvide k0, Beta and Iteration Values!\n")
+	if (len(sys.argv) != 8):
+	    print("No Input Provided, Error.\nProvide k0\nalpha\nBeta\nIterations\nTransient Iterations\nN\nu0\n")
 	    sys.exit()
 	else: 
 	    k0    = int(sys.argv[1])
 	    alpha = float(sys.argv[2])
 	    beta  = float(sys.argv[3])
 	    iters = int(sys.argv[4])
-	    N     = int(sys.argv[5])
-	filename = "/LCE_Runtime_Data_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[ALIGNED]_ITERS[{}]".format(N, k0, alpha, beta, iters)
+	    trans = int(sys.argv[5])
+	    N     = int(sys.argv[6])
+	    u0    = str(sys.argv[7])
+	# filename = "/LCE_Runtime_Data_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[ALIGNED]_ITERS[{}]".format(N, k0, alpha, beta, iters)
+	results_dir = "/RESULTS_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]".format(N, k0, alpha, beta, u0)
+	filename    = "/LCEData_ITERS[{}]_TRANS[{}]".format(iters, trans)
 
 	######################
 	##	Input & Output Dir
 	######################
-	input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Output"
-	output_dir = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Snapshots/TriadDynamics" + filename
+	# input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Output"
+	# output_dir = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Snapshots/TriadDynamics" + filename
+	input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/RESULTS"
+	output_dir = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/RESULTS/" + results_dir
 
 	if os.path.isdir(output_dir) != True:
 		os.mkdir(output_dir)
 	if os.path.isdir(output_dir + '/SNAPS') != True:
 		os.mkdir(output_dir + '/SNAPS')
-
 
 
 	######################

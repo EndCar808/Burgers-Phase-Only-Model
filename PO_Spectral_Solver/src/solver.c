@@ -51,13 +51,12 @@ void initial_condition(double* phi, double* amp, fftw_complex* u_z, int* kx, int
 	// Spectrum cutoff
 	double cutoff = ((double) num_osc - 1.0) / 2.0;
 
-	for (int i = 0; i < num_osc; ++i) {
+	// fill amp and phi arrays
+	if (strcmp(IC, "ALIGNED") == 0) {
+		for (int i = 0; i < num_osc; ++i) {
+			// fill the wavenumbers array
+			kx[i] = i;
 
-		// fill the wavenumbers array
-		kx[i] = i;
-
-		// fill amp and phi arrays
-		if (strcmp(IC, "ALIGNED") == 0) {
 			if(i <= k0) {
 				amp[i] = 0.0;
 				phi[i] = 0.0;
@@ -65,10 +64,15 @@ void initial_condition(double* phi, double* amp, fftw_complex* u_z, int* kx, int
 			} else {
 				amp[i] = pow((double)i, -a) * exp(-b * pow((double) kx[i]/cutoff, 2) );
 				phi[i] = (M_PI / 2.0) * (1.0 + 1e-10 * pow((double) i, 0.9));		
-				u_z[i] = amp[i] * exp(I * phi[i]);
+				u_z[i] = amp[i] * cexp(I * phi[i]);
 			}
-		} 
-		else if (strcmp(IC, "NEW") == 0) {
+		}
+	} 
+	else if (strcmp(IC, "NEW") == 0) {
+		for (int i = 0; i < num_osc; ++i) {
+			// fill the wavenumbers array
+			kx[i] = i;
+
 			if(i <= k0) {
 				amp[i] = 0.0;
 				phi[i] = 0.0;
@@ -77,20 +81,25 @@ void initial_condition(double* phi, double* amp, fftw_complex* u_z, int* kx, int
 			else if (i % 3 == 0){
 				amp[i] = pow((double)i, -a) * exp(-b * pow((double) kx[i]/cutoff, 2) );
 				phi[i] = (M_PI / 2.0) * (1.0 + 1e-10 * pow((double) i, 0.9));	
-				u_z[i] = amp[i] * exp(I * phi[i]);
+				u_z[i] = amp[i] * cexp(I * phi[i]);
 			} 
 			else if (i % 3 == 1) {
 				amp[i] = pow((double)i, -a) * exp(-b * pow((double) kx[i]/cutoff, 2) );
 				phi[i] = (M_PI / 6.0) * (1.0 + 1e-10 * pow((double) i, 0.9));	
-				u_z[i] = amp[i] * exp(I * phi[i]);
+				u_z[i] = amp[i] * cexp(I * phi[i]);
 			}
 			else if (i % 3 == 2) {
 				amp[i] = pow((double)i, -a) * exp(-b * pow((double) kx[i]/cutoff, 2) );
 				phi[i] = (5.0 * M_PI / 6.0) * (1.0 + 1e-10 * pow((double) i, 0.9));	
-				u_z[i] = amp[i] * exp(I * phi[i]);
+				u_z[i] = amp[i] * cexp(I * phi[i]);
 			}
 		}
-		else if (strcmp(IC, "RANDOM") == 0) {
+	}
+	else if (strcmp(IC, "RANDOM") == 0) {
+		for (int i = 0; i < num_osc; ++i) {
+			// fill the wavenumbers array
+			kx[i] = i;
+
 			if(i <= k0) {
 				amp[i] = 0.0;
 				phi[i] = 0.0;
@@ -98,10 +107,75 @@ void initial_condition(double* phi, double* amp, fftw_complex* u_z, int* kx, int
 			} else {
 				amp[i] = pow((double)i, -a) * exp(-b * pow((double) kx[i]/cutoff, 2) );	
 				phi[i] = M_PI * ( (double) rand() / (double) RAND_MAX);	
-				u_z[i] = amp[i] * exp(I * phi[i]);
+				u_z[i] = amp[i] * cexp(I * phi[i]);
 			}
 		}
 	}
+	else if (strcmp(IC, "ZERO") == 0) {
+		for (int i = 0; i < num_osc; ++i) {
+			// fill the wavenumbers array
+			kx[i] = i;
+			
+			if(i <= k0) {
+				amp[i] = 0.0;
+				phi[i] = 0.0;
+				u_z[i] = 0.0 + 0.0 * I;
+			} else {
+				amp[i] = pow((double)i, -a) * exp(-b * pow((double) kx[i]/cutoff, 2) );	
+				phi[i] = 0.0;	
+				u_z[i] = amp[i] * cexp(I * phi[i]);
+			}
+		}
+	}
+	else if (strcmp(IC, "TEST") == 0) {
+		for (int i = 0; i < num_osc; ++i) {
+			// fill the wavenumbers array
+			kx[i] = i;
+			
+			if(i <= k0) {
+				amp[i] = 0.0;
+				phi[i] = 0.0;
+				u_z[i] = 0.0 + 0.0 * I;
+			} else {
+				amp[i] = pow((double)i, -a) * exp(-b * pow((double) kx[i]/cutoff, 2) );	
+				phi[i] = M_PI / 4.0;	
+				u_z[i] = amp[i] * cexp(I * phi[i]);
+			}
+		}
+	}
+	else {
+		// input file name
+		char input_file[128];
+		sprintf(input_file, "../Data/Input/Initial_Conditions/FixedPoint_N[%d]_k0[%d]_BETA[%0.3f]_u0[%s].txt", 2*(num_osc - 1),  k0, b, IC); 
+
+		printf("\tInput File: %s\n\n", input_file);
+		
+		// Open input file
+		FILE *in_file  = fopen(input_file, "r"); 
+		if (in_file == NULL) {
+			fprintf(stderr, "ERROR ("__FILE__":%d) -- Unable to open input file: %s\n", __LINE__, input_file);
+			exit(-1);
+		}
+
+		for (int i = 0; i < num_osc; ++i) {
+			// fill the wavenumbers array
+			kx[i] = i;
+
+			// Read in phases
+			fscanf(in_file, "%lf", &phi[i]);
+
+			if(i <= k0) {
+				amp[i] = 0.0;
+				u_z[i] = 0.0 + 0.0 * I;
+			} else {
+				amp[i] = pow((double)i, -a) * exp(-b * pow((double) kx[i]/cutoff, 2) );
+				u_z[i] = amp[i] * cexp(I * phi[i]);
+			}
+		}
+
+		fclose(in_file);
+	}
+	
 }
 
 
@@ -546,7 +620,7 @@ void po_rhs(double* rhs, fftw_complex* u_z, fftw_plan *plan_c2r_pad, fftw_plan *
 		u_tmp[i] = pow(u_tmp[i], 2);
 	}
 
-	
+
 	// transform forward to Fourier space
 	fftw_execute_dft_r2c((*plan_r2c_pad), u_tmp, u_z_tmp);
 
@@ -624,15 +698,17 @@ double get_timestep(double* amps, fftw_plan plan_c2r, fftw_plan plan_r2c, int* k
 		if (i <= k0) {
 			u_z_tmp[i] = 0.0 + 0.0*I;
 		} else {
-			u_z_tmp[i] = amps[i] * exp(I * 0.0);
+			u_z_tmp[i] = amps[i] * cexp(I * 0.0);
 		}
 	}
 
 	// Call the RHS
 	po_rhs(tmp_rhs, u_z_tmp, &plan_c2r, &plan_r2c, kx, n, num_osc, k0);
 
+	
 	// Find  the fastest moving oscillator
 	max(tmp_rhs, num_osc, k0, &max_val);
+
 
 	// Get timestep
 	dt = 1.0 / max_val;
@@ -665,7 +741,7 @@ int get_transient_iters(double* amps, fftw_plan plan_c2r, fftw_plan plan_r2c, in
 		if (i <= k0) {
 			u_z_tmp[i] = 0.0 + 0.0*I;
 		} else {
-			u_z_tmp[i] = amps[i] * exp(I * 0.0);
+			u_z_tmp[i] = amps[i] * cexp(I * 0.0);
 		}
 	}
 
@@ -994,7 +1070,7 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 		/*---------- STAGE 4 ----------*/
 		// find RHS first and then update 
 		po_rhs(RK4, u_z_tmp, &fftw_plan_c2r_pad, &fftw_plan_r2c_pad, kx, N, num_osc, k0);
-
+		
 
 		//////////////
 		// Update
@@ -1002,6 +1078,8 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 		for (int i = 0; i < num_osc; ++i) {
 			phi[i] = phi[i] + (dt * B1) * RK1[i] + (dt * B2) * RK2[i] + (dt * B3) * RK3[i] + (dt * B4) * RK4[i];  
 		}
+
+	
 
 		////////////
 		// Print to file
@@ -1085,6 +1163,7 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 		printf("\n\n!!Failed to make - PhaseOrderPhi - Dataset!!\n\n");
 	}
 	#endif
+
 
 
 	// ------------------------------

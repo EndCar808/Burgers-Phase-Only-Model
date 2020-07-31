@@ -60,7 +60,8 @@ void initial_condition(double* phi, double* amp, int* kx, int num_osc, int k0, d
 			phi[i] = 0.0;
 		} else {
 			amp[i] = pow((double)i, -a) * exp(-b * pow((double) kx[i]/cutoff, 2) );
-			phi[i] = (M_PI / 2.0) * (1.0 + 1e-10 * pow((double) i, 0.9));	
+			phi[i] = (M_PI / 4.0);
+			//* (1.0 + 1e-10 * pow((double) i, 0.9));	
 			// phi[i] = M_PI*( (double) rand() / (double) RAND_MAX);	
 		}
 	}

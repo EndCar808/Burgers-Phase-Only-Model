@@ -16,13 +16,12 @@
 #include <hdf5_hl.h>
 #include <omp.h>
 #include <gsl/gsl_cblas.h>
-#include <lapacke.h>
 
 
 // ---------------------------------------------------------------------
 //  User Libraries and Headers
 // ---------------------------------------------------------------------
-#include "lce_spectrum.h"
+#include "data_types.h"
 #include "utils.h"
 #include "solver.h"
 
@@ -43,31 +42,47 @@ int main(int argc, char** argv) {
 
 	// Collocation points
 	int N = atoi(argv[1]);
-	
 
-	// Spectrum variables
-	int k0 = 1;
-	double alpha = atof(argv[2]);
-	double beta  = atof(argv[3]);
-	
+	int k0 = atoi(argv[2]);
 
-	// Integration parameters
-	int m_end  = 1000;
-	int m_iter = 20;
+	double alpha = atof(argv[3]);
+	double beta  = atof(argv[4]);
 
-	// Perturbation
+	int mEND   = 40000;
+	int mITERS = 10;
+
+	// Initial Condition
+	char u0[128];
+	strcpy(u0, argv[5]);
+
+	int batch = atoi(argv[6]);
+
 	double pert = 1e-8;
 
 
+	// Get the number of threads 
+	int n_threads = 16;
+
+
+	// set number of threads
+	omp_set_num_threads(n_threads);
+	
+	printf("\n\tNumber of OpenMP Threads running = %d\n\n" , omp_get_max_threads());
+	
+	// Initialize and set threads for fftw plans
+	fftw_init_threads();
+	fftw_plan_with_nthreads((int)omp_get_max_threads());
+
 
 	// ------------------------------
-	//  Compute Lyapunov Spectrum
+	//  Call Solver Here
 	// ------------------------------
-	compute_spectrum(N, k0, alpha, beta, m_end, m_iter, pert);
+	cloneDynamics(N, k0, alpha, beta, batch, mEND, mITERS, u0, pert);
 	// ------------------------------
-	//  Compute Lyapunov Spectrum
+	//  Call Solver Here
 	// ------------------------------
 	
+
 	
 	// Finish timing
 	clock_t end = clock();
@@ -75,8 +90,10 @@ int main(int argc, char** argv) {
 	// calculate execution time
 	double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
 
-	printf("\n\tExecution Time: %20.16lf\n", time_spent);
-	printf("\n\n");
+	printf("\n\n\tTotal Execution Time: %20.16lf\n\n", time_spent);
 
 	return 0;
 }
+// ---------------------------------------------------------------------
+//  End of File
+// ---------------------------------------------------------------------

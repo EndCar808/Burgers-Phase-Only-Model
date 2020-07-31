@@ -616,13 +616,14 @@ void compute_spectrum(int N, int k0, double a, double b, int m_end, int m_iter, 
 	// ------------------------------
 	initial_condition(phi_base, amp, kx, num_osc, k0, a, b);
 	
-
-	for (int i = 0; i < num_osc; ++i) {
-		phi[i] = phi_base[i];
-		printf("k[%d]: %d | a: %5.15lf   p: %5.16lf   | u_z[%d]: %5.16lf  %5.16lfI \n", i, kx[i], amp[i], phi[i], i, creal(amp[i] * cexp(I * phi[i])), cimag(amp[i] * cexp(I * phi[i])));
+	if (N <= 32) {
+		for (int i = 0; i < num_osc; ++i) {
+			phi[i] = phi_base[i];
+			printf("k[%d]: %d | a: %5.15lf   p: %5.16lf   | u_z[%d]: %5.16lf  %5.16lfI \n", i, kx[i], amp[i], phi[i], i, creal(amp[i] * cexp(I * phi[i])), cimag(amp[i] * cexp(I * phi[i])));
+		}
+		printf("\n");
 	}
-	printf("\n");
-
+	
 	
 
 	// ------------------------------
@@ -644,62 +645,62 @@ void compute_spectrum(int N, int k0, double a, double b, int m_end, int m_iter, 
 
 
 
-	// ------------------------------
-	//  HDF5 File Create
-	// ------------------------------
-	// Create the HDF5 file handle
-	hid_t HDF_file_handle;
+	// // ------------------------------
+	// //  HDF5 File Create
+	// // ------------------------------
+	// // Create the HDF5 file handle
+	// hid_t HDF_file_handle;
 
 
-	// create hdf5 handle identifiers for hyperslabing the full evolution data
-	hid_t HDF_file_space[4];
-	hid_t HDF_data_set[4];
-	hid_t HDF_mem_space[4];
+	// // create hdf5 handle identifiers for hyperslabing the full evolution data
+	// hid_t HDF_file_space[4];
+	// hid_t HDF_data_set[4];
+	// hid_t HDF_mem_space[4];
 
-	// // define filename - const because it doesnt change
-	char output_file_name[128] = "../../Data/Output/LCE/LCE_Runtime_Data";
-	char output_file_data[128];
+	// // // define filename - const because it doesnt change
+	// char output_file_name[128] = "../../Data/Output/LCE/LCE_Runtime_Data";
+	// char output_file_data[128];
 
-	// form the filename of the output file
-	sprintf(output_file_data,  "_N[%d]_k0[%d]_ALPHA[%1.3lf]_BETA[%1.3lf]_u0[%s]_ITERS[%d].h5", N, k0, a, b, "ALIGNED", m_iter * m_end);
-	strcat(output_file_name, output_file_data);
+	// // form the filename of the output file
+	// sprintf(output_file_data,  "_N[%d]_k0[%d]_ALPHA[%1.3lf]_BETA[%1.3lf]_u0[%s]_ITERS[%d].h5", N, k0, a, b, "ALIGNED", m_iter * m_end);
+	// strcat(output_file_name, output_file_data);
 	
-	// Print file name to screen
-	printf("\nOutput File: %s \n\n", output_file_name);
+	// // Print file name to screen
+	// printf("\nOutput File: %s \n\n", output_file_name);
 
 
-	// open output file and create hyperslabbed datasets 
-	open_output_create_slabbed_datasets_lce(&HDF_file_handle, output_file_name, HDF_file_space, HDF_data_set, HDF_mem_space, tot_t_save_steps, tot_m_save_steps, num_osc, k_range, k1_range, kmin);
+	// // open output file and create hyperslabbed datasets 
+	// open_output_create_slabbed_datasets_lce(&HDF_file_handle, output_file_name, HDF_file_space, HDF_data_set, HDF_mem_space, tot_t_save_steps, tot_m_save_steps, num_osc, k_range, k1_range, kmin);
 
 
-	// Create arrays for time and phase order to save after algorithm is finished
-	double* time_array      = (double* )malloc(sizeof(double) * (tot_t_save_steps + 1));
-	double* phase_order_R   = (double* )malloc(sizeof(double) * (tot_t_save_steps + 1));
-	double* phase_order_Phi = (double* )malloc(sizeof(double) * (tot_t_save_steps + 1));
+	// // Create arrays for time and phase order to save after algorithm is finished
+	// double* time_array      = (double* )malloc(sizeof(double) * (tot_t_save_steps + 1));
+	// double* phase_order_R   = (double* )malloc(sizeof(double) * (tot_t_save_steps + 1));
+	// double* phase_order_Phi = (double* )malloc(sizeof(double) * (tot_t_save_steps + 1));
 
-	// ------------------------------
-	//  Write Initial Conditions to File
-	// ------------------------------
-	write_hyperslab_data_d(HDF_file_space[0], HDF_data_set[0], HDF_mem_space[0], phi, "phi", num_osc, 0);
+	// // ------------------------------
+	// //  Write Initial Conditions to File
+	// // ------------------------------
+	// write_hyperslab_data_d(HDF_file_space[0], HDF_data_set[0], HDF_mem_space[0], phi, "phi", num_osc, 0);
 
 
-	// #ifdef __TRIADS
-	// compute triads for initial conditions
-	triad_phases(triads, &triad_phase_order, phi, kmin, kmax);
+	// // #ifdef __TRIADS
+	// // compute triads for initial conditions
+	// triad_phases(triads, &triad_phase_order, phi, kmin, kmax);
 	
-	// then write the current modes to this hyperslab
-	write_hyperslab_data_d(HDF_file_space[1], HDF_data_set[1], HDF_mem_space[1], triads, "triads", k_range * k1_range, 0);
+	// // then write the current modes to this hyperslab
+	// write_hyperslab_data_d(HDF_file_space[1], HDF_data_set[1], HDF_mem_space[1], triads, "triads", k_range * k1_range, 0);
 	
-	phase_order_R[0]   = cabs(triad_phase_order);
-	phase_order_Phi[0] = carg(triad_phase_order);
-	// #endif
+	// phase_order_R[0]   = cabs(triad_phase_order);
+	// phase_order_Phi[0] = carg(triad_phase_order);
+	// // #endif
 
-	// Write initial time
-	// #ifdef TRANSIENT
-	// time_array[0] = trans_iters * dt;
-	// #else
-	time_array[0] = 0.0;
-	// #endif
+	// // Write initial time
+	// // #ifdef TRANSIENT
+	// // time_array[0] = trans_iters * dt;
+	// // #else
+	// time_array[0] = 0.0;
+	// // #endif
 
 	
 	// ------------------------------
@@ -771,25 +772,25 @@ void compute_spectrum(int N, int k0, double a, double b, int m_end, int m_iter, 
 			//////////////
 			// Print to file
 			//////////////
-			if (iter % save_step == 0) {
-				// Write phases
-				write_hyperslab_data_d(HDF_file_space[0], HDF_data_set[0], HDF_mem_space[0], phi, "phi", num_osc, save_data_indx);
+			// if (iter % save_step == 0) {
+			// 	// Write phases
+			// 	write_hyperslab_data_d(HDF_file_space[0], HDF_data_set[0], HDF_mem_space[0], phi, "phi", num_osc, save_data_indx);
 
-				// compute triads for initial conditions
-				triad_phases(triads, &triad_phase_order, phi, kmin, kmax);
+			// 	// compute triads for initial conditions
+			// 	triad_phases(triads, &triad_phase_order, phi, kmin, kmax);
 				
-				// write triads
-				write_hyperslab_data_d(HDF_file_space[1], HDF_data_set[1], HDF_mem_space[1], triads, "triads", k_range * k1_range, save_data_indx);
+			// 	// write triads
+			// 	write_hyperslab_data_d(HDF_file_space[1], HDF_data_set[1], HDF_mem_space[1], triads, "triads", k_range * k1_range, save_data_indx);
 
-				// save time and phase order parameter
-				time_array[save_data_indx]      = iter * dt;
-				phase_order_R[save_data_indx]   = cabs(triad_phase_order);
-				phase_order_Phi[save_data_indx] = carg(triad_phase_order);
+			// 	// save time and phase order parameter
+			// 	time_array[save_data_indx]      = iter * dt;
+			// 	phase_order_R[save_data_indx]   = cabs(triad_phase_order);
+			// 	phase_order_Phi[save_data_indx] = carg(triad_phase_order);
 
 
-				// increment indx for next iteration
-				save_data_indx++;
-			}
+			// 	// increment indx for next iteration
+			// 	save_data_indx++;
+			// }
 					
 			// increment
 			t   = iter*dt;
@@ -813,15 +814,16 @@ void compute_spectrum(int N, int k0, double a, double b, int m_end, int m_iter, 
 
 				phi_tracjs[index] = phi_tmp[i];
 
-				// printf("p[%d]: %5.16lf\t", index, phi_tracjs[index]);
+				// printf("phi_tmp[%d]: %5.16lf\t", index, phi_tmp[i]);
 
 				// Create Perturbation Matrix
 				if (i > k0) {
 					pertMat[(i - kmin) * (num_osc - kmin) + j] = phi[i] - phi_tmp[i];
 				}
 			}
-			// printf("\n\n");
+			// printf("\n");
 		}
+		// printf("\n\n");
 
 
 		// for (int i = 0; i < num_osc - kmin; ++i)
@@ -840,6 +842,37 @@ void compute_spectrum(int N, int k0, double a, double b, int m_end, int m_iter, 
 		// ------------------------------
 		orthonormalize(pertMat, znorm, num_osc, k0 + 1);
 
+
+		// for (int i = 0; i < num_osc - kmin; ++i)
+		// {
+		// 	for (int j = 0; j < num_osc - kmin; ++j)
+		// 	{
+		// 		printf("pertM[%d]: %5.16lf \t", i*(num_osc - kmin) + j, pertMat[i*(num_osc - kmin) + j]);
+		// 	}
+		// 	printf("\n");
+		// }
+		// printf("\n\n");
+
+
+		// for (int i = 0; i < num_osc; ++i)
+		// {
+		// 	for (int j = 0; j < num_osc - kmin; ++j)
+		// 	{
+		// 		if (i <= k0) {
+		// 			printf("phi[%d]: %5.16lf \t", i*(num_osc - kmin) + j, 0.0);
+		// 		}else {
+		// 			printf("phi[%d]: %5.16lf \t", i*(num_osc - kmin) + j, phi[i] + pert * pertMat[(i - kmin)*(num_osc - kmin) + (j)]);
+		// 		}
+		// 	}
+		// 	printf("\n");
+		// }
+		// printf("\n\n");
+
+
+		// for (int i = 0; i < num_osc; ++i)
+		// {
+		// 	printf("phi[%d]: %5.16lf \n", i, phi[i]);
+		// }
 		
 		// ------------------------------
 		//  Compute LCEs & Write To File
@@ -858,14 +891,23 @@ void compute_spectrum(int N, int k0, double a, double b, int m_end, int m_iter, 
 		// Print update to screen
 		if (m % print_every == 0) {
 			double lce_sum = 0.0;
-
+			double dim_sum = 0.0;
+			int dim_indx   = 0;
 			for (int i = 0; i < num_osc - kmin; ++i) {
+				// Get spectrum sum
 				lce_sum += lce[i];
+
+				// Compute attractor dim
+				if (dim_sum + lce[i] > 0) {
+					dim_sum += lce[i];
+					dim_indx += 1;
+				}
+				else {
+					continue;
+				}
 			}
-			
-			printf("Iter: %d / %d | t: %5.6lf tsteps: %d | k0:%d alpha: %5.6lf beta: %5.6lf | Sum: %5.9lf\n", m, m_end, t, m_end * m_iter, k0, a, b, lce_sum);
+			printf("Iter: %d / %d | t: %5.6lf tsteps: %d | k0:%d alpha: %5.6lf beta: %5.6lf | Sum: %5.9lf | Dim: %5.9lf\n", m, m_end, t, m_end * m_iter, k0, a, b, lce_sum, (dim_indx + (dim_sum / fabs(lce[dim_indx]))));
 			printf("k: \n");
-			
 			for (int j = 0; j < num_osc - kmin; ++j) {
 				printf("%5.6lf ", lce[j]);
 			}
@@ -889,35 +931,35 @@ void compute_spectrum(int N, int k0, double a, double b, int m_end, int m_iter, 
 	// ------------------------------
 	//  Write 1D Arrays Using HDF5Lite
 	// ------------------------------
-	hid_t D2 = 2;
-	hid_t D2dims[D2];
+	// hid_t D2 = 2;
+	// hid_t D2dims[D2];
 
-	// Write amplitudes
-	D2dims[0] = 1;
-	D2dims[1] = num_osc;
-	if ( (H5LTmake_dataset(HDF_file_handle, "Amps", D2, D2dims, H5T_NATIVE_DOUBLE, amp)) < 0){
-		printf("\n\n!!Failed to make - Amps - Dataset!!\n\n");
-	}
+	// // Write amplitudes
+	// D2dims[0] = 1;
+	// D2dims[1] = num_osc;
+	// if ( (H5LTmake_dataset(HDF_file_handle, "Amps", D2, D2dims, H5T_NATIVE_DOUBLE, amp)) < 0){
+	// 	printf("\n\n!!Failed to make - Amps - Dataset!!\n\n");
+	// }
 	
-	// Wtie time
-	D2dims[0] = tot_t_save_steps + 1;
-	D2dims[1] = 1;
-	if ( (H5LTmake_dataset(HDF_file_handle, "Time", D2, D2dims, H5T_NATIVE_DOUBLE, time_array)) < 0) {
-		printf("\n\n!!Failed to make - Time - Dataset!!\n\n");
-	}
+	// // Wtie time
+	// D2dims[0] = tot_t_save_steps + 1;
+	// D2dims[1] = 1;
+	// if ( (H5LTmake_dataset(HDF_file_handle, "Time", D2, D2dims, H5T_NATIVE_DOUBLE, time_array)) < 0) {
+	// 	printf("\n\n!!Failed to make - Time - Dataset!!\n\n");
+	// }
 	
-	// Write Phase Order R
-	D2dims[0] = tot_t_save_steps + 1;
-	D2dims[1] = 1;
-	if ( (H5LTmake_dataset(HDF_file_handle, "PhaseOrderR", D2, D2dims, H5T_NATIVE_DOUBLE, phase_order_R)) < 0) {
-		printf("\n\n!!Failed to make - PhaseOrderR - Dataset!!\n\n");
-	}
-	// Write Phase Order Phi
-	D2dims[0] = tot_t_save_steps + 1;
-	D2dims[1] = 1;
-	if ( (H5LTmake_dataset(HDF_file_handle, "PhaseOrderPhi", D2, D2dims, H5T_NATIVE_DOUBLE, phase_order_Phi)) < 0) {
-		printf("\n\n!!Failed to make - PhaseOrderPhi - Dataset!!\n\n");
-	}
+	// // Write Phase Order R
+	// D2dims[0] = tot_t_save_steps + 1;
+	// D2dims[1] = 1;
+	// if ( (H5LTmake_dataset(HDF_file_handle, "PhaseOrderR", D2, D2dims, H5T_NATIVE_DOUBLE, phase_order_R)) < 0) {
+	// 	printf("\n\n!!Failed to make - PhaseOrderR - Dataset!!\n\n");
+	// }
+	// // Write Phase Order Phi
+	// D2dims[0] = tot_t_save_steps + 1;
+	// D2dims[1] = 1;
+	// if ( (H5LTmake_dataset(HDF_file_handle, "PhaseOrderPhi", D2, D2dims, H5T_NATIVE_DOUBLE, phase_order_Phi)) < 0) {
+	// 	printf("\n\n!!Failed to make - PhaseOrderPhi - Dataset!!\n\n");
+	// }
 
 
 
@@ -932,9 +974,9 @@ void compute_spectrum(int N, int k0, double a, double b, int m_end, int m_iter, 
 	free(kx);
 	free(u_pad);
 	free(triads);
-	free(time_array);
-	free(phase_order_Phi);
-	free(phase_order_R);
+	// free(time_array);
+	// free(phase_order_Phi);
+	// free(phase_order_R);
 	fftw_free(u_z);
 	fftw_free(RK1);
 	fftw_free(RK2);
@@ -943,16 +985,16 @@ void compute_spectrum(int N, int k0, double a, double b, int m_end, int m_iter, 
 	fftw_free(u_z_tmp);
 	fftw_free(u_z_pad);
 
-	// close HDF5 handles
-	H5Sclose( HDF_mem_space[0] );
-	H5Dclose( HDF_data_set[0] );
-	H5Sclose( HDF_file_space[0] );
-	H5Sclose( HDF_mem_space[1] );
-	H5Dclose( HDF_data_set[1] );
-	H5Sclose( HDF_file_space[1] );
+	// // close HDF5 handles
+	// H5Sclose( HDF_mem_space[0] );
+	// H5Dclose( HDF_data_set[0] );
+	// H5Sclose( HDF_file_space[0] );
+	// H5Sclose( HDF_mem_space[1] );
+	// H5Dclose( HDF_data_set[1] );
+	// H5Sclose( HDF_file_space[1] );
 
-	// Close pipeline to output file
-	H5Fclose(HDF_file_handle);
+	// // Close pipeline to output file
+	// H5Fclose(HDF_file_handle);
 }
 // ---------------------------------------------------------------------
 //  End of File

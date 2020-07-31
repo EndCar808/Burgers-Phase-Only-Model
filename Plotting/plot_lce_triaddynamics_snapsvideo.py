@@ -301,8 +301,9 @@ if __name__ == '__main__':
 	##	ColourMaps
 	######################
 	# Triads Colourmap
-	colours = [[1, 1, 1], [1, 1, 0], [0, 0, 1], [0, 1, 1], [0, 1, 0], [1, 0, 1], [1, 0, 0], [1, 0.25, 0], [1, 1, 1]]   #located @ 0, pi/2, pi, 3pi/2 and 2pi
-	my_m    = mpl.colors.LinearSegmentedColormap.from_list('my_map', cm.hsv(np.arange(255)), N = kmax)                            # set N to inertial range
+	colours = [[1, 1, 1], [1, 1, 0], [0, 0, 1], [0, 1, 1], [0, 1, 0], [1, 0, 1], [1, 0, 0], [1, 0.25, 0], [1, 1, 1]]   # located @ 0, pi/2, pi, 3pi/2 and 2pi
+	# my_m    = mpl.colors.LinearSegmentedColormap.from_list('my_map', colours, N = kmax)                                # set N to inertial range
+	my_m  = mpl.colors.LinearSegmentedColormap.from_list('my_map', cm.hsv(np.arange(255)), N = kmax)                 # set N to inertial range
 	my_m.set_under('1.0')
 	my_norm = mpl.colors.Normalize(vmin = 0, vmax = 2*np.pi)
 
@@ -335,7 +336,6 @@ if __name__ == '__main__':
 			plot_snaps(i, x, u_urms[i, :], du_x_rms[i, :], time[i, 0], triads[:, :, i], kmin, kmax, phases[i, kmin:], R[0:i, 0], Phi[0:i, 0], time[0, 0], time[-1, 0], time[0:i, 0])
 		else:
 			plot_snaps(i, x, u_urms[i, :], du_x_rms[i, :], time[i, 0], triads[i, :, :], kmin, kmax, phases[i, kmin:], R[0:i, 0], Phi[0:i, 0], time[0, 0], time[-1, 0], time[0:i, 0])
-	 	
 
 	# Start timer
 	end = TIME.perf_counter()

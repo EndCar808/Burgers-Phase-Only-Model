@@ -110,6 +110,17 @@ void initial_conditions_lce(double* pert, double* phi, double* amp, fftw_complex
 				u_z[i] = amp[i] * exp(I * phi[i]);
 			}
 		}
+		else if (strcmp(IC, "TEST") == 0) {
+			if(i <= k0) {
+				amp[i] = 0.0;
+				phi[i] = 0.0;
+				u_z[i] = 0.0 + 0.0 * I;
+			} else {
+				amp[i] = pow((double)i, -a) * exp(-b * pow((double) kx[i]/cutoff, 2) );	
+				phi[i] = M_PI / 4.0;	
+				u_z[i] = amp[i] * exp(I * phi[i]);
+			}
+		}
 
 		// fill the perturbation array
 		if (i < num_osc - kmin) {
@@ -359,6 +370,7 @@ double get_timestep(double* amps, fftw_plan plan_c2r, fftw_plan plan_r2c, int* k
 
 	// Call the RHS
 	po_rhs(tmp_rhs, u_z_tmp, &plan_c2r, &plan_r2c, kx, n, num_osc, k0);
+
 
 	// Find  the fastest moving oscillator
 	max(tmp_rhs, num_osc, k0, &max_val);

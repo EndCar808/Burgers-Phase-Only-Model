@@ -54,7 +54,7 @@ def fill_data(NUM_OSC, k0, a, b, ic):
 				phi[i] = mp.pi / mp.mpf(2);
 
 			u_z[i] = amp[i] * mp.expj(phi[i])
-	elif ic == 'NEW':
+	elif ic == 'A':
 		for i in range(NUM_OSC):
 			if i <= k0:
 				amp[i] = mp.mpf(0.0);
@@ -69,6 +69,26 @@ def fill_data(NUM_OSC, k0, a, b, ic):
 			elif np.mod(i, 3) == 2:
 				amp[i] = mp.power(mp.mpf(i), mp.mpf(-a)) * mp.exp(mp.mpf(-b) * mp.power((mp.mpf(i) / mp.mpf((NUM_OSC - 1)/2)) ,2));
 				phi[i] = (mp.mpf(5) * mp.pi) / mp.mpf(6);
+
+			u_z[i] = amp[i] * mp.expj(phi[i])
+	elif ic == "B":
+		for i in range(NUM_OSC):
+			if i <= k0:
+				amp[i] = mp.mpf(0.0);
+				phi[i] = mp.mpf(0.0);
+				u_z[i] = mp.mpc(real = '0.0', imag = '0.0')
+			elif np.mod(i, 3) == 0 and i < 12:
+				amp[i] = mp.power(mp.mpf(i), mp.mpf(-a)) * mp.exp(mp.mpf(-b) * mp.power((mp.mpf(i) / mp.mpf((NUM_OSC - 1)/2)) ,2));
+				phi[i] = mp.pi / mp.mpf(2);
+			elif np.mod(i, 3) == 1:
+				amp[i] = mp.power(mp.mpf(i), mp.mpf(-a)) * mp.exp(mp.mpf(-b) * mp.power((mp.mpf(i) / mp.mpf((NUM_OSC - 1)/2)) ,2));
+				phi[i] = mp.pi / mp.mpf(6);
+			elif np.mod(i, 3) == 2:
+				amp[i] = mp.power(mp.mpf(i), mp.mpf(-a)) * mp.exp(mp.mpf(-b) * mp.power((mp.mpf(i) / mp.mpf((NUM_OSC - 1)/2)) ,2));
+				phi[i] = (mp.mpf(5) * mp.pi) / mp.mpf(6);
+			elif np.mod(i, 3) == 0 and i >= 12:
+				amp[i] = mp.power(mp.mpf(i), mp.mpf(-a)) * mp.exp(mp.mpf(-b) * mp.power((mp.mpf(i) / mp.mpf((NUM_OSC - 1)/2)) ,2));
+				phi[i] =  (mp.mpf(3) *mp.pi) / mp.mpf(2)
 
 			u_z[i] = amp[i] * mp.expj(phi[i])
 
@@ -133,7 +153,7 @@ def compute_jacobian(u_z, NUM_OSC, kmin, kmax, k0):
 
 	return jac
 
-def compute_stability_verus_alpha(nvals, Alphavals):
+def compute_stability_verus_alpha(nvals, Alphavals, u0):
 	Nvals = nvals
 	print(Nvals)
 
@@ -144,7 +164,7 @@ def compute_stability_verus_alpha(nvals, Alphavals):
 
 	for l, n in enumerate(Nvals):
 
-		f = h5py.File("EigenValuesData_N[{}].hdf5".format(Nvals[l]), "w")
+		f = h5py.File("EigenValuesData_N[{}]_u0[{}].hdf5".format(Nvals[l], u0), "w")
 		for j, aa in enumerate(alpha):
 			######################
 			##	Setup Vars
@@ -157,7 +177,7 @@ def compute_stability_verus_alpha(nvals, Alphavals):
 
 			k0 = 2
 			a  = mp.mpf(aa)
-			b  = mp.mpf(0.0)
+			b  = mp.mpf(1.0)
 			kmin = k0 + 1
 			kmax = NUM_OSC - 1
 
@@ -169,7 +189,7 @@ def compute_stability_verus_alpha(nvals, Alphavals):
 			######################
 			##	Get Data
 			######################
-			u_z, amp, phi = fill_data(NUM_OSC, k0, a, b, 'NEW')
+			u_z, amp, phi = fill_data(NUM_OSC, k0, a, b, u0)
 
 			# print(u_z)
 			# print()
@@ -231,6 +251,7 @@ def compute_stability_verus_alpha(nvals, Alphavals):
 	ax1.set_xlim(alpha[0], alpha[-1])
 	ax1.set_xlabel(r"$\alpha$")
 	ax1.set_ylabel(r"Proportion of Unstable Eigenvalues")
+	ax1.set_title(r"$\beta = {}, u_0 = {}$".format(b, u0))
 	ax1.legend([r"$N = {}$".format(Nvals[i]) for i in range(len(Nvals))])
 	ax1.grid(True)
 
@@ -238,7 +259,7 @@ def compute_stability_verus_alpha(nvals, Alphavals):
 	plt.close()
 
 
-def compute_stability_verus_N(nvals, Alphaval):
+def compute_stability_verus_N(nvals, Alphaval, u0):
 	Nvals = nvals
 	print(Nvals)
 
@@ -248,7 +269,7 @@ def compute_stability_verus_N(nvals, Alphaval):
 	prop = np.zeros((len(Nvals)))
 
 	# Create file
-	f = h5py.File("EigenValuesData_v_N_ALPHA[{:0.3f}].hdf5".format(alpha), "w")
+	f = h5py.File("EigenValuesData_v_N_ALPHA[{:0.3f}]_u0[{}].hdf5".format(alpha, u0), "w")
 
 	for l, n in enumerate(Nvals):		
 			######################
@@ -274,7 +295,7 @@ def compute_stability_verus_N(nvals, Alphaval):
 			######################
 			##	Get Data
 			######################
-			u_z, amp, phi = fill_data(NUM_OSC, k0, a, b, 'NEW')
+			u_z, amp, phi = fill_data(NUM_OSC, k0, a, b, u0)
 
 			# print(u_z)
 			# print()
@@ -344,7 +365,7 @@ def compute_stability_verus_N(nvals, Alphaval):
 	plt.close()
 
 
-def compute_stability_individual(Nval, Alphaval):
+def compute_stability_individual(Nval, Alphaval, u0):
 
 	
 	N       = int(Nval)
@@ -361,14 +382,14 @@ def compute_stability_individual(Nval, Alphaval):
 
 	print(kmin)
 
-	f = h5py.File("./EigenValueData/EigenValuesData_N[{}]_ALPHA[{:0.3f}].hdf5".format(Nval, Alphaval), "w")
+	f = h5py.File("./EigenValueData/EigenValuesData_N[{}]_ALPHA[{:0.3f}]_u0[{}].hdf5".format(Nval, Alphaval, u0), "w")
 
 	print("\n|----------------------------------------------------------------------------------------------------------------------------|")
 	print("|----------------------------------------------N = {}  Alpha = {:0.3f}---------------------------------------------------------|\n".format(Nval, Alphaval))
 	######################
 	##	Get Data
 	######################
-	u_z, amp, phi = fill_data(NUM_OSC, k0, a, b, 'NEW')
+	u_z, amp, phi = fill_data(NUM_OSC, k0, a, b, u0)
 
 
 	######################
@@ -420,12 +441,17 @@ def compute_stability_individual(Nval, Alphaval):
 ######################
 if __name__ == '__main__':
 
-	if (len(sys.argv) != 3):
-	    print("No Input Provided, Error.\nProvide: \nN\nAlpha\n")
-	    sys.exit()
-	else: 
-	    N     = int(sys.argv[1])
-	    alpha = float(sys.argv[2])
+	# if (len(sys.argv) != 3):
+	#     print("No Input Provided, Error.\nProvide: \nN\nAlpha\n")
+	#     sys.exit()
+	# else: 
+	#     N     = int(sys.argv[1])
+	#     alpha = float(sys.argv[2])
 
-	compute_stability_individual(N, alpha)
-	    
+	# compute_stability_individual(N, alpha)
+	#     
+	N = [2**i for i in range(6, 9)]
+	a = np.arange(0.0, 2.5, 0.1)
+	u0 = "B"
+
+	compute_stability_verus_alpha(N, a, u0)

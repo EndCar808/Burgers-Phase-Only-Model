@@ -310,12 +310,14 @@ void orthonormalize(double* pert, double* znorm, int num_osc, int kmin) {
 	mem_chk(rhs_pert, "rhs_pert");
 
 	// Initialize col_change matrix
-	for (int i = 0; i < kdim; ++i) {
-		for (int j = 0; j < kdim; ++j) {
-			col_change[i * (kdim) + j] = 0.0; 
-			rhs_pert[i * (kdim) + j]   = pert[i * (kdim) + j];
-		}
-	}
+	// for (int i = 0; i < kdim; ++i) {
+	// 	for (int j = 0; j < kdim; ++j) {
+	// 		col_change[i * (kdim) + j] = 0.0; 
+	// 		rhs_pert[i * (kdim) + j]   = pert[i * (kdim) + j];
+	// 	}
+	// }
+	memset(col_change, 0.0, sizeof(double) * (kdim) * (kdim));
+	memcpy(rhs_pert, pert, sizeof(double) * (kdim) * (kdim));
 
 	///---------------
 	/// Perform QR Fac
@@ -704,13 +706,17 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 			// increment
 			t    = iter*dt;			
 			iter += 1;			
-		}
+		}		
+		// ------------------------------
+		//  End Integration
+		// ------------------------------
+		
 		// ------------------------------
 		//  Orthonormalize 
 		// ------------------------------
 		orthonormalize(pert, znorm, num_osc, kmin);
 
-	
+		
 		// ------------------------------
 		//  Compute LCEs & Write To File
 		// ------------------------------

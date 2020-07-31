@@ -1,7 +1,6 @@
 // Enda Carroll
 // May 2020
-// Main function file for calling the Benettin et al., algorithm
-// for computing the Lyapunov spectrum of the Phase Only 1D Burgers equation
+// Main file for calling the pseudospectral solver for the 1D Burgers equation
 
 // ---------------------------------------------------------------------
 //  Standard Libraries and Headers
@@ -23,10 +22,9 @@
 // ---------------------------------------------------------------------
 //  User Libraries and Headers
 // ---------------------------------------------------------------------
-#include "data_types.h"
-#include "utils.h"
 #include "lce_spectrum.h"
-
+#include "utils.h"
+#include "solver.h"
 
 
 
@@ -34,6 +32,7 @@
 //  Main function
 // ---------------------------------------------------------------------
 int main(int argc, char** argv) {
+
 
 	// ------------------------------
 	//  Setup 
@@ -44,32 +43,32 @@ int main(int argc, char** argv) {
 
 	// Collocation points
 	int N = atoi(argv[1]);
-
-	// Alpha value
-	double alpha = atof(argv[3]);
-	double beta  = atof(argv[4]);
 	
-	// Kill first k0 modes
-	int k0 = atoi(argv[2]);;
 
-	// Specify initial condition
-	char* u0[128];
-	strcpy(u0, argv[5]);
+	// Spectrum variables
+	int k0 = 1;
+	double alpha = atof(argv[2]);
+	double beta  = atof(argv[3]);
+	
 
 	// Integration parameters
 	int m_end  = 40000;
 	int m_iter = 10;
 
-
-	// ------------------------------
-	//  Compute Spectrum
-	// ------------------------------
-	compute_lce_spectrum(N, alpha, beta, u0, k0, m_end, m_iter);
-	// ------------------------------
-	//  Compute Spectrum
-	// ------------------------------
+	// Perturbation
+	double pert = 1e-8;
 
 
+
+	// ------------------------------
+	//  Compute Lyapunov Spectrum
+	// ------------------------------
+	compute_spectrum(N, k0, alpha, beta, m_end, m_iter, pert);
+	// ------------------------------
+	//  Compute Lyapunov Spectrum
+	// ------------------------------
+	
+	
 	// Finish timing
 	clock_t end = clock();
 
@@ -78,7 +77,6 @@ int main(int argc, char** argv) {
 
 	printf("\n\tExecution Time: %20.16lf\n", time_spent);
 	printf("\n\n");
-
 
 	return 0;
 }

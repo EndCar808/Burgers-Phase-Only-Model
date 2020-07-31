@@ -11,13 +11,13 @@ mpl.use('Agg') # Use this backend for writing plots to file
 
 import matplotlib.pyplot as plt
 plt.style.use('seaborn-talk')
-mpl.rcParams['figure.figsize'] = [10, 8]
+mpl.rcParams['figure.figsize']    = [10, 8]
 mpl.rcParams['figure.autolayout'] = True
-mpl.rcParams['text.usetex'] = True
-mpl.rcParams['font.family'] = 'serif'
-mpl.rcParams['font.serif'] = 'Computer Modern Roman'
-mpl.rcParams['lines.linewidth'] = 1.25
-mpl.rcParams['lines.markersize'] = 6
+mpl.rcParams['text.usetex']       = True
+mpl.rcParams['font.family']       = 'serif'
+mpl.rcParams['font.serif']        = 'Computer Modern Roman'
+mpl.rcParams['lines.linewidth']   = 1.25
+mpl.rcParams['lines.markersize']  = 6
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
 import h5py
 import sys
@@ -34,20 +34,22 @@ np.set_printoptions(threshold=sys.maxsize)
 # N = 2**np.arange(4, 9)
 N = [64, 128, 256, 512]
 # alpha = np.append(np.append(np.arange(0.0, 1.0, 0.05), np.arange(1.0, 2.0, 0.025)), np.arange(2.0, 2.5, 0.05))
-alpha = np.arange(0.0, 2.50, 0.05)
+alpha = np.arange(0.0, 3.5, 0.05)
 print(alpha)
 
 
 ######################
 ##  Get Input Values
 ######################
-if (len(sys.argv) != 4):
-    print("No Input Provided, Error.\nProvide k0, Beta and Iteration Values!\n")
+if (len(sys.argv) != 6):
+    print("No Input Provided, Error.\nProvide k0\nBeta\nIteration\nTransient Iterations\nInitial Condition!\n")
     sys.exit()
 else: 
     k0    = int(sys.argv[1])
     beta  = float(sys.argv[2])
     iters = int(sys.argv[3])
+    trans = int(sys.argv[4])
+    u0    = str(sys.argv[5])
 
 
 ######################
@@ -55,7 +57,7 @@ else:
 ######################
 input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Output/LCE"
 output_dir = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Snapshots/Spectra"
-
+# input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/RESULTS"
 
 ######################
 ##	Allocate Memory
@@ -86,6 +88,7 @@ for n in range(0, len(N)):
 
         # Read in data
         filename = "/LCE_Runtime_Data_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[ALIGNED]_ITERS[{}].h5".format(N[n], k0, alpha[a], beta, iters)
+        # filename = "/RESULTS_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]/LCEData_ITERS[{}]_TRANS[{}].h5".format(N[n], k0, alpha[a], beta, u0, iters, trans)
         file     = h5py.File(input_dir + filename, 'r')
         
         # Extract LCE Data
@@ -98,6 +101,7 @@ for n in range(0, len(N)):
         # find the zero mode
         minval  = np.amin(np.absolute(spectrum))
         minindx = np.where(np.absolute(spectrum) == minval)
+        minindx_el,  = minindx
         
         # Extract the zero mode
         non_zero_spectrum = np.delete(spectrum, minindx, 0)
@@ -115,14 +119,17 @@ for n in range(0, len(N)):
         
         ## Kaplan-Yorke Dimension
         lcesum = 0.0;
+        k_indx = int(0)
         for l in range(0, len(spectrum)):
-            lcesum += spectrum[l]
-            if lcesum <= 0.0:
-                lcesum -= spectrum[l]
-                k_indx  = l - 1
-                break
-                
-        kaplan_york_dim[n, a]  = k_indx + (lcesum / np.absolute(spectrum[k_indx + 1]))
+            if (lcesum + spectrum[l]) > 0.0:
+                lcesum += spectrum[l]
+                k_indx += 1
+            else:
+                 break
+        if minindx_el == 0:
+            kaplan_york_dim[n, a] = 0.0;
+        else:
+            kaplan_york_dim[n, a]  = k_indx + (lcesum / np.absolute(spectrum[k_indx]))
         entropy_prod_dim[n, a] = lcesum
                 
     ######################
@@ -161,7 +168,7 @@ for n in range(0, len(N)):
         cax.set_label(r'$\alpha$')
 
     # plt.savefig(output_dir + "/SPECTRUM_N[{}]_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(N[n], beta, k0, iters), format='png', dpi = 800)  
-    plt.savefig(output_dir + "/SPECTRUM_N[{}]_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].pdf".format(N[n], beta, k0, iters))  
+    plt.savefig(output_dir + "/SPECTRUM_N[{}]_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}]_u0[{}].pdf".format(N[n], beta, k0, iters, u0))  
     plt.close()
 
     # Symmetry
@@ -175,7 +182,7 @@ for n in range(0, len(N)):
     plt.title(r'Spectrum Symmetry for $N = {} \quad k_0 = {} \quad \beta = {}$'.format(N[n], k0, beta))
     cax = plt.colorbar(cmap, ticks = [0.0, 0.5, 1.0, 1.5, 2.0, 2.45])
     cax.set_label(r'$\alpha$')
-    plt.savefig(output_dir + "/SPECTRUM_SYMETRY_N[{}]_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(N[n], beta, k0, iters))
+    plt.savefig(output_dir + "/SPECTRUM_SYMETRY_N[{}]_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}]_u0[{}].pdf".format(N[n], beta, k0, iters, u0))
     # plt.savefig(output_dir + "/SPECTRUM_SYMETRY_N[{}]_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(N[n], beta, k0, iters), format='png', dpi = 800)  
     plt.close()
 
@@ -194,14 +201,14 @@ plt.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
 plt.xlabel(r"$\alpha$")
 plt.title(r'Entropy Production - $k_0 = {} \quad \beta = {}$'.format(k0, beta))
 plt.legend([r"$N = {val}$".format(val = nn) for nn in N])
-plt.savefig(output_dir + "/ENTROPY_PROD_LOG_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].pdf".format(beta, k0, iters))  
+plt.savefig(output_dir + "/ENTROPY_PROD_LOG_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}]_u0[{}].pdf".format(beta, k0, iters, u0))  
 # plt.savefig(output_dir + "/ENTROPY_PROD_LOG_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800)  
 
 
 plt.yscale('linear')
 plt.ylim(-0.5, 3e2)
 plt.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
-plt.savefig(output_dir + "/ENTROPY_PROD_LIN_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].pdf".format(beta, k0, iters))  
+plt.savefig(output_dir + "/ENTROPY_PROD_LIN_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}]_u0[{}].pdf".format(beta, k0, iters, u0))  
 # plt.savefig(output_dir + "/ENTROPY_PROD_LIN_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800)  
 plt.close()
 
@@ -216,7 +223,7 @@ plt.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
 plt.xlabel(r"$\alpha$")
 plt.title(r'Kaplan-Yorke Dimension - $k_0 = {} \quad \beta = {}$'.format(k0, beta))
 plt.legend([r"$N = {val}$".format(val = nn) for nn in N])
-plt.savefig(output_dir + "/KAPLANYORKE_LOG_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].pdf".format(beta, k0, iters))  
+plt.savefig(output_dir + "/KAPLANYORKE_LOG_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}]_u0[{}].pdf".format(beta, k0, iters, u0))  
 # plt.savefig(output_dir + "/KAPLANYORKE_LOG_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800)  
 
 # Kaplan-Yorke Dimension - LIN
@@ -230,7 +237,7 @@ plt.xlabel(r"$\alpha$")
 plt.gca().set_ylim(bottom = -0.5)
 plt.title(r'Kaplan-Yorke Dimension - $k_0 = {} \quad \beta = {}$'.format(k0, beta))
 plt.legend([r"$N = {val}$".format(val = nn) for nn in N])
-plt.savefig(output_dir + "/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].pdf".format(beta, k0, iters))  
+plt.savefig(output_dir + "/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}]_u0[{}].pdf".format(beta, k0, iters, u0))  
 # plt.savefig(output_dir + "/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800)  
 plt.close()
 
@@ -243,7 +250,7 @@ plt.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
 plt.xlabel(r"$\alpha$")
 plt.title(r'Proportion of Positive Lyapunov Epxonents - $k_0 = {} \quad \beta = {}$'.format(k0, beta))
 plt.legend([r"$N = {val}$".format(val = nn) for nn in N])
-plt.savefig(output_dir + "/PROPORTION_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].pdf".format(beta, k0, iters))
+plt.savefig(output_dir + "/PROPORTION_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}]_u0[{}].pdf".format(beta, k0, iters, u0))
 # plt.savefig(output_dir + "/PROPORTION_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800)  
 plt.close()
 
@@ -256,7 +263,7 @@ plt.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
 plt.xlabel(r"$\alpha$")
 plt.title(r'Number of Positive Lyapunov Epxonents - $k_0 = {} \quad \beta = {}$'.format(k0, beta))
 plt.legend([r"$N = {val}$".format(val = nn) for nn in N])
-plt.savefig(output_dir + "/NUM_POS_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].pdf".format(beta, k0, iters))
+plt.savefig(output_dir + "/NUM_POS_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}]_u0[{}].pdf".format(beta, k0, iters, u0))
 # plt.savefig(output_dir + "/NUM_POS_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800)  
 plt.close()
 
@@ -271,7 +278,7 @@ plt.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
 plt.xlabel(r"$\alpha$")
 plt.title(r'Sum of Lyapunov Epxonents - $k_0 = {} \quad \beta = {}$'.format(k0, beta))
 plt.legend([r"$N = {val}$".format(val = nn) for nn in N])
-plt.savefig(output_dir + "/SUM_LOGY_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].pdf".format(beta, k0, iters))  
+plt.savefig(output_dir + "/SUM_LOGY_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}]_u0[{}].pdf".format(beta, k0, iters, u0))  
 # plt.savefig(output_dir + "/SUM_LOGY_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800) 
 plt.close()
 
@@ -286,6 +293,6 @@ plt.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
 plt.xlabel(r"$\alpha$")
 plt.title(r'Sum of Lyapunov Epxonents - $k_0 = {} \quad \beta = {}$'.format(k0, beta))
 plt.legend([r"$N = {val}$".format(val = nn) for nn in N])
-plt.savefig(output_dir + "/SUM_LIN_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].pdf".format(beta, k0, iters)) 
+plt.savefig(output_dir + "/SUM_LIN_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}]_u0[{}].pdf".format(beta, k0, iters, u0)) 
 # plt.savefig(output_dir + "/SUM_LIN_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800)  
 plt.close()

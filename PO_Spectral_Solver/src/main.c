@@ -43,16 +43,17 @@ int main(int argc, char** argv) {
 	// Collocation points
 	int N = atoi(argv[1]);
 
-	int k0 = 1;
+	int k0 = atoi(argv[2]);
 
-	double alpha = atof(argv[2]);
-	double beta  = atof(argv[3]);
+	double alpha = atof(argv[3]);
+	double beta  = atof(argv[4]);
 
-	int tsteps     = 5e6;
+	int tsteps     = 4e5;
 	int save_steps = SAVE_DATA_STEP;
 
 	// Initial Condition
-	char u0[128] = "RANDOM";
+	char u0[128];
+	strcpy(u0, argv[5]);
 
 
 	// Get the number of threads 

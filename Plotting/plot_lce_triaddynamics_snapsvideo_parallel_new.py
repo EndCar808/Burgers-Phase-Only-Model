@@ -163,9 +163,9 @@ def compute_triads(phases, kmin, kmax):
 	## Create memory space
 	triadphase = -10 * np.ones((k3_range, k1_range, time_steps))
 	triads     = -10 * np.ones((k3_range, k1_range, time_steps))
-	phaseOrder = np.complex(0.0, 0.0) * np.ones((time_steps, 1))
-	R          = np.zeros((time_steps, 1))
-	Phi        = np.zeros((time_steps, 1))
+	phaseOrder = np.complex(0.0, 0.0) * np.ones((time_steps))
+	R          = np.zeros((time_steps))
+	Phi        = np.zeros((time_steps))
 	
 	## Compute the triads
 	for k in range(kmin, kmax + 1):
@@ -173,12 +173,12 @@ def compute_triads(phases, kmin, kmax):
 	        triadphase[k - kmin, k1 - kmin, :] = phases[:, k1] + phases[:, k - k1] - phases[:, k]
 	        triads[k - kmin, k1 - kmin, :]     = np.mod(triadphase[k - kmin, k1 - kmin, :], 2*np.pi)
 
-	        phaseOrder[:, 0] += np.exp(np.complex(0.0, 1.0)*triads[k - kmin, k1 - kmin, :])
+	        phaseOrder[:] += np.exp(np.complex(0.0, 1.0)*triads[k - kmin, k1 - kmin, :])
 	        numTriads += 1
 	
 	# Compute Phase-Order params
-	R[:, 0]   = np.absolute(phaseOrder[:, 0] / numTriads)
-	Phi[:, 0] = np.angle(phaseOrder[:, 0] / numTriads)
+	R[:]   = np.absolute(phaseOrder[:] / numTriads)
+	Phi[:] = np.angle(phaseOrder[:] / numTriads)
 
 	return triads, R, Phi
 
@@ -190,7 +190,7 @@ def compute_realspace(amps, phases, N):
 	print("\n...Creating Real Space Soln...\n")
 
 	# Create full set of amps and phases
-	amps_full   = np.append(amps[0, :], np.flipud(amps[0, 1:-1]))
+	amps_full   = np.append(amps[:], np.flipud(amps[1:-1]))
 	phases_full = np.concatenate((phases[:, :], -np.fliplr(phases[:, 1:-1])), axis = 1)
 
 	# Construct modes and realspace soln
@@ -221,30 +221,31 @@ def compute_gradient(u_z, kmin, kmax):
 
 
 
-
-
-
-
 if __name__ == '__main__':
 	#########################
 	##	Get Input Parameters
 	#########################
-	if (len(sys.argv) != 6):
-	    print("No Input Provided, Error.\nProvide: \nk0\nAlpha\nBeta\nIterations\nN\n")
+	if (len(sys.argv) != 8):
+	    print("No Input Provided, Error.\nProvide k0\nAlpah\nBeta\nIterations\nTransient Iterations\nN\nu0\n")
 	    sys.exit()
 	else: 
 	    k0    = int(sys.argv[1])
 	    alpha = float(sys.argv[2])
 	    beta  = float(sys.argv[3])
 	    iters = int(sys.argv[4])
-	    N     = int(sys.argv[5])
-	filename = "/LCE_Runtime_Data_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[ALIGNED]_ITERS[{}]".format(N, k0, alpha, beta, iters)
+	    trans = int(sys.argv[5])
+	    N     = int(sys.argv[6])
+	    u0    = str(sys.argv[7])
+	results_dir = "/RESULTS_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]".format(N, k0, alpha, beta, u0)
+	filename    = "/SolverData_ITERS[{}]_TRANS[{}]".format(iters, trans)
 
 	######################
 	##	Input & Output Dir
 	######################
-	input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Output/LCE"
-	output_dir = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Snapshots/TriadDynamics" + filename
+	# input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Output/LCE"
+	# output_dir = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Snapshots/TriadDynamics" + filename
+	input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/RESULTS"
+	output_dir = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/RESULTS/" + results_dir
 
 	if os.path.isdir(output_dir) != True:
 		os.mkdir(output_dir)
@@ -256,32 +257,31 @@ if __name__ == '__main__':
 	######################
 	##	Read in Input File
 	######################
-	HDFfileData = h5py.File(input_dir + filename + '.h5', 'r')
+	# HDFfileData = h5py.File(input_dir + filename + '.h5', 'r')
+	HDFfileData = h5py.File(input_dir + results_dir + filename + '.h5', 'r')
 
 	# print input file name to screen
-	print("\n\nData File: %s.h5\n" % filename)
-
+	# print("\n\nData File: %s.h5\n" % filename)
+	print("\n\nData File: %s.h5\n".formtat(results_dir + filename))
 
 	######################
 	##	Read in Datasets
 	######################
 	phases = HDFfileData['Phases'][:, :]
-	time   = HDFfileData['Time'][:, :]
-	amps   = HDFfileData['Amps'][:, :]
-	# u_z    = HDFfileData['Modes'][:, :]
-	# lce    = HDFfileData['LCE'][:, :]
+	time   = HDFfileData['Time'][:]
+	amps   = HDFfileData['Amps'][:]
+
 
 
 
 	######################
 	##	Preliminary Calcs
 	######################
-	ntsteps = phases.shape[0];
+	ntsteps = len(time);
 	num_osc = phases.shape[1];
-	N       = 2 * num_osc - 1 - 1;
+	N       = 2 * (num_osc - 1);
 	kmin    = k0 + 1;
-	kmax    = amps.shape[1] - 1
-	k0      = kmin - 1;
+	kmax    = num_osc - 1;
 
 
 
@@ -303,7 +303,7 @@ if __name__ == '__main__':
 	# 	triads_exist = 0
 
 	triads, R, Phi = compute_triads(phases, kmin, kmax)
-	triads_exist = 0
+	triads_exist   = 0
 
 
 	######################
@@ -342,9 +342,9 @@ if __name__ == '__main__':
 
 	## Create iterable group of processess
 	if triads_exist == 0:
-		groups_args = [(mprocs.Process(target = plot_snaps, args = (i, x, u_urms[i, :], du_x_rms[i, :], time[i, 0], triads[:, :, i], kmin, kmax, phases[i, kmin:], R[0:i, 0], Phi[0:i, 0], time[0, 0], time[-1, 0], time[0:i, 0])) for i in range(time.shape[0]))] * procLim
+		groups_args = [(mprocs.Process(target = plot_snaps, args = (i, x, u_urms[i, :], du_x_rms[i, :], time[i], triads[:, :, i], kmin, kmax, phases[i, kmin:], R[0:i], Phi[0:i], time[0], time[-1], time[0:i])) for i in range(time.shape[0]))] * procLim
 	else:
-	 	groups_args = [(mprocs.Process(target = plot_snaps, args = (i, x, u_urms[i, :], du_x_rms[i, :], time[i, 0], triads[i, :, :], kmin, kmax, phases[i, kmin:], R[0:i, 0], Phi[0:i, 0], time[0, 0], time[-1, 0], time[0:i, 0])) for i in range(time.shape[0]))] * procLim
+	 	groups_args = [(mprocs.Process(target = plot_snaps, args = (i, x, u_urms[i, :], du_x_rms[i, :], time[i], triads[i, :, :], kmin, kmax, phases[i, kmin:], R[0:i], Phi[0:i], time[0], time[-1], time[0:i])) for i in range(time.shape[0]))] * procLim
 
 
 	## Start timer

@@ -33,7 +33,8 @@
 // ---------------------------------------------------------------------
 //  Global Variables
 // ---------------------------------------------------------------------
-#define SAVE_DATA_STEP 100	// Parameter to determine after how many integrations steps data should be saved to output
+#define SAVE_DATA_STEP 1	// Parameter to determine after how many integrations steps data should be saved to output
+#define SAVE_LCE_STEP 1	    // Parameter to determine after how many algorithm steps lce data should be saved to output
 
 
 
