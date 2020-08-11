@@ -63,11 +63,13 @@ for exp in range(5):
 			######################
 			max_spec_al  = np.zeros((len(alpha), len(N)))
 			max_spec_zer = np.zeros((len(alpha), len(N)))
+			max_spec_ran = np.zeros((len(alpha), len(N)))
 
 			for n in range(0, len(N)):
 
 				spectra_al   = np.zeros((len(alpha), int(N[n] / 2 - k)))    
 				spectra_zer  = np.zeros((len(alpha), int(N[n] / 2 - k)))    
+				spectra_ran  = np.zeros((len(alpha), int(N[n] / 2 - k)))   
 
 				for a in range(0, len(alpha)):
 					print("(n = {}, k0 = {}, a = {}, b = {})".format(N[n], k, alpha[a], b))
@@ -77,6 +79,13 @@ for exp in range(5):
 					filename_zer = "/RESULTS_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]/LCEData_ITERS[{}]_TRANS[{}].h5".format(N[n], k, alpha[a], b, "ZERO", iters, trans)
 					file_al  = h5py.File(input_dir_ali + filename_al, 'r')
 					file_zer = h5py.File(input_dir_zer + filename_zer, 'r')
+					
+					filename_ran = "/RESULTS_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]/LCEData_ITERS[{}]_TRANS[{}].h5".format(N[n], k, alpha[a], b, "RANDOM", iters, trans)
+					file_ran = h5py.File(input_dir_zer + filename_ran, 'r')
+					lce_ran = file_ran['LCE']
+					spectrum_ran = lce_ran[-1, :]
+					spectra_ran[a, :]  = spectrum_ran
+					max_spec_ran[a, n]  = lce_ran[-1, exp]
 
 					# Extract LCE Data
 					lce_al = file_al['LCE']
@@ -105,10 +114,11 @@ for exp in range(5):
 				ax = fig.add_subplot(gs[p])
 				ax.plot(alpha, max_spec_al[:, i], '.-')
 				ax.plot(alpha, max_spec_zer[:, i], '.-')
-				ax.legend([r"Aligned", r"Zero"])
+				ax.plot(alpha, max_spec_ran[:, i], '.-')
+				ax.legend([r"Aligned", r"Zero",  r"Random"])
 				ax.set_title(r"$N = {}$".format(N[i]))
 				ax.set_yscale('symlog')
-
+	
 			plt.suptitle(r"Lyapunov Exponent: No. {}, $k_0 = {}$, $\beta = {}$".format(exp + 1, k, b))
 			plt.savefig(output_dir + "/LargestLyapunov_Exp[{}]_k0[{}]_BETA[{}].pdf".format(exp + 1, k, b))
 			plt.close()

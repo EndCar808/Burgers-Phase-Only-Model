@@ -4,15 +4,13 @@ import numpy as np
 import re
 
 # Values to run for
-n = [16, 32]
-# [64, 128, 256, 512]
-k0 = [1, 2]
+n = [64, 128, 256, 512]
+k0 = [1]
 # a = np.append(np.append(np.arange(0.0, 1.0, 0.05), np.arange(1.0, 2.0, 0.025)), np.arange(2.0, 2.5, 0.05))
 # a = np.arange(0.0, 2.5, 0.05)
 a = np.arange(0.0, 3.5, 0.05)
 print(a)
 print(a.shape)
-
 
 beta = [0.0 , 1.0];
 
@@ -30,7 +28,7 @@ print(len(cmdList))
 ##	Run commands in parallel
 ######################
 # Set the limit of subprocesses / threads to spawn at any one time	
-procLimit = 10
+procLimit = 35
 
 # Create grouped iterable of subprocess calls to Popen() - see grouper recipe in itertools
 groups = [(Popen(cmd, shell = True, stdout = PIPE, stdin = PIPE, universal_newlines = True) for cmd in cmdList)] * procLimit 

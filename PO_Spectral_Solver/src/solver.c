@@ -145,8 +145,8 @@ void initial_condition(double* phi, double* amp, fftw_complex* u_z, int* kx, int
 	}
 	else {
 		// input file name
-		char input_file[128];
-		sprintf(input_file, "../Data/Input/Initial_Conditions/FixedPoint_N[%d]_k0[%d]_BETA[%0.3f]_u0[%s].txt", 2*(num_osc - 1),  k0, b, IC); 
+		char input_file[256];
+		sprintf(input_file, "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Input/Initial_Conditions/FixedPoint_N[%d]_k0[%d]_BETA[%0.3f]_u0[%s].txt", 2*(num_osc - 1),  k0, b, IC); 
 
 		printf("\tInput File: %s\n\n", input_file);
 		
@@ -206,7 +206,7 @@ void max(double* a, int n, int k0, double* max_val) {
 void get_output_file_name(char* output_file_name, int N, int k0, double a, double b, char* u0, int ntsteps, int trans_iters) {
 
 	// Create Output File Locatoin
-	char output_dir[512] = "../Data/RESULTS/RESULTS";
+	char output_dir[512] = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/RESULTS/RESULTS";
 	char output_dir_tmp[512];
 	sprintf(output_dir_tmp,  "_N[%d]_k0[%d]_ALPHA[%1.3lf]_BETA[%1.3lf]_u0[%s]", N, k0, a, b, u0);
 	strcat(output_dir, output_dir_tmp);
@@ -910,6 +910,7 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 	// ------------------------------
 	initial_condition(phi, amp, u_z, kx, num_osc, k0, a, b, u0);
 	
+
 	// Print IC if small system size
 	if (N <= 32) {
 		for (int i = 0; i < num_osc; ++i) {

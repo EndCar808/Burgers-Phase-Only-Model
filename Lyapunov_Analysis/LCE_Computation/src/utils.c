@@ -445,7 +445,7 @@ void get_output_file_name(char* output_file_name, int N, int k0, double a, doubl
 	// Check if output directory exists, if not make directory
 	struct stat st = {0};
 	if (stat(output_dir, &st) == -1) {
-		  mkdir(output_dir, 0700);	  
+		mkdir(output_dir, 0700);	  
 	}
 
 	// form the filename of the output file	

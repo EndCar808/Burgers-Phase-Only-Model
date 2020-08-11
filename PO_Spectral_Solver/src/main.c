@@ -45,20 +45,23 @@ int main(int argc, char** argv) {
 
 	int k0 = atoi(argv[2]);
 
+
 	double alpha = atof(argv[3]);
 	double beta  = atof(argv[4]);
 
 	int tsteps     = 4e5;
 	int save_steps = SAVE_DATA_STEP;
 
+
 	// Initial Condition
 	char u0[128];
 	strcpy(u0, argv[5]);
 
-
+// printf("\n\nu0= %s\n", argv[5]);
 	// Get the number of threads 
 	int n_threads = 1;
 
+	
 
 	// set number of threads
 	omp_set_num_threads(n_threads);

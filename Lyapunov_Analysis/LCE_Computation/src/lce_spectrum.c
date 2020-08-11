@@ -382,6 +382,12 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	int tmp;
 	int indx;
 
+	// LCE variables
+	double lce_sum;
+	double dim_sum;
+	int dim_indx;
+
+
 	// ------------------------------
 	//  Allocate memory
 	// ------------------------------
@@ -507,7 +513,11 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	double dt = get_timestep(amp, fftw_plan_c2r, fftw_plan_r2c, kx, N, num_osc, k0);
 
 	#ifdef __TRANSIENTS
+	#ifdef TRANS_STEPS
+	int trans_iters = (int ) (TRANS_STEPS * (m_iter * m_end));	
+	#else
 	int trans_iters = get_transient_iters(amp, fftw_plan_c2r, fftw_plan_r2c, kx, N, num_osc, k0);
+	#endif
 	#else
 	int trans_iters = 0;
 	#endif
@@ -522,17 +532,21 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	// LCE algorithm varibales
 	int m = 1;
 	#ifdef __TRANSIENTS
-	int trans_m = (int) ceil(trans_iters / m_iter);
+	#ifdef TRANS_STEPS
+	int trans_m = (int ) (TRANS_STEPS * (m_end));	
+	#else
+	int trans_m = (int ) (trans_iters / m_iter);;
+	#endif
 	#else
 	int trans_m = 0;
 	#endif	
-	int max_m_iters = m_end + trans_m;
 	
 
 	// Solver time varibales 	
 	double t0      = 0.0;
 	double T       = t0 + m_iter * dt;	
 
+	// printf("Tot Iters: %d - Trans Iters: %d ||| Mend: %d Trans m: %d ||| Trans Steps: %lf\n", (m_iter * m_end), trans_iters, m_end, trans_m, TRANS_STEPS);
 
 	// ------------------------------
 	//  HDF5 File Create
@@ -721,6 +735,9 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 		//  Compute LCEs & Write To File
 		// ------------------------------
 		if (m > trans_m) {
+			lce_sum = 0.0;
+			dim_sum = 0.0;
+			dim_indx = 0;
 			for (int i = 0; i < num_osc - kmin; ++i) {
 				// Compute LCE
 				run_sum[i] = run_sum[i] + log(znorm[i]);
@@ -748,9 +765,9 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 
 			// Print update to screen
 			if (m % print_every == 0) {
-				double lce_sum = 0.0;
-				double dim_sum = 0.0;
-				int dim_indx   = 0;
+				lce_sum = 0.0;
+				dim_sum = 0.0;
+				dim_indx = 0;
 				for (int i = 0; i < num_osc - kmin; ++i) {
 					// Get spectrum sum
 					lce_sum += lce[i];

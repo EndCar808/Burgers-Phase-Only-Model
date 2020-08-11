@@ -262,7 +262,7 @@ if __name__ == '__main__':
 
 	# print input file name to screen
 	# print("\n\nData File: %s.h5\n" % filename)
-	print("\n\nData File: %s.h5\n".formtat(results_dir + filename))
+	print("\n\nData File: %s.h5\n".format(results_dir + filename))
 
 	######################
 	##	Read in Datasets

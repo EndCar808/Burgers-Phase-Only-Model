@@ -4,19 +4,21 @@ import numpy as np
 import re
 
 # Values to run for
+# Values to run for
 k0    = 1
-N     = [256, 512]
-alpha = 1.35
+N     = [64, 128, 512]
+alpha = 1.4
 beta  = 0.0
 trans = 0
 iters = 400000
-u0    = "B"
+u0    = "D"
+
 
 ######################
 ##	Run commands
 ######################
 for n in N:
-    cmd = './PO_Spectral_Solver/bin/main' + ' ' + str(n) + ' ' + str(k0) + ' ' + str(alpha) + ' ' + str(beta) + ' ' + str(iters) + ' ' + u0
+    cmd = './PO_Spectral_Solver/bin/main' + ' ' + str(n) + ' ' + str(k0) + ' ' + str(alpha) + ' ' + str(beta) + ' ' + u0
 
     print(cmd)
     # Create a subprocess class using Popen in the shell - store this in runCode
