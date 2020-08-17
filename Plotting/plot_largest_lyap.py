@@ -114,7 +114,45 @@ for exp in range(5):
 			######################
 			##	Plot Data
 			######################
-			## CREATE FIGURE
+			if exp == 0:
+				## CREATE FIGURE
+				fig = plt.figure(figsize = (16, 9), tight_layout = True)
+				gs  = GridSpec(1, 1)
+				ax = fig.add_subplot(gs[(0, 0)])
+				for n in range(0, len(N)):
+					ax.plot(alpha, max_spec_al[:, n], '.-')
+				ax.legend([r"$N = {val}$".format(val = nn) for nn in N])
+				ax.set_title(r"Aligned")
+				ax.set_yscale('symlog')
+
+				plt.savefig(output_dir + "/N_LargestLyapunov_k0[{}]_BETA[{}]_u0[{}].pdf".format(k, b, "Aligned"))
+				plt.close()
+
+				fig = plt.figure(figsize = (16, 9), tight_layout = True)
+				gs  = GridSpec(1, 1)
+				ax = fig.add_subplot(gs[(0, 0)])
+				for n in range(0, len(N)):
+					ax.plot(alpha, max_spec_zer[:, n], '.-')
+				ax.legend([r"$N = {val}$".format(val = nn) for nn in N])
+				ax.set_title(r"Zero")
+				ax.set_yscale('symlog')
+
+				plt.savefig(output_dir + "/N_LargestLyapunov_k0[{}]_BETA[{}]_u0[{}].pdf".format(k, b, "Zero"))
+				plt.close()
+
+				fig = plt.figure(figsize = (16, 9), tight_layout = True)
+				gs  = GridSpec(1, 1)
+				ax = fig.add_subplot(gs[(0, 0)])
+				for n in range(0, len(N)):
+					ax.plot(alpha, max_spec_ran[:, n], '.-')
+				ax.legend([r"$N = {val}$".format(val = nn) for nn in N])
+				ax.set_title(r"Random")
+				ax.set_yscale('symlog')
+
+				plt.savefig(output_dir + "/N_LargestLyapunov_k0[{}]_BETA[{}]_u0[{}].pdf".format(k, b, "Random"))
+				plt.close()
+
+
 			fig = plt.figure(figsize = (16, 9), tight_layout = True)
 			gs  = GridSpec(2, 2)
 

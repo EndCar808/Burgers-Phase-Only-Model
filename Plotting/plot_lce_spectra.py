@@ -122,21 +122,21 @@ for n in range(0, len(N)):
         prop_pos_lce[n, a] = len(pos_lce) / (len(pos_lce) + len(neg_lce))
         
         # find the sum of the spectrum
-        spectrum_sum[n, a] = np.sum(spectrum)
+        spectrum_sum[n, a] = np.sum(non_zero_spectrum)
         
         ## Kaplan-Yorke Dimension
         lcesum = 0.0;
         k_indx = int(0)
-        for l in range(0, len(spectrum)):
-            if (lcesum + spectrum[l]) > 0.0:
-                lcesum += spectrum[l]
+        for l in range(0, len(non_zero_spectrum)):
+            if (lcesum + non_zero_spectrum[l]) > 0.0:
+                lcesum += non_zero_spectrum[l]
                 k_indx += 1
             else:
                  break
         if minindx_el == 0:
             kaplan_york_dim[n, a] = 0.0;
         else:
-            kaplan_york_dim[n, a]  = k_indx + (lcesum / np.absolute(spectrum[k_indx]))
+            kaplan_york_dim[n, a]  = k_indx + (lcesum / np.absolute(non_zero_spectrum[k_indx]))
         entropy_prod_dim[n, a] = lcesum
                 
     ######################
