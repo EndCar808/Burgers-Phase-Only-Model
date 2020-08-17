@@ -488,7 +488,7 @@ void open_output_create_slabbed_datasets_lce(hid_t* file_handle, char* output_fi
 	hsize_t chunkdims[dimensions]; // array to hold dims of the hyperslab chunks
 
 	// initialize the hyperslab arrays
-	dims[0]      = num_t_steps + 1;             // number of timesteps
+	dims[0]      = num_t_steps;             // number of timesteps
 	dims[1]      = num_osc;                 // number of oscillators
 	maxdims[0]   = H5S_UNLIMITED;           // setting max time index to unlimited means we must chunk our data
 	maxdims[1]   = num_osc;                 // same as before = number of modes
@@ -529,7 +529,7 @@ void open_output_create_slabbed_datasets_lce(hid_t* file_handle, char* output_fi
 	hsize_t chunkdims2[dim2]; // array to hold dims of the hyperslab chunks
 
 	// initialize the hyperslab arrays
-	dims2[0]      = num_t_steps + 1;             // number of timesteps + initial condition
+	dims2[0]      = num_t_steps;             // number of timesteps + initial condition
 	dims2[1]      = k_range * k1_range;      // size of triads array
 	maxdims2[0]   = H5S_UNLIMITED;           // setting max time index to unlimited means we must chunk our data
 	maxdims2[1]   = k_range * k1_range;      // size of triads array

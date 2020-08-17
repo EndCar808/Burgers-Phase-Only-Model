@@ -206,11 +206,16 @@ void max(double* a, int n, int k0, double* max_val) {
 void get_output_file_name(char* output_file_name, int N, int k0, double a, double b, char* u0, int ntsteps, int trans_iters) {
 
 	// Create Output File Locatoin
-	char output_dir[512] = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/RESULTS/RESULTS";
+	char output_dir[512] = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/RESULTS/";
 	char output_dir_tmp[512];
-	sprintf(output_dir_tmp,  "_N[%d]_k0[%d]_ALPHA[%1.3lf]_BETA[%1.3lf]_u0[%s]", N, k0, a, b, u0);
+	#ifdef __FXD_PT_SEARCH__
+	sprintf(output_dir_tmp,  "FXDPT_SEARCH_k0[%d]_ALPHA[%1.3lf]_BETA[%1.3lf]_u0[%s]", k0, a, b, u0);
 	strcat(output_dir, output_dir_tmp);
-
+	#else
+	sprintf(output_dir_tmp,  "RESULTS_N[%d]_k0[%d]_ALPHA[%1.3lf]_BETA[%1.3lf]_u0[%s]", N, k0, a, b, u0);
+	strcat(output_dir, output_dir_tmp);
+	#endif
+	
 	// Check if output directory exists, if not make directory
 	struct stat st = {0};
 	if (stat(output_dir, &st) == -1) {
@@ -219,10 +224,16 @@ void get_output_file_name(char* output_file_name, int N, int k0, double a, doubl
 
 	// form the filename of the output file	
 	char output_file_data[128];
+	#ifdef __FXD_PT_SEARCH__
+	sprintf(output_file_data,  "/Search_Data_N[%d]_ITERS[%d]_TRANS[%d].h5", N, ntsteps, trans_iters);
+	strcpy(output_file_name, output_dir);
+	strcat(output_file_name, output_file_data);
+	#else
 	sprintf(output_file_data,  "/SolverData_ITERS[%d]_TRANS[%d].h5", ntsteps, trans_iters);
 	strcpy(output_file_name, output_dir);
 	strcat(output_file_name, output_file_data);
-	
+	#endif
+
 	#ifdef __STATS	
 	// Print file name to screen
 	printf("\nOutput File: %s \n\n", output_file_name);
@@ -286,6 +297,41 @@ void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_n
 
 	H5Pclose(plist);
 
+	#ifdef __RHS
+	//-----------------------------//
+	//----------- RHS -------------//
+	//-----------------------------//
+	// initialize the hyperslab arrays
+	dims[0]      = num_t_steps;             // number of timesteps
+	dims[1]      = num_osc;                 // number of oscillators
+	maxdims[0]   = H5S_UNLIMITED;           // setting max time index to unlimited means we must chunk our data
+	maxdims[1]   = num_osc;                 // same as before = number of modes
+	chunkdims[0] = 1;                       // 1D chunk to be saved 
+	chunkdims[1] = num_osc;                 // 1D chunk of size number of modes
+
+	// create the 2D dataspace - setting the no. of dimensions, expected and max size of the dimensions
+	file_space[4] = H5Screate_simple(dimensions, dims, maxdims);
+
+	// must create a propertly list to enable data chunking due to max time dimension being unlimited
+	// create property list 
+	hid_t plist5;
+	plist5 = H5Pcreate(H5P_DATASET_CREATE);
+
+	// using this property list set the chuncking - stores the chunking info in plist
+	H5Pset_chunk(plist5, dimensions, chunkdims);
+
+	// Create the dataset in the previouosly created datafile - using the chunk enabled property list and new compound datatype
+	data_set[4] = H5Dcreate(*file_handle, "RHS", H5T_NATIVE_DOUBLE, file_space[4], H5P_DEFAULT, plist5, H5P_DEFAULT);
+	
+	// create the memory space for the slab
+	dims[0] = 1;
+	dims[1] = num_osc;
+
+	// setting the max dims to NULL defaults to same size as dims
+	mem_space[4] = H5Screate_simple(dimensions, dims, NULL);
+
+	H5Pclose(plist5);
+	#endif
 	
 	//-----------------------------//
 	//---------- TRIADS -----------//
@@ -465,6 +511,55 @@ void write_hyperslab_data(hid_t file_space, hid_t data_set, hid_t mem_space, hid
 	}
 }
 
+void write_fixed_point(double* phi, double b, char* u0, int N, int num_osc, int k0, int kdim, hid_t* data_set, int save_data_indx) {
+
+	// create fixed point filename
+	char output_file[256];
+	sprintf(output_file, "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Input/Initial_Conditions/FixedPoint_N[%d]_k0[%d]_BETA[%0.3f]_u0[%s].txt", 2*(num_osc - 1) + 2,  k0, b, u0); 
+
+	printf("\n\nFixed Point File: %s\n\n", output_file);
+	
+	// Open output file
+	FILE *out_file  = fopen(output_file, "w"); 
+	if (out_file == NULL) {
+		fprintf(stderr, "ERROR ("__FILE__":%d) -- Unable to open input file: %s\n", __LINE__, output_file);
+		exit(-1);
+	}
+
+	// write to file including extra random oscillators
+	for (int i = 0; i < num_osc + 2; ++i) {
+		if (i < num_osc) {
+			fprintf(out_file, "%20.16lf\n", phi[i]);
+		}
+		else {
+			fprintf(out_file, "%20.16lf\n", M_PI * ( (double) rand() / (double) RAND_MAX));
+		}
+	}
+
+	// Close output file
+	fclose(out_file);
+
+	// Change size of hdf5 datasets
+	hsize_t dims[2];
+	dims[0] = save_data_indx;
+	dims[1] = num_osc;
+	H5Dset_extent(data_set[0], dims);
+	#ifdef __MODES
+	H5Dset_extent(data_set[2], dims);
+	#endif
+	#ifdef __RHS
+	H5Dset_extent(data_set[4], dims);
+	#endif
+	#ifdef __REALSPACE
+	dims[1] = N;
+	H5Dset_extent(data_set[3], dims);
+	#endif
+	#ifdef __TRIADS
+	dims[1] = kdim;
+	H5Dset_extent(data_set[1], dims);
+	#endif
+
+}
 
 void conv_2N_pad(fftw_complex* convo, fftw_complex* uz, fftw_plan *fftw_plan_r2c_ptr, fftw_plan *fftw_plan_c2r_ptr, int n, int num_osc, int k0) {
 
@@ -797,8 +892,23 @@ double system_enstrophy(fftw_complex* u_z, int* k, int N) {
 	return sys_enstrophy;
 }
 
+void fixed_point_search(int N, int Nmax, int k0, double a, double b, int iters, int save_step, char* u0) {
 
-void solver(int N, int k0, double a, double b, int iters, int save_step, char* u0) {
+	int flag;
+
+	for (int i = N; i < Nmax; i+= 2)
+	{
+		printf("|------------- System Size N = %d -----------|\n", i);
+		flag = solver(i, k0, a, b, iters, save_step, u0);
+		if (flag == 0) {
+			printf("\n\n!!! No fixed point found - Exiting\n");
+			exit(-1);
+		}
+	}
+}	
+
+
+int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0) {
 
 	// ------------------------------
 	//  Variable Definitions
@@ -822,6 +932,8 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 
 	int indx;
 	int tmp;	
+
+	int EXIT_FLAG = 1;
 	
 	// ------------------------------
 	//  Allocate memory
@@ -835,6 +947,12 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 	mem_chk(amp, "amp");
 	double* phi = (double* ) malloc(num_osc * sizeof(double));
 	mem_chk(phi, "phi");
+	#ifdef __FXD_PT_SEARCH__
+	double* rhs_prev = (double* ) malloc(num_osc * sizeof(double));
+	mem_chk(phi, "rhs_prev");
+	double sum;
+	int iters_at_fxd_pt = 0;
+	#endif
 
 	// modes array
 	fftw_complex* u_z = (fftw_complex* ) fftw_malloc(num_osc * sizeof(fftw_complex));
@@ -948,9 +1066,9 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 
 
 	// create hdf5 handle identifiers for hyperslabing the full evolution data
-	hid_t HDF_file_space[4];
-	hid_t HDF_data_set[4];
-	hid_t HDF_mem_space[4];
+	hid_t HDF_file_space[5];
+	hid_t HDF_data_set[5];
+	hid_t HDF_mem_space[5];
 
 	// get output file name
 	char output_file_name[512];
@@ -1106,20 +1224,37 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 			}
 			#endif
 			#ifdef __MODES
-			// Write Initial condition for modes
+			// Write current modes
 			write_hyperslab_data(HDF_file_space[2], HDF_data_set[2], HDF_mem_space[2], COMPLEX_DATATYPE, u_z, "u_z", num_osc, save_data_indx);
+			#endif
+			#ifdef __RHS
+			// Write RHS
+			write_hyperslab_data(HDF_file_space[4], HDF_data_set[4], HDF_mem_space[4], H5T_NATIVE_DOUBLE, RK1, "RHS", num_osc, save_data_indx);
 			#endif
 			#ifdef __REALSPACE 
 			// transform back to Real Space
 			fftw_execute_dft_c2r(fftw_plan_c2r, u_z, u);
 
-			// Write Initial condition for real space
+			// Write real space
 			write_hyperslab_data(HDF_file_space[3], HDF_data_set[3], HDF_mem_space[3], H5T_NATIVE_DOUBLE, u, "u", N, save_data_indx);
 			#endif
 
-
 			// save time and phase order parameter
-			time_array[save_data_indx]      = iter * dt;
+			time_array[save_data_indx]  = iter * dt;
+
+			#ifdef __FXD_PT_SEARCH__
+			// check if system has fallen into a fixed point
+			if (iters_at_fxd_pt > 5) {
+				printf("\n\nTrajectory fallen into fixed point at iteration: %d\n", iter);
+
+				// Write fixed point phases to file & change size of hdf5 datasets
+				write_fixed_point(phi, b, u0, N, num_osc, k0, k_range * k1_range, HDF_data_set, save_data_indx);
+
+				// change number of save steps and break loop
+				num_save_steps = save_data_indx;
+				break;
+			}
+			#endif 
 
 			// increment indx for next iteration
 			save_data_indx++;
@@ -1127,6 +1262,23 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 		// Check if transient iterations has been reached
 		#ifdef __TRANSIENTS
 		if (iter == trans_iters) printf("\n|---- TRANSIENT ITERATIONS COMPLETE ----|\n  Iterations Performed:\t%d\n  Iterations Left:\t%d\n\n", trans_iters, iters);
+		#endif
+
+
+		#ifdef __FXD_PT_SEARCH__
+		// check if system has fallen into a fixed point
+		if (iter > 1) {
+			sum = 0.0;
+			for (int i = 0; i < num_osc; ++i) {
+				sum += fabs(RK1[i] - rhs_prev[i]);
+			}
+
+			if (sum <= 0.0) {
+				iters_at_fxd_pt++;
+			}
+		}
+		// update for next iteration
+		memcpy(rhs_prev, RK1, num_osc * sizeof(double));
 		#endif
 
 				
@@ -1219,7 +1371,19 @@ void solver(int N, int k0, double a, double b, int iters, int save_step, char* u
 	H5Dclose( HDF_data_set[3] );
 	H5Sclose( HDF_file_space[3] );
 	#endif
+	#ifdef __RHS
+	H5Sclose( HDF_mem_space[4] );
+	H5Dclose( HDF_data_set[4] );
+	H5Sclose( HDF_file_space[4] );
+	#endif
 
 	// Close pipeline to output file
 	H5Fclose(HDF_Outputfile_handle);
+
+	// Check if fixed point found 
+	#ifdef __FXD_PT_SEARCH__
+	if (iters_at_fxd_pt <= 5) EXIT_FLAG = 0;
+	#endif
+
+	return EXIT_FLAG;
 }

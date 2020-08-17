@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <time.h>
+#include <float.h>
 #include <string.h>
 #include <complex.h>
 #include <fftw3.h>
@@ -26,7 +27,6 @@
 // ---------------------------------------------------------------------
 #include "data_types.h"
 #include "utils.h"
-
 
 
 
@@ -508,52 +508,54 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 
 
 	// ------------------------------
-	//  Get Timestep
+	//  Get Timestep & Integration Vars
 	// ------------------------------
+	// Get timestep
 	double dt = get_timestep(amp, fftw_plan_c2r, fftw_plan_r2c, kx, N, num_osc, k0);
-
-	#ifdef __TRANSIENTS
-	#ifdef TRANS_STEPS
-	int trans_iters = (int ) (TRANS_STEPS * (m_iter * m_end));	
-	#else
-	int trans_iters = get_transient_iters(amp, fftw_plan_c2r, fftw_plan_r2c, kx, N, num_osc, k0);
-	#endif
-	#else
-	int trans_iters = 0;
-	#endif
-
-	// ------------------------------
-	//  Setup Variables
-	// ------------------------------
-	// Saving variables
-	int tot_m_save_steps = (int) m_end / SAVE_LCE_STEP;
-	int tot_t_save_steps = (int) ((m_iter * m_end) / SAVE_DATA_STEP);	
 
 	// LCE algorithm varibales
 	int m = 1;
+
 	#ifdef __TRANSIENTS
 	#ifdef TRANS_STEPS
-	int trans_m = (int ) (TRANS_STEPS * (m_end));	
+	// Get no. of transient steps
+	int trans_iters = (int ) (TRANS_STEPS * (m_iter * m_end));	
+	int trans_m     = (int ) (TRANS_STEPS * (m_end));
+
+	// Get saving variables
+	int tot_m_save_steps = (int) (m_end - trans_m) / SAVE_LCE_STEP;
+	int tot_t_save_steps = (int) (((m_iter * m_end) - trans_iters) / SAVE_DATA_STEP);
 	#else
-	int trans_m = (int ) (trans_iters / m_iter);;
+	// Get no. of transient steps
+	int trans_iters = get_transient_iters(amp, fftw_plan_c2r, fftw_plan_r2c, kx, N, num_osc, k0);
+	int trans_m     = (int ) (trans_iters / m_iter);
+
+	// Get saving variables
+	int tot_m_save_steps = (int) (m_end - trans_m) / SAVE_LCE_STEP;
+	int tot_t_save_steps = (int) (((m_iter * m_end) - trans_iters) / SAVE_DATA_STEP);	
 	#endif
 	#else
-	int trans_m = 0;
+	// Get no. of transient steps
+	int trans_iters = 0;
+	int trans_m     = 0;
+
+	// Get saving variables
+	int tot_m_save_steps = (int) (m_end) / SAVE_LCE_STEP;
+	int tot_t_save_steps = (int) ((m_iter * m_end) / SAVE_DATA_STEP) + 1;
 	#endif	
-	
 
 	// Solver time varibales 	
-	double t0      = 0.0;
-	double T       = t0 + m_iter * dt;	
+	double t0 = 0.0;
+	double T  = t0 + m_iter * dt;	
 
 	// printf("Tot Iters: %d - Trans Iters: %d ||| Mend: %d Trans m: %d ||| Trans Steps: %lf\n", (m_iter * m_end), trans_iters, m_end, trans_m, TRANS_STEPS);
+
 
 	// ------------------------------
 	//  HDF5 File Create
 	// ------------------------------
 	// Create the HDF5 file handle
 	hid_t HDF_file_handle;
-
 
 	// create hdf5 handle identifiers for hyperslabing the full evolution data
 	hid_t HDF_file_space[4];
@@ -570,16 +572,17 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 
 
 	// Create arrays for time and phase order to save after algorithm is finished
-	double* time_array      = (double* )malloc(sizeof(double) * (tot_t_save_steps + 1));
+	double* time_array      = (double* )malloc(sizeof(double) * (tot_t_save_steps));
 	mem_chk(time_array, "time_array");
-	double* phase_order_R   = (double* )malloc(sizeof(double) * (tot_t_save_steps + 1));
+	double* phase_order_R   = (double* )malloc(sizeof(double) * (tot_t_save_steps));
 	mem_chk(phase_order_R, "phase_order_R");
-	double* phase_order_Phi = (double* )malloc(sizeof(double) * (tot_t_save_steps + 1));
+	double* phase_order_Phi = (double* )malloc(sizeof(double) * (tot_t_save_steps));
 	mem_chk(phase_order_Phi, "phase_order_Phi");
 
 	// ------------------------------
 	//  Write Initial Conditions to File
 	// ------------------------------
+	#ifndef __TRANSIENTS
 	write_hyperslab_data_d(HDF_file_space[0], HDF_data_set[0], HDF_mem_space[0], phi, "phi", num_osc, 0);
 
 
@@ -595,9 +598,6 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	#endif
 
 	// Write initial time
-	#ifdef __TRANSIENTS
-	time_array[0] = trans_iters * dt;
-	#else
 	time_array[0] = 0.0;
 	#endif
 
@@ -605,9 +605,14 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	//  Begin Algorithm
 	// ------------------------------
 	double t = 0.0;
-	int iter = 1;
+	int iter = 1;	
+	#ifdef __TRANSIENTS
+	int save_data_indx = 0;
+	int save_lce_indx  = 0;
+	#else
 	int save_data_indx = 1;
-	int save_lce_indx  = 1;
+	int save_lce_indx  = 0;
+	#endif
 	while (m <= m_end) {
 
 		// ------------------------------
@@ -755,10 +760,10 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 
 			// then write the current LCEs to this hyperslab
 			if (m % SAVE_LCE_STEP == 0) {			
-				write_hyperslab_data_d(HDF_file_space[2], HDF_data_set[2], HDF_mem_space[2], lce, "lce", num_osc - kmin, save_lce_indx - 1);
+				write_hyperslab_data_d(HDF_file_space[2], HDF_data_set[2], HDF_mem_space[2], lce, "lce", num_osc - kmin, save_lce_indx);
 
 				#ifdef __LCE_ERROR
-				write_hyperslab_data_d(HDF_file_space[3], HDF_data_set[3], HDF_mem_space[3], abs_err, "lceError", num_osc - kmin, save_lce_indx - 1);
+				write_hyperslab_data_d(HDF_file_space[3], HDF_data_set[3], HDF_mem_space[3], abs_err, "lceError", num_osc - kmin, save_lce_indx);
 				#endif
 				save_lce_indx += 1;
 			}
@@ -773,7 +778,7 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 					lce_sum += lce[i];
 
 					// Compute attractor dim
-					if (dim_sum + lce[i] > 0) {
+					if (dim_sum + lce[i] > DBL_EPSILON) {
 						dim_sum += lce[i];
 						dim_indx += 1;
 					}
@@ -798,7 +803,7 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 		m += 1;
 		#ifdef __TRANSIENTS
 		if (m - 1 == trans_m) {
-			printf("\n\t!!Transient Iterations Complete!! - Iters: %d\n\n", iter - 1);
+			printf("\n\t!!Transient Iterations Complete!! - Iters: %d\n\n\n", iter - 1);
 		}
 		#endif
 	}
@@ -815,20 +820,20 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	}
 
 	// Wtie time
-	D1dims[0] = tot_t_save_steps + 1;
+	D1dims[0] = tot_t_save_steps;
 	if ( (H5LTmake_dataset(HDF_file_handle, "Time", D1, D1dims, H5T_NATIVE_DOUBLE, time_array)) < 0) {
 		printf("\n\n!!Failed to make - Time - Dataset!!\n\n");
 	}
 
 	#ifdef __TRIADS
 	// Write Phase Order R
-	D1dims[0] = tot_t_save_steps + 1;
+	D1dims[0] = tot_t_save_steps;
 	if ( (H5LTmake_dataset(HDF_file_handle, "PhaseOrderR", D1, D1dims, H5T_NATIVE_DOUBLE, phase_order_R)) < 0) {
 		printf("\n\n!!Failed to make - PhaseOrderR - Dataset!!\n\n");
 	}
 
 	// Write Phase Order Phi
-	D1dims[0] = tot_t_save_steps + 1;
+	D1dims[0] = tot_t_save_steps;
 	if ( (H5LTmake_dataset(HDF_file_handle, "PhaseOrderPhi", D1, D1dims, H5T_NATIVE_DOUBLE, phase_order_Phi)) < 0) {
 		printf("\n\n!!Failed to make - PhaseOrderPhi - Dataset!!\n\n");
 	}

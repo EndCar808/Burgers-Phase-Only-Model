@@ -364,18 +364,21 @@ if __name__ == '__main__':
 	# Start timer
 	end = TIME.perf_counter()
 
-	print("\n\nTime: {:5.8f}s\n\n".format(end - start))
+	print("\n\nPlotting Time: {:5.8f}s\n\n".format(end - start))
 
 
 	######################
 	##	Make Video From Snaps
 	######################
-	framesPerSec = 25
+	framesPerSec = 20
 	inputFile    = output_dir + "/SNAPS/Triad_SNAPS_%05d.png"
-	videoName    = output_dir + "/SNAPS/Triad_Dynamics5.mp4"
+	videoName    = output_dir + "/SNAPS/Triad_Dynamics6.mp4"
+	# cmd = "ffmpeg -r {} -f image2 -s 1920x1080 -i {} -vcodec libx264 -crf 25 -pix_fmt yuv420p {}".format(framesPerSec, inputFile, videoName)
 	cmd = "ffmpeg -r {} -f image2 -s 1920x1080 -i {} -vcodec libx264 -crf 25 -pix_fmt yuv420p {}".format(framesPerSec, inputFile, videoName)
 
-
+	## Start timer
+	start = TIME.perf_counter()
+	
 	process = Popen(cmd, shell = True, stdout = PIPE, stdin = PIPE, universal_newlines = True)
 	[runCodeOutput, runCodeErr] = process.communicate()
 	print(runCodeOutput)
@@ -387,4 +390,7 @@ if __name__ == '__main__':
 	print("Video Location...")
 	print("\n" + videoName + "\n")
 
+	# Start timer
+	end = TIME.perf_counter()
 
+	print("\n\nMovie Time: {:5.8f}s\n\n".format(end - start))

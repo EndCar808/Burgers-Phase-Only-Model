@@ -49,19 +49,17 @@ int main(int argc, char** argv) {
 	double alpha = atof(argv[3]);
 	double beta  = atof(argv[4]);
 
-	int tsteps     = 4e5;
+	int tsteps     = 5e5;
 	int save_steps = SAVE_DATA_STEP;
 
+	int Nmax = N * 2;
 
 	// Initial Condition
 	char u0[128];
 	strcpy(u0, argv[5]);
 
-// printf("\n\nu0= %s\n", argv[5]);
 	// Get the number of threads 
 	int n_threads = 1;
-
-	
 
 	// set number of threads
 	omp_set_num_threads(n_threads);
@@ -73,14 +71,24 @@ int main(int argc, char** argv) {
 	fftw_plan_with_nthreads((int)omp_get_max_threads());
 
 
+
+	#ifdef __FXD_PT_SEARCH__
+	// ------------------------------
+	//  Call Searching Algo
+	// ------------------------------
+	fixed_point_search(N, Nmax, k0, alpha, beta, tsteps, save_steps, u0);
+	// ------------------------------
+	//  Call Searching Algo
+	// ------------------------------
+	#else
 	// ------------------------------
 	//  Call Solver Here
 	// ------------------------------
-	solver(N, k0, alpha, beta, tsteps, save_steps, u0);
+	int flag = solver(N, k0, alpha, beta, tsteps, save_steps, u0);
 	// ------------------------------
 	//  Call Solver Here
 	// ------------------------------
-	
+	#endif
 
 	
 	// Finish timing

@@ -11,13 +11,13 @@ mpl.use('Agg') # Use this backend for writing plots to file
 
 import matplotlib.pyplot as plt
 # plt.style.use('seaborn-talk')
-mpl.rcParams['figure.figsize'] = [10, 8]
+mpl.rcParams['figure.figsize']    = [10, 8]
 mpl.rcParams['figure.autolayout'] = True
-mpl.rcParams['text.usetex'] = True
-mpl.rcParams['font.family'] = 'serif'
-mpl.rcParams['font.serif'] = 'Computer Modern Roman'
-mpl.rcParams['lines.linewidth'] = 1.25
-mpl.rcParams['lines.markersize'] = 6
+mpl.rcParams['text.usetex']       = True
+mpl.rcParams['font.family']       = 'serif'
+mpl.rcParams['font.serif']        = 'Computer Modern Roman'
+mpl.rcParams['lines.linewidth']   = 1.25
+mpl.rcParams['lines.markersize']  = 6
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
 import h5py
 import sys
@@ -143,7 +143,7 @@ def plot_snaps(i, x, u_urms, du_x_rms, time, triads, kmin, kmax, phases, R, Phi,
     cbar4.set_ticklabels([r"$0$", r"$\frac{\pi}{2}$", r"$\pi$", r"$\frac{3\pi}{2}$", r"$2\pi$"])
 
 
-    plt.savefig(output_dir + "/SNAPS/Triad_SNAPS_{:05d}.png".format(i), format='png', dpi = 400)  
+    plt.savefig(output_dir + "/SNAPS/Triad_SNAPS_{:05d}.png".format(i), format='png', dpi = 200)  
     plt.close()
 
 
@@ -324,9 +324,7 @@ if __name__ == '__main__':
 
 
 
-
-
-	######################
+	######################	
 	##	Plot Data
 	######################
 	## Call realspace function
@@ -338,7 +336,7 @@ if __name__ == '__main__':
 
 	## Plot in parallel
 	## Create Process list	
-	procLim  = 15
+	procLim  = 10
 
 	## Create iterable group of processess
 	if triads_exist == 0:
@@ -364,23 +362,32 @@ if __name__ == '__main__':
 	# Start timer
 	end = TIME.perf_counter()
 
-	print("\n\nTime: {:5.8f}s\n\n".format(end - start))
+	print("\n\nPlotting Time: {:5.8f}s\n\n".format(end - start))
 
 
 	######################
 	##	Make Video From Snaps
 	######################
-	framesPerSec = 25
+	framesPerSec = 20
 	inputFile    = output_dir + "/SNAPS/Triad_SNAPS_%05d.png"
-	videoName    = output_dir + "/SNAPS/Triad_Dynamics5.mp4"
-	cmd = "ffmpeg -r {} -f image2 -s 1920x1080 -i {} -vcodec libx264 -crf 25 -pix_fmt yuv420p {}".format(framesPerSec, inputFile, videoName)
+	videoName    = output_dir + "/SNAPS/Triad_Dynamics6.mp4"
+	# cmd = "ffmpeg -r {} -f image2 -s 1920x1080 -i {} -vcodec libx264 -crf 25 -pix_fmt yuv420p {}".format(framesPerSec, inputFile, videoName)
+	cmd = "ffmpeg -r {} -f image2 -s 1280×720 -i {} -vcodec libx264 -preset ultrafast -crf 35 -pix_fmt yuv420p {}".format(framesPerSec, inputFile, videoName)
 
+
+	## Start timer
+	start = TIME.perf_counter()
 
 	process = Popen(cmd, shell = True, stdout = PIPE, stdin = PIPE, universal_newlines = True)
 	[runCodeOutput, runCodeErr] = process.communicate()
 	print(runCodeOutput)
 	print(runCodeErr)
 	process.wait()
+
+	# Start timer
+	end = TIME.perf_counter()
+
+	print("\n\nMovie Time: {:5.8f}s\n\n".format(end - start))
 
 
 	print("Finished making video...")

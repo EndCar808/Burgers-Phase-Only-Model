@@ -62,6 +62,7 @@ output_dir = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Snapshots
 ######################
 ##	Allocate Memory
 ######################
+deg_of_freedom   = np.zeros((len(N),))
 num_pos_lce      = np.zeros((len(N), len(alpha)))
 prop_pos_lce     = np.zeros((len(N), len(alpha)))
 spectrum_sum     = np.zeros((len(N), len(alpha)))
@@ -84,7 +85,13 @@ for n in range(0, len(N)):
 
     spectra = np.zeros((len(alpha), int(N[n] / 2 - k0)))
 
+    deg_of_freedom[n] = N[n] / 2 - 1 - k0
+
+    print(deg_of_freedom[n])
+
     for a in range(0, len(alpha)):
+
+        # print("n = {}, a = {}".format(N[n], alpha[a]))
 
         # Read in data
         # filename = "/LCE_Runtime_Data_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[ALIGNED]_ITERS[{}].h5".format(N[n], k0, alpha[a], beta, iters)
@@ -95,7 +102,7 @@ for n in range(0, len(N)):
         lce = file['LCE']
         
         # Extract final state
-        spectrum = lce[-1, :]
+        spectrum      = lce[-1, :]
         spectra[a, :] = spectrum
         
         # find the zero mode
@@ -238,6 +245,21 @@ plt.gca().set_ylim(bottom = -0.5)
 plt.title(r'Kaplan-Yorke Dimension - $k_0 = {} \quad \beta = {}$'.format(k0, beta))
 plt.legend([r"$N = {val}$".format(val = nn) for nn in N])
 plt.savefig(output_dir + "/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}]_u0[{}].pdf".format(beta, k0, iters, u0))  
+# plt.savefig(output_dir + "/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800)  
+plt.close()
+
+# Kaplan-Yorke Dimension / DOF 
+plt.figure()
+for i in range(len(N)):
+    plt.plot(alpha[:], kaplan_york_dim[i, :] / deg_of_freedom[i], '.-')
+plt.xlim(alpha[0], alpha[-1])
+# plt.ylim(0.0 - 0.5, 1.0+0.5)
+plt.yscale('linear')
+plt.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
+plt.xlabel(r"$\alpha$")
+plt.title(r'Attractor Dim / Degrees of freedom - $k_0 = {} \quad \beta = {}$'.format(k0, beta))
+plt.legend([r"$N = {val}$".format(val = nn) for nn in N])
+plt.savefig(output_dir + "/KAPLANYORKE_DEGOFFREE_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}]_u0[{}].pdf".format(beta, k0, iters, u0))  
 # plt.savefig(output_dir + "/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800)  
 plt.close()
 
