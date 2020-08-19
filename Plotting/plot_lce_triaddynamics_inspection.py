@@ -237,33 +237,33 @@ plt.savefig(output_dir + "/RealSpace_N[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_k0[{}]_I
 plt.close()
 
 
-for i in range(50):
-	print("SNAP {}"+format(i))
-	plt.plot(np.arange(kmin, kmax + 1), triads[:, i, -1])
-	plt.xlabel(r'$k$')
-	plt.ylabel(r'$\varphi_{{{}, k}}^{{k + {}}}$'.format(str(kmin + i), str(kmin + i)));
-	plt.savefig(output_dir + "/Triad_versus_k_N[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_k0[{}]_ITERS[{}]_k1[{}].png".format(N, alpha, beta, k0, iters, k1 + i), format='png', dpi = 400)  
-	plt.close()
+# for i in range(50):
+# 	print("SNAP {}"+format(i))
+# 	plt.plot(np.arange(kmin, kmax + 1), triads[:, i, -1])
+# 	plt.xlabel(r'$k$')
+# 	plt.ylabel(r'$\varphi_{{{}, k}}^{{k + {}}}$'.format(str(kmin + i), str(kmin + i)));
+# 	plt.savefig(output_dir + "/Triad_versus_k_N[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_k0[{}]_ITERS[{}]_k1[{}].png".format(N, alpha, beta, k0, iters, k1 + i), format='png', dpi = 400)  
+# 	plt.close()
 
 
 
 
 
-#####################
-#	Plot Real Space Snaps
-######################
-for i, t in enumerate(time[:]):
-	print(i)
+# #####################
+# #	Plot Real Space Snaps
+# ######################
+# for i, t in enumerate(time[:]):
+# 	print(i)
 
-	phases_full = np.append(phases[i, :], -np.flipud(phases[i, :-2]))
-	u_z = amps_full * np.exp(np.complex(0.0, 1.0) * phases_full)
-	u   = np.real(np.fft.ifft(u_z))
-	plt.plot(x, u / np.sqrt(np.mean(u**2)))
-	plt.xlim(0, 2*np.pi)
-	plt.ylim(-3.2, 3.2)
-	plt.xlabel(r'$x$')
-	plt.ylabel(r'$u(x, T) / u_{rms}(x, T)$')
-	plt.legend(r'$t = {}$'.format(t))
-	plt.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
-	plt.savefig(output_dir + "/SNAPS/SNAPS_{:05d}.png".format(i), format='png', dpi = 400)  
+# 	phases_full = np.append(phases[i, :], -np.flipud(phases[i, :-2]))
+# 	u_z = amps_full * np.exp(np.complex(0.0, 1.0) * phases_full)
+# 	u   = np.real(np.fft.ifft(u_z))
+# 	plt.plot(x, u / np.sqrt(np.mean(u**2)))
+# 	plt.xlim(0, 2*np.pi)
+# 	plt.ylim(-3.2, 3.2)
+# 	plt.xlabel(r'$x$')
+# 	plt.ylabel(r'$u(x, T) / u_{rms}(x, T)$')
+# 	plt.legend(r'$t = {}$'.format(t))
+# 	plt.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
+# 	plt.savefig(output_dir + "/SNAPS/SNAPS_{:05d}.png".format(i), format='png', dpi = 400)  
 	plt.close()
