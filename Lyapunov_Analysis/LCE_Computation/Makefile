@@ -25,8 +25,8 @@ else ifeq ($(OS), RedHatEnterpriseServer)
 	LIBFLAG := -fopenmp -lpthread -lfftw3_omp -lfftw3 -lm -lhdf5 -lhdf5_hl
 	GSLFLAG := -lgsl -lgslcblas
 	LAPACKFLAG := -llapacke -llapack -lblas -lgfortran
-	INCDIR = -I/usr/include/hdf5/serial/  -I/usr/include/gsl/ -I../../Libraries/lapack-3.9.0/CBLAS/include/ -I../../Libraries/lapack-3.9.0/LAPACKE/include/
-	LIBDIR = -L/usr/lib/x86_64-linux-gnu/hdf5/serial/ -L../../Libraries/lapack-3.9.0/
+	INCDIR = -I/opt/software/fftw/3.3.8/include/ -I/opt/software/intel/2019u5/compilers_and_libraries_2019.5.281/linux/mpi/intel64/include -I/opt/software/gsl/include/gsl/ -I/opt/software/hdf5/1.10.5/include/ -I/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Libraries/lapack-3.9.0/CBLAS/include -I/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Libraries/lapack-3.9.0/LAPACKE/include
+	LIBDIR = -L/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Libraries/lapack-3.9.0/
 else ifeq ($(OS), CentOS)
 	# KAY (ICHEC)
 	GCC := icc

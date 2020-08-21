@@ -614,7 +614,7 @@ void open_output_create_slabbed_datasets_lce(hid_t* file_handle, char* output_fi
 
 	H5Pclose(plist3);
 
-	#ifdef __LCE_ERROR
+	#ifdef __RNORM
 	//---------- LCE ERROR -----------//
 	//
 	// initialize the hyperslab arrays
@@ -637,7 +637,7 @@ void open_output_create_slabbed_datasets_lce(hid_t* file_handle, char* output_fi
 	H5Pset_chunk(plist4, dimensions, chunkdims);
 
 	// Create the dataset in the previouosly created datafile - using the chunk enabled property list and new compound datatype
-	data_set[3] = H5Dcreate(*file_handle, "LCE_Error", H5T_NATIVE_DOUBLE, file_space[3], H5P_DEFAULT, plist4, H5P_DEFAULT);
+	data_set[3] = H5Dcreate(*file_handle, "RNorm", H5T_NATIVE_DOUBLE, file_space[3], H5P_DEFAULT, plist4, H5P_DEFAULT);
 	
 	// create the memory space for the slab
 	dims[0] = 1;

@@ -5,7 +5,7 @@ import re
 
 # Values to run for
 # n = [64, 128, 256, 512]
-n = [256, 512, 1024]
+n = [1024]
 k0 = [1]
 
 # a = np.append(np.append(np.arange(0.0, 1.0, 0.05), np.arange(1.0, 2.0, 0.025)), np.arange(2.0, 2.5, 0.05))
@@ -17,7 +17,7 @@ print(a.shape)
 # beta = [0.0 , 1.0];
 beta = [0.0];
 
-u0 = ["RANDOM"]
+u0 = ["ZERO"]
 
 ######################
 ##	Create command list

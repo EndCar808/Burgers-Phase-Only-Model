@@ -412,12 +412,6 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	mem_chk(lce, "lce");
 	double* run_sum  = (double* )malloc(sizeof(double) * (num_osc - kmin));
 	mem_chk(run_sum, "run_sum");
-	#ifdef __LCE_ERROR
-	double* lce_last = (double* )malloc(sizeof(double) * (num_osc - kmin));
-	mem_chk(lce_last, "lce_last");
-	double* abs_err  = (double* )malloc(sizeof(double) * (num_osc - kmin));
-	mem_chk(abs_err, "abs_err");
-	#endif
 
 	#ifdef __TRIADS
 	// Allocate array for triads
@@ -747,23 +741,14 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 				// Compute LCE
 				run_sum[i] = run_sum[i] + log(znorm[i]);
 				lce[i]     = run_sum[i] / (t - t0);
-
-				#ifdef __LCE_ERROR
-				// Compute Absolute Difference
-				if (m > 1) {
-					abs_err[i] = fabs(lce[i] - lce_last[i]);
-				}
-				// Save for next iteration
-				lce_last[i] = lce[i];
-				#endif
 			}
 
 			// then write the current LCEs to this hyperslab
 			if (m % SAVE_LCE_STEP == 0) {			
 				write_hyperslab_data_d(HDF_file_space[2], HDF_data_set[2], HDF_mem_space[2], lce, "lce", num_osc - kmin, save_lce_indx);
 
-				#ifdef __LCE_ERROR
-				write_hyperslab_data_d(HDF_file_space[3], HDF_data_set[3], HDF_mem_space[3], abs_err, "lceError", num_osc - kmin, save_lce_indx);
+				#ifdef __RNORM
+				write_hyperslab_data_d(HDF_file_space[3], HDF_data_set[3], HDF_mem_space[3], znorm, "rNorm", num_osc - kmin, save_lce_indx);
 				#endif
 				save_lce_indx += 1;
 			}
@@ -853,10 +838,6 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	free(phase_order_Phi);
 	free(phase_order_R);
 	#endif
-	#ifdef __LCE_ERROR
-	free(lce_last);
-	free(abs_err);
-	#endif
 	free(kx);
 	free(amp);
 	free(phi);
@@ -886,7 +867,7 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	H5Dclose( HDF_data_set[1] );
 	H5Sclose( HDF_file_space[1] );
 	#endif
-	#ifdef __LCE_ERROR
+	#ifdef __RNORM
 	H5Sclose( HDF_mem_space[3] );
 	H5Dclose( HDF_data_set[3] );
 	H5Sclose( HDF_file_space[3] );

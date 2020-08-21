@@ -11,7 +11,7 @@
 // #define __TRIADS
 // #define __MODES
 // #define __REALSPACE
-// #define __LCE_ERROR
+#define __RNORM
 // #define __TRANSIENTS			// Turn on transient iterations - these iterations are ignored in the calculation
 
 
