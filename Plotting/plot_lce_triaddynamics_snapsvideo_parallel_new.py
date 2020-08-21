@@ -237,7 +237,7 @@ if __name__ == '__main__':
 	    N     = int(sys.argv[6])
 	    u0    = str(sys.argv[7])
 	results_dir = "/RESULTS_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]".format(N, k0, alpha, beta, u0)
-	filename    = "/SolverData_ITERS[{}]_TRANS[{}]".format(iters, trans)
+	filename    = "/LCEData_ITERS[{}]_TRANS[{}]".format(iters, trans)
 
 	######################
 	##	Input & Output Dir

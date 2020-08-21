@@ -38,12 +38,12 @@ from numba import jit
 ######################
 ##	Create Dataspace
 ######################
-N = [64, 128, 256, 512]
+N = [64, 128, 256, 512, 1024]
 
 alpha = np.arange(0.0, 3.5, 0.05)
 
-k0    = [1, 2]
-beta  = [0.0, 1.0]
+k0    = [1]
+beta  = [0.0]
 iters = 400000
 trans = 0
 trans_alt = 40000
@@ -77,30 +77,30 @@ for exp in range(5):
 				for a in range(0, len(alpha)):
 					print("(n = {}, k0 = {}, a = {:0.3f}, b = {:0.3f})".format(N[n], k, alpha[a], b))
 
-					## ALIGNED
-					filename_al  = "/LCE_Runtime_Data_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[ALIGNED]_ITERS[{}].h5".format(N[n], k, alpha[a], b, iters)
-					file_al      = h5py.File(input_dir_ali + filename_al, 'r')
-					lce_al       = file_al['LCE']
-					spectrum_al  = lce_al[-1, :]
-					spectra_al[a, :]  = spectrum_al
-					max_spec_al[a, n] = lce_al[-1, exp]
+					# ## ALIGNED
+					# filename_al  = "/LCE_Runtime_Data_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[ALIGNED]_ITERS[{}].h5".format(N[n], k, alpha[a], b, iters)
+					# file_al      = h5py.File(input_dir_ali + filename_al, 'r')
+					# lce_al       = file_al['LCE']
+					# spectrum_al  = lce_al[-1, :]
+					# spectra_al[a, :]  = spectrum_al
+					# max_spec_al[a, n] = lce_al[-1, exp]
 
-					if k == 1:
-						## ALIGNED - TRANS
-						filename_al_trans = "/RESULTS_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]/LCEData_ITERS[{}]_TRANS[{}].h5".format(N[n], k, alpha[a], b, "ALIGNED", iters, trans_alt)
-						file_al_trans     = h5py.File(input_dir_zer + filename_al_trans, 'r')
-						lce_al_trans      = file_al_trans['LCE']
-						spectrum_al_trans = lce_al_trans[718, :]
-						spectra_al_trans[a, :]  = spectrum_al_trans
-						max_spec_al_trans[a, n] = lce_al_trans[-1, exp]
+					# if k == 1:
+					# 	## ALIGNED - TRANS
+					# 	filename_al_trans = "/RESULTS_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]/LCEData_ITERS[{}]_TRANS[{}].h5".format(N[n], k, alpha[a], b, "ALIGNED", iters, trans_alt)
+					# 	file_al_trans     = h5py.File(input_dir_zer + filename_al_trans, 'r')
+					# 	lce_al_trans      = file_al_trans['LCE']
+					# 	spectrum_al_trans = lce_al_trans[718, :]
+					# 	spectra_al_trans[a, :]  = spectrum_al_trans
+					# 	max_spec_al_trans[a, n] = lce_al_trans[-1, exp]
 
-					## ZERO
-					filename_zer = "/RESULTS_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]/LCEData_ITERS[{}]_TRANS[{}].h5".format(N[n], k, alpha[a], b, "ZERO", iters, trans)
-					file_zer     = h5py.File(input_dir_zer + filename_zer, 'r')
-					lce_zer      = file_zer['LCE']
-					spectrum_zer = lce_zer[-1, :]
-					spectra_zer[a, :]  = spectrum_zer
-					max_spec_zer[a, n] = lce_zer[-1, exp]
+					# ## ZERO
+					# filename_zer = "/RESULTS_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]/LCEData_ITERS[{}]_TRANS[{}].h5".format(N[n], k, alpha[a], b, "ZERO", iters, trans)
+					# file_zer     = h5py.File(input_dir_zer + filename_zer, 'r')
+					# lce_zer      = file_zer['LCE']
+					# spectrum_zer = lce_zer[-1, :]
+					# spectra_zer[a, :]  = spectrum_zer
+					# max_spec_zer[a, n] = lce_zer[-1, exp]
 					
 					## RANDOM
 					filename_ran = "/RESULTS_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]/LCEData_ITERS[{}]_TRANS[{}].h5".format(N[n], k, alpha[a], b, "RANDOM", iters, trans)
@@ -114,83 +114,82 @@ for exp in range(5):
 			######################
 			##	Plot Data
 			######################
-			if exp == 0:
-				## CREATE FIGURE
-				fig = plt.figure(figsize = (16, 9), tight_layout = True)
-				gs  = GridSpec(1, 1)
-				ax = fig.add_subplot(gs[(0, 0)])
-				for n in range(0, len(N)):
-					ax.plot(alpha, max_spec_al[:, n], '.-')
-				ax.legend([r"$N = {val}$".format(val = nn) for nn in N])
-				ax.set_title(r"Aligned")
-				ax.set_yscale('symlog')
-
-				plt.savefig(output_dir + "/N_LargestLyapunov_k0[{}]_BETA[{}]_u0[{}].pdf".format(k, b, "Aligned"))
-				plt.close()
-
-				fig = plt.figure(figsize = (16, 9), tight_layout = True)
-				gs  = GridSpec(1, 1)
-				ax = fig.add_subplot(gs[(0, 0)])
-				for n in range(0, len(N)):
-					ax.plot(alpha, max_spec_zer[:, n], '.-')
-				ax.legend([r"$N = {val}$".format(val = nn) for nn in N])
-				ax.set_title(r"Zero")
-				ax.set_yscale('symlog')
-
-				plt.savefig(output_dir + "/N_LargestLyapunov_k0[{}]_BETA[{}]_u0[{}].pdf".format(k, b, "Zero"))
-				plt.close()
-
-				fig = plt.figure(figsize = (16, 9), tight_layout = True)
-				gs  = GridSpec(1, 1)
-				ax = fig.add_subplot(gs[(0, 0)])
-				for n in range(0, len(N)):
-					ax.plot(alpha, max_spec_ran[:, n], '.-')
-				ax.legend([r"$N = {val}$".format(val = nn) for nn in N])
-				ax.set_title(r"Random")
-				ax.set_yscale('symlog')
-
-				plt.savefig(output_dir + "/N_LargestLyapunov_k0[{}]_BETA[{}]_u0[{}].pdf".format(k, b, "Random"))
-				plt.close()
-
-
-			fig = plt.figure(figsize = (16, 9), tight_layout = True)
-			gs  = GridSpec(2, 2)
-
-			for i, p in enumerate([(0, 0), (0, 1), (1, 0), (1, 1)]):
-				if k == 1:
-					ax = fig.add_subplot(gs[p])
-					ax.plot(alpha, max_spec_al[:, i], '.-')
-					ax.plot(alpha, max_spec_al_trans[:, i], '.-')
-					ax.plot(alpha, max_spec_zer[:, i], '.-')
-					ax.plot(alpha, max_spec_ran[:, i], '.-')
-					ax.legend([r"Aligned", r"Aligned - Trans", r"Zero",  r"Random"])
-					ax.set_title(r"$N = {}$".format(N[i]))
-					ax.set_yscale('symlog')
-				else:
-					ax = fig.add_subplot(gs[p])
-					ax.plot(alpha, max_spec_al[:, i], '.-')
-					ax.plot(alpha, max_spec_zer[:, i], '.-')
-					ax.plot(alpha, max_spec_ran[:, i], '.-')
-					ax.legend([r"Aligned", r"Zero",  r"Random"])
-					ax.set_title(r"$N = {}$".format(N[i]))
-					ax.set_yscale('symlog')
-	
-			plt.suptitle(r"Lyapunov Exponent: No. {}, $k_0 = {}$, $\beta = {}$".format(exp + 1, k, b))
-			plt.savefig(output_dir + "/LargestLyapunov_Exp[{}]_k0[{}]_BETA[{}].pdf".format(exp + 1, k, b))
-			plt.close()
-
-
 			## CREATE FIGURE
+			# fig = plt.figure(figsize = (16, 9), tight_layout = True)
+			# gs  = GridSpec(1, 1)
+			# ax = fig.add_subplot(gs[(0, 0)])
+			# for n in range(0, len(N)):
+			# 	ax.plot(alpha, max_spec_al[:, n], '.-')
+			# ax.legend([r"$N = {val}$".format(val = nn) for nn in N])
+			# ax.set_title(r"Aligned")
+			# ax.set_yscale('symlog')
+
+			# plt.savefig(output_dir + "/N_LargestLyapunov_EXP[{}]_k0[{}]_BETA[{}]_u0[{}].pdf".format(exp + 1, k, b, "Aligned"))
+			# plt.close()
+
+			# fig = plt.figure(figsize = (16, 9), tight_layout = True)
+			# gs  = GridSpec(1, 1)
+			# ax = fig.add_subplot(gs[(0, 0)])
+			# for n in range(0, len(N)):
+			# 	ax.plot(alpha, max_spec_zer[:, n], '.-')
+			# ax.legend([r"$N = {val}$".format(val = nn) for nn in N])
+			# ax.set_title(r"Zero")
+			# ax.set_yscale('symlog')
+
+			# plt.savefig(output_dir + "/N_LargestLyapunov_EXP[{}]_k0[{}]_BETA[{}]_u0[{}].pdf".format(exp + 1, k, b, "Zero"))
+			# plt.close()
+
 			fig = plt.figure(figsize = (16, 9), tight_layout = True)
-			gs  = GridSpec(2, 2)
+			gs  = GridSpec(1, 1)
+			ax = fig.add_subplot(gs[(0, 0)])
+			for n in range(0, len(N)):
+				ax.plot(alpha, max_spec_ran[:, n], '.-')
+			ax.legend([r"$N = {val}$".format(val = nn) for nn in N])
+			ax.set_title(r"Random")
+			ax.set_yscale('symlog')
 
-			for i, p in enumerate([(0, 0), (0, 1), (1, 0), (1, 1)]):
-				ax = fig.add_subplot(gs[p])
-				ax.plot(alpha, np.absolute(max_spec_al[:, i] - max_spec_zer[:, i]), '.-')
-				ax.legend([r"Absolute Error"])
-				ax.set_title(r"$N = {}$".format(N[i]))
-				ax.set_yscale('log')
-
-			plt.suptitle(r"Error: No. {}, $k_0 = {}$, $\beta = {}$".format(exp + 1, k, b))
-			plt.savefig(output_dir + "/Error_Exp[{}]_k0[{}]_BETA[{}].pdf".format(exp + 1, k, b))
+			plt.savefig(output_dir + "/N_LargestLyapunov_EXP[{}]_k0[{}]_BETA[{}]_u0[{}].pdf".format(exp + 1, k, b, "Random"))
 			plt.close()
+
+
+			# fig = plt.figure(figsize = (16, 9), tight_layout = True)
+			# gs  = GridSpec(2, 2)
+
+			# for i, p in enumerate([(0, 0), (0, 1), (1, 0), (1, 1)]):
+			# 	if k == 1:
+			# 		ax = fig.add_subplot(gs[p])
+			# 		ax.plot(alpha, max_spec_al[:, i], '.-')
+			# 		ax.plot(alpha, max_spec_al_trans[:, i], '.-')
+			# 		ax.plot(alpha, max_spec_zer[:, i], '.-')
+			# 		ax.plot(alpha, max_spec_ran[:, i], '.-')
+			# 		ax.legend([r"Aligned", r"Aligned - Trans", r"Zero",  r"Random"])
+			# 		ax.set_title(r"$N = {}$".format(N[i]))
+			# 		ax.set_yscale('symlog')
+			# 	else:
+			# 		ax = fig.add_subplot(gs[p])
+			# 		ax.plot(alpha, max_spec_al[:, i], '.-')
+			# 		ax.plot(alpha, max_spec_zer[:, i], '.-')
+			# 		ax.plot(alpha, max_spec_ran[:, i], '.-')
+			# 		ax.legend([r"Aligned", r"Zero",  r"Random"])
+			# 		ax.set_title(r"$N = {}$".format(N[i]))
+			# 		ax.set_yscale('symlog')
+	
+			# plt.suptitle(r"Lyapunov Exponent: No. {}, $k_0 = {}$, $\beta = {}$".format(exp + 1, k, b))
+			# plt.savefig(output_dir + "/LargestLyapunov_Exp[{}]_k0[{}]_BETA[{}].pdf".format(exp + 1, k, b))
+			# plt.close()
+
+
+			# ## CREATE FIGURE
+			# fig = plt.figure(figsize = (16, 9), tight_layout = True)
+			# gs  = GridSpec(2, 2)
+
+			# for i, p in enumerate([(0, 0), (0, 1), (1, 0), (1, 1)]):
+			# 	ax = fig.add_subplot(gs[p])
+			# 	ax.plot(alpha, np.absolute(max_spec_al[:, i] - max_spec_zer[:, i]), '.-')
+			# 	ax.legend([r"Absolute Error"])
+			# 	ax.set_title(r"$N = {}$".format(N[i]))
+			# 	ax.set_yscale('log')
+
+			# plt.suptitle(r"Error: No. {}, $k_0 = {}$, $\beta = {}$".format(exp + 1, k, b))
+			# plt.savefig(output_dir + "/Error_Exp[{}]_k0[{}]_BETA[{}].pdf".format(exp + 1, k, b))
+			# plt.close()

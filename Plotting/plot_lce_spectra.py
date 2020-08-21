@@ -6,7 +6,8 @@
 ##	Library Imports
 ######################
 import matplotlib as mpl
-import platform
+# import platform
+mpl.use('Agg') # Use this backend for writing plots to file
 
 import matplotlib.pyplot as plt
 plt.style.use('seaborn-talk')
@@ -27,19 +28,19 @@ np.set_printoptions(threshold=sys.maxsize)
 
 
 
-dist = platform.dist()
-if dist[0] == 'ubuntu':
-    # mpl.use('TkAgg') # Use this backend for displaying plots in window
-    mpl.use('Agg') # Use this backend for writing plots to file
-elif dist[0] == 'centos':
-    mpl.use('PDF') # Use this backend for Kay (ICHEC)
+# dist = platform.dist()
+# if dist[0] == 'ubuntu':
+#     # mpl.use('TkAgg') # Use this backend for displaying plots in window
+#     mpl.use('Agg') # Use this backend for writing plots to file
+# elif dist[0] == 'centos':
+#     mpl.use('PDF') # Use this backend for Kay (ICHEC)
 
 
 ######################
 ##	Create dataspace arrays
 ######################
 # N = 2**np.arange(4, 9)
-N = [64, 128]
+N = [64, 128, 256, 512, 1024]
 # alpha = np.append(np.append(np.arange(0.0, 1.0, 0.05), np.arange(1.0, 2.0, 0.025)), np.arange(2.0, 2.5, 0.05))
 alpha = np.arange(0.0, 3.5, 0.05)
 print(alpha)
@@ -62,15 +63,18 @@ else:
 ######################
 ##  Input & Output Dirs
 ######################
-dist = platform.dist()
-if dist[0] == 'ubuntu':
-    # input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Output/LCE"
-    input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/RESULTS"
-    output_dir = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Snapshots/Spectra"
-elif dist[0] == 'centos':   
-    # input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Output/LCE"
-    input_dir  = "/ichec/home/users/endacarroll/Burgers/burgers-code/Data/RESULTS/"
-    output_dir = "/ichec/home/users/endacarroll/Burgers/burgers-code/Data/Snapshots/Spectra"
+# dist = platform.dist()
+# if dist[0] == 'ubuntu':
+#     # input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Output/LCE"
+#     input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/RESULTS"
+#     output_dir = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Snapshots/Spectra"
+# elif dist[0] == 'centos':   
+#     # input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Output/LCE"
+#     input_dir  = "/ichec/home/users/endacarroll/Burgers/burgers-code/Data/RESULTS/"
+#     output_dir = "/ichec/home/users/endacarroll/Burgers/burgers-code/Data/Snapshots/Spectra"
+
+input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/RESULTS"
+output_dir = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Snapshots/Spectra"
 
 ######################
 ##	Allocate Memory
@@ -292,11 +296,11 @@ plt.close()
 # Number of Positive LCE
 plt.figure()
 for i in range(len(N)):
-    plt.plot(alpha[:], num_pos_lce[i, :],  '.-')
+    plt.plot(alpha[:], num_pos_lce[i, :] / deg_of_freedom[i],  '.-')
 plt.xlim(alpha[0], alpha[-1])
 plt.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
 plt.xlabel(r"$\alpha$")
-plt.title(r'Number of Positive Lyapunov Epxonents - $k_0 = {} \quad \beta = {}$'.format(k0, beta))
+plt.title(r'Number of Positive Lyapunov Epxonents / D.o.f - $k_0 = {} \quad \beta = {}$'.format(k0, beta))
 plt.legend([r"$N = {val}$".format(val = nn) for nn in N])
 plt.savefig(output_dir + "/NUM_POS_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}]_u0[{}].pdf".format(beta, k0, iters, u0))
 # plt.savefig(output_dir + "/NUM_POS_ALPHA[VARIED]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(beta, k0, iters), format='png', dpi = 800)  
