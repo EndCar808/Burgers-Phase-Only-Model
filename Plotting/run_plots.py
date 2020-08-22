@@ -5,10 +5,13 @@ import re
 
 # Values to run for
 k0    = 1
-N     = [256]
-alpha = np.arange(2.25, 2.45, 0.05)
+N     = [256, 512, 1024]
+# alpha = np.arange(2.25, 2.45, 0.05)
+alpha = [2.0, 2.35]
 beta  = [0.0]
 iters = 400000
+trans = 0
+u0    = "RANDOM"
 
 
 ######################
@@ -17,7 +20,7 @@ iters = 400000
 for a in alpha:
     for b in beta:
         for n in N:
-            cmd = 'python3 plot_lce_triaddynamics_snapsvideo_parallel.py' + ' ' + str(k0) + ' ' + str(a) + ' ' + str(b) + ' ' + str(iters) + ' ' + str(n)
+            cmd = 'python3 plot_lce_triaddynamics_snapsvideo_parallel_new.py' + ' ' + str(k0) + ' ' + str(a) + ' ' + str(b) + ' ' + str(iters) + ' ' + str(trans) + ' ' + str(n) + ' ' + u0
 
             print(cmd)
             # Create a subprocess class using Popen in the shell - store this in runCode

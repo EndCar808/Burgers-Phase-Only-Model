@@ -262,7 +262,7 @@ if __name__ == '__main__':
 
 	# print input file name to screen
 	# print("\n\nData File: %s.h5\n" % filename)
-	print("\n\nData File: %s.h5\n".format(results_dir + filename))
+	print("\n\nData File: {}.h5\n".format(results_dir + filename))
 
 	######################
 	##	Read in Datasets
@@ -371,8 +371,8 @@ if __name__ == '__main__':
 	framesPerSec = 20
 	inputFile    = output_dir + "/SNAPS/Triad_SNAPS_%05d.png"
 	videoName    = output_dir + "/SNAPS/Triad_Dynamics6.mp4"
-	# cmd = "ffmpeg -r {} -f image2 -s 1920x1080 -i {} -vcodec libx264 -crf 25 -pix_fmt yuv420p {}".format(framesPerSec, inputFile, videoName)
-	cmd = "ffmpeg -r {} -f image2 -s 1280×720 -i {} -vcodec libx264 -preset ultrafast -crf 35 -pix_fmt yuv420p {}".format(framesPerSec, inputFile, videoName)
+	cmd = "ffmpeg -r {} -f image2 -s 1920x1080 -i {} -vcodec libx264 -crf 25 -pix_fmt yuv420p {}".format(framesPerSec, inputFile, videoName)
+	# cmd = "ffmpeg -r {} -f image2 -s 1280×720 -i {} -vcodec libx264 -preset ultrafast -crf 35 -pix_fmt yuv420p {}".format(framesPerSec, inputFile, videoName)
 
 
 	## Start timer
@@ -384,14 +384,12 @@ if __name__ == '__main__':
 	print(runCodeErr)
 	process.wait()
 
-	# Start timer
-	end = TIME.perf_counter()
-
-	print("\n\nMovie Time: {:5.8f}s\n\n".format(end - start))
-
-
+	
 	print("Finished making video...")
 	print("Video Location...")
 	print("\n" + videoName + "\n")
 
+	# Start timer
+	end = TIME.perf_counter()
 
+	print("\n\nMovie Time: {:5.8f}s\n\n".format(end - start))
