@@ -1,6 +1,8 @@
 *.o
 *.exe
 *.asv
+*.out
+*.output
 
 # Data
 *.h5
