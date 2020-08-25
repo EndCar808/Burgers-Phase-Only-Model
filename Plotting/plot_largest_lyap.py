@@ -11,10 +11,11 @@ mpl.use('Agg') # Use this backend for writing plots to file
 
 import matplotlib.pyplot as plt
 # plt.style.use('seaborn-talk')
-mpl.rcParams['figure.figsize'] = [16, 9]
+mpl.rcParams['figure.figsize'] = [10, 8]
 mpl.rcParams['figure.autolayout'] = True
 mpl.rcParams['text.usetex'] = True
 mpl.rcParams['font.family'] = 'serif'
+mpl.rcParams['font.size']   = 12
 mpl.rcParams['font.serif'] = 'Computer Modern Roman'
 mpl.rcParams['lines.linewidth'] = 1.25
 mpl.rcParams['lines.markersize'] = 6
@@ -72,7 +73,9 @@ for exp in range(5):
 				spectra_al       = np.zeros((len(alpha), int(N[n] / 2 - k))) 
 				spectra_al_trans = np.zeros((len(alpha), int(N[n] / 2 - k)))    
 				spectra_zer      = np.zeros((len(alpha), int(N[n] / 2 - k)))    
-				spectra_ran      = np.zeros((len(alpha), int(N[n] / 2 - k)))   
+				spectra_ran      = np.zeros((len(alpha), int(N[n] / 2 - k))) 
+
+				dof = N[n] / 2 - 1 - k 
 
 				for a in range(0, len(alpha)):
 					print("(n = {}, k0 = {}, a = {:0.3f}, b = {:0.3f})".format(N[n], k, alpha[a], b))
@@ -139,16 +142,29 @@ for exp in range(5):
 			# plt.savefig(output_dir + "/N_LargestLyapunov_EXP[{}]_k0[{}]_BETA[{}]_u0[{}].pdf".format(exp + 1, k, b, "Zero"))
 			# plt.close()
 
-			fig = plt.figure(figsize = (16, 9), tight_layout = True)
+			fig = plt.figure(figsize = (10, 8), tight_layout = True)
 			gs  = GridSpec(1, 1)
 			ax = fig.add_subplot(gs[(0, 0)])
 			for n in range(0, len(N)):
 				ax.plot(alpha, max_spec_ran[:, n], '.-')
 			ax.legend([r"$N = {val}$".format(val = nn) for nn in N])
-			ax.set_title(r"Random")
+			ax.set_title(r"Largest Lyapunov Exp. - $k_0 = {}$, $\beta = {}$, $u_0 = {}$".format(k, b, "Random"))
 			ax.set_yscale('symlog')
 
 			plt.savefig(output_dir + "/N_LargestLyapunov_EXP[{}]_k0[{}]_BETA[{}]_u0[{}].pdf".format(exp + 1, k, b, "Random"))
+			plt.close()
+
+
+			fig = plt.figure(figsize = (10, 8), tight_layout = True)
+			gs  = GridSpec(1, 1)
+			ax = fig.add_subplot(gs[(0, 0)])
+			for n in range(0, len(N)):
+				ax.plot(alpha, max_spec_ran[:, n] / max_spec_ran[0, n], '.-')
+			ax.legend([r"$N = {val}$".format(val = nn) for nn in N])
+			ax.set_title(r"LLE($\alpha$)/LLE($0$) - $k_0 = {}$, $\beta = {}$, $u_0 = {}$".format(k, b, "Random"))
+			ax.set_yscale('log')
+
+			plt.savefig(output_dir + "/N_LargestLyapunov_ZEROEXP_EXP[{}]_k0[{}]_BETA[{}]_u0[{}].pdf".format(exp + 1, k, b, "Random"))
 			plt.close()
 
 
