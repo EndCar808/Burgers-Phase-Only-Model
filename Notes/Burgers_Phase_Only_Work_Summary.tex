@@ -1,0 +1,524 @@
+%---------------------------PREAMBLE-------------------------------------------- %
+\documentclass[9pt]{article}
+% \documentclass[9pt]{amsart}
+% \documentclass[9pt]{revtex4-2}
+
+
+%------------------- PACKAGES 
+
+\usepackage{graphicx}
+	\graphicspath{ {Plots/} }
+\usepackage{subcaption}
+\usepackage{caption}
+\usepackage{epstopdf}
+\usepackage{pdfpages}
+\usepackage{array}
+\usepackage{ulem}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{amsthm}
+	\newtheorem{definition}{Definition}[section]
+	\newtheorem*{remark}{Remark}
+	\newtheorem{theorem}{Theorem}[section]
+	\newtheorem{corollary}{Corollary}[theorem]
+	\newtheorem{lemma}[theorem]{Lemma}
+\usepackage{mathrsfs}
+\usepackage{color}
+\usepackage{tikz}
+	\usetikzlibrary{tikzmark}
+\usepackage{enumerate}
+\usepackage{array}
+\usepackage{wrapfig}
+\usepackage{enumitem}
+\usepackage{bm}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\usepackage{authblk}
+\usepackage{cancel}
+\usepackage{listings}
+\usepackage[colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue, breaklinks]{hyperref}
+
+
+
+
+%------------------ USEFULL MACROS ------------------%
+%-- MISC
+\newcommand{\comment}[1]{}                                % for adding an inline comment
+\makeatletter 											  % This entire thing is for redefining *matrix environment in amsmath so that you can specify the line spacing in a matrix by  - \begin{pmatrix}[1.5]
+\renewcommand*\env@matrix[1][\arraystretch]{%             
+  \edef\arraystretch{#1}%
+  \hskip -\arraycolsep
+  \let\@ifnextchar\new@ifnextchar
+  \array{*\c@MaxMatrixCols c}}
+\makeatother
+
+%-- DERIVATIVES
+\newcommand{\der}[2]{\frac{\mathrm{d}#1}{\mathrm{d}#2}}          	 % first derivative
+\newcommand{\dder}[2]{\frac{\mathrm{d}^{2}#1}{\mathrm{d}#2^{2}}}	 % second derivative
+\newcommand{\nder}[3]{\frac{\mathrm{d}^{#3}#1}{\mathrm{d}#2^{#3}}}   % nth derivative
+\newcommand{\pder}[2]{\frac{\partial #1}{\partial #2}}               % first partial derivative
+\newcommand{\ppder}[2]{\frac{\partial^2 #1}{\partial {#2}^2}}        % second partial derivative
+\newcommand{\npder}[3]{\frac{\partial^{#3} #1}{\partial {#2}^{#3}}}  % second partial derivative
+
+%-- SUMMATION
+\newcommand{\sumk}[3]{\sum_{#1 = #2}^{#3}}        			% sum over #1 with limits #2 #3
+\newcommand{\sumkk}[2]{\sum_{#1, #2} }         	  			% sum over #1 and #2 no limits
+\newcommand{\sumkkdom}[3]{\sum_{#1 , #2 \in #3}}   			% sum over #1 and #2 with domain specified
+
+%-- RESEARCH RELATED
+\newcommand{\uhat}[1]{\hat{u}_{#1}}      				          % quick fourier mode
+\newcommand{\akak}[2]{a_{#1}a_{#2}}      				          % quick convolution amplitudes
+\newcommand{\akakak}[3]{\frac{a_{#1}a_{#2}}{a_{#3}}}      	      % quick convolution amplitudes
+\newcommand{\triadexp}[3]{\phi_{#1} + \phi_{#2} - \phi_{#3}}      % quick triad explicitly
+\newcommand{\triad}[3]{\varphi_{#1, #2}^{#3}}                     % quick varphi triad
+\newcommand{\ii}{\mathrm{i}}      								  % imaginary i
+\newcommand{\e}{\mathrm{e}}      								  % e
+\newcommand{\Mod}[1]{\ (\mathrm{mod}\ #1)}
+
+
+%-- CODE SNIPPETS
+\newcommand{\code}[1]{\texttt{#1}}
+
+
+
+
+
+%-------- PAGE STYLE & MARGIN SIZE
+% \pagestyle{plain} \setlength{\oddsidemargin}{0.05in}
+% \setlength{\evensidemargin}{0.05in} \setlength{\topmargin}{0in}
+% \setlength{\footskip}{1.05in} \setlength{\headsep}{0in}
+% \setlength{\textwidth}{6.4in} \setlength{\textheight}{8.25in}
+\usepackage[a4paper, margin=2.7cm]{geometry}
+
+
+
+
+\title{\textbf{Lyapunov Spectrum and Phase Dynamics in a Phase Only Burgers Model}}
+
+\author[$1$]{E. M. Carroll}
+\author[$1$]{M. D. Bustamante}
+\affil[$1$]{Department of Mathematics and Statistics, University College Dublin, Dublin, Ireland} 
+
+
+
+
+
+\begin{document}
+
+
+\maketitle	
+
+
+\section{Phase Only Burgers Model}
+
+We consider a phase only Burgers model
+
+
+\begin{align}
+	\dot{\phi_k} &= \frac{ -k }{ 2 } \sum_{k_1, k_2 } \frac{ a_{k_1}a_{k_2} }{a_k}\cos( \varphi_{k_1, k_2}^{k} ) \delta_{k_1 + k_2, k}  
+	\label{eq:po_model}
+\end{align}
+where the Fourier phases and Fourier amplitudes are defined as $\phi_{k}=\arg \left(\hat{u}_{k}\right)$ and $a_k = |\uhat{k}|$ respectively and the Fourier modes $\uhat{k}$ are the Fourier space form of the real space scalar field 
+
+\begin{align}
+	u(x, t)=\sum_{k \in \mathbb{Z}} \mathrm{e}^{\mathrm{i} k x} \hat{u}_{k}(t).
+	\label{eq:fourier_expansion}
+\end{align}
+
+In this model with have ``fixed'' the Fourier amplitudes by giving them a prescribed spectrum
+
+
+\begin{align}
+	a_{k}=A \cdot|k|^{-\alpha} \cdot \exp \left[-\beta \cdot\left(\frac{k}{N / 2}\right)^{2}\right].
+	\label{eq:fixed_amp}
+\end{align}
+
+The system defined in (\ref{eq:po_model}) has a $N$ dynamical variables $\{\phi_k\}_{k = 1}^{N}$ with $\phi_{-k} = -\phi_k$ due to the reality of the real space scalar field. However it is important to note that the system has a translation symmetry in space ($u(x, t) \rightarrow u(x + \epsilon, t)$ which implies that $\phi_k(t) \rightarrow \phi_k(t) + \epsilon k, k\in \mathbb{Z}$. This symmetry means that there are in fact $N - 1$ independent phases out of the set of $N$ dynamical variables. This ``lost'' degree of freedom leads to a neutral direction in the tangent space defined from the dynamical variables $\{\phi_k\}_{k = 1}^{N}$.
+
+
+\subsection{Fixed Point and Stability}
+
+The phase only system defined above has a fixed point when $\phi_k = \pm \pi/2$ (the $\pm$ coming from  $\phi_{-k} = -\phi_k$). The stability of this fixed point can be found by examining the sign of the real part of the eigenvalues of the Jacobian which is given by 
+
+\begin{align}
+	J_{k, k^{\prime}}=\frac{k}{2}\left(2 \frac{a_{k}^{\prime} a_{k-k^{\prime}}}{a_{k}} \sin \left(\varphi_{k^{\prime}, k-k^{\prime}}^{k}\right)+2 \frac{a_{k} a_{k+k}}{a_{k}} \sin \left(\varphi_{k}^{k+k}\right)-\delta_{k, k} \sum_{k_{1}} \frac{a_{k_{1}} a_{k-k_{1}}}{a_{k}} \sin \left(\varphi_{k_{1}, k-k_{1}}^{k}\right)\right)
+	\label{eq:jaco}
+\end{align}
+where $k, k' \in [1, N]$ and the triad phases are evaluated at $\varphi_{k_{1}, k_{2}}^{k}=\left(\operatorname{sign}\left(k_{1}\right)+\operatorname{sign}\left(k_{2}\right)-\operatorname{sign}(k)\right) \pi / 2$.
+
+
+This fixed point is stable and corresponds to the fully aligned case in the full Burgers model (Kuramoto order parameters $\mathcal{R}(t) = 1$, $\Phi = \pi/2$). 
+
+
+% \section{Computing Lyapunov Spectrum}
+
+% To compute the Lyapunov spectrum we are first tasked with choosing a set of $n$ orthogonal tangent vectors, $\delta \phi_k$, which evolve according to
+
+% \begin{align}
+% 	\frac{\mathrm{d}}{\mathrm{d} t} \delta \phi_{k}(t)=\sum_{k^{\prime}} J_{k k^{\prime}} \delta \phi_{k^{\prime}}(t)
+% 	\label{eq:pert_evo}
+% \end{align}
+% where $J_{k k^{\prime}} $, is $(k, k')$ element of the Jacobian described in (\ref{eq:jaco}). The choice of initial perturbation vectors can be chosen randomly but with the restriction $\|\delta \phi_k\| = 1$ (the standard choice is $\delta \phi_1 (0) = (1, 0, 0, \ldots)$; $\delta \phi_2 (0) = (0, 2, 0, \ldots), \ldots$ etc).
+
+% We integrate (\ref{eq:pert_evo}) up until some time, $\tau$, for each initial perturbation vector yielding $\delta \phi_1(\tau)$, $\delta \phi_1(\tau)$, $\ldots, \delta \phi_n(\tau) $. These vectors are then orthonormalized using a Gram-Schmidt Reorthonormalization (GSR) procedure given by
+
+% \begin{align}
+% 	\hat{\delta \phi}_1 (\tau) &= \frac{\delta \phi_1 (\tau)}{\|\delta \phi_1 (\tau) \|} \notag\\ 
+% 	\hat{\delta \phi}_2 (\tau) &= \frac{\delta \phi_2 (\tau) - \left\langle \delta \phi_2 (\tau), \hat{\delta \phi}_1 (\tau) \right\rangle \hat{\delta \phi}_1 (\tau)}{\left\|\delta \phi_2 (\tau) - \left\langle \delta \phi_2 (\tau), \hat{\delta \phi}_1 (\tau) \right\rangle \hat{\delta \phi}_1 (\tau)\right\|} \notag\\
+% 	& \vdots	\notag
+% \end{align}
+% and so on. The norms in the denominators, denoted by $N_1(1), N_2(1), \ldots, N_n(1)$ are recorded and used in the computation of the Lyapunov exponents. This procedure is repeated, integrating until a further $\tau$ time later, giving the set $ \hat{\delta \phi}_1(\tau), \hat{\delta \phi}_1(\tau), \ldots, \hat{\delta \phi}_n(\tau) $, these are then orthogonalized and the norms $N_1(2), N_2(2), \ldots, N_n(2)$ are record. After $r$ iterations of this procedure we the final set of orthonormal perturbation vectors $ \hat{\delta \phi}_1(r\tau), \hat{\delta \phi}_1(r\tau), \ldots, \hat{\delta \phi}_n(r\tau) $ at time $t = r\tau$. The Lyapunov exponents are found using the following
+
+% \begin{align}
+% 	\lambda_i = \lim_{r \rightarrow \infty} \frac{1}{r\tau} \sum_m^n \log N_i(m) \qquad \text{for} \quad i = 1, 2, \ldots n
+% \end{align}
+
+
+
+\subsubsection{Kaplan-Yorke / Lyapunov Dimension}
+
+We define the Kaplan-Yorke (Lyapunov) dimension as 
+
+\begin{align}
+  D_{L} = k + \frac{\lambda_1 + \lambda_2 \ldots \lambda_k}{|\lambda_{k + 1}|}  
+\end{align} 
+such that the sum $\lambda_1 + \lambda_2 \ldots \lambda_k > 0$, where $\lambda_k$, is the $k^{\text{th}}$ Lyapunov exponent.
+
+
+
+\newpage
+
+
+% \section{Computing Lyapunov Vectors}
+
+
+% \newpage
+
+
+\section{Main Results}
+
+\subsection{Spectrum Dependent Attractor Dimension}
+
+
+\begin{figure}[h!]
+\centering
+\begin{tabular}{ccc}
+i) Aligned &  ii) Zero &  iii) Random\\
+\includegraphics[width=0.33\textwidth]{Plots/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[0.000]_k0[1]_ITERS[400000]_u0[ALIGNED].pdf} &
+\includegraphics[width=0.33\textwidth]{Plots/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[0.000]_k0[1]_ITERS[400000]_u0[ZERO].pdf} &
+\includegraphics[width=0.33\textwidth]{Plots/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[0.000]_k0[1]_ITERS[400000]_u0[RANDOM].pdf} \\
+iv) Aligned &  v) Zero &  vi) Random\\
+\includegraphics[width=0.33\textwidth]{Plots/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[1.000]_k0[1]_ITERS[400000]_u0[ALIGNED].pdf} &
+\includegraphics[width=0.33\textwidth]{Plots/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[1.000]_k0[1]_ITERS[400000]_u0[ZERO].pdf} &
+\includegraphics[width=0.33\textwidth]{Plots/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[1.000]_k0[1]_ITERS[400000]_u0[RANDOM].pdf}
+\end{tabular}
+\caption{$k_0 = 1$
+}
+\label{fig:k01}
+\end{figure}
+\begin{figure}[h!]
+\centering
+\begin{tabular}{lll}
+i) Aligned &  ii) Zero &  iii) Random\\
+\includegraphics[width=0.33\textwidth]{Plots/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[0.000]_k0[2]_ITERS[400000]_u0[ALIGNED].pdf} &
+\includegraphics[width=0.33\textwidth]{Plots/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[0.000]_k0[2]_ITERS[400000]_u0[ZERO].pdf} &
+\includegraphics[width=0.33\textwidth]{Plots/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[0.000]_k0[2]_ITERS[400000]_u0[RANDOM].pdf} \\
+iv) Aligned &  v) Zero &  vi) Random\\
+\includegraphics[width=0.33\textwidth]{Plots/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[1.000]_k0[2]_ITERS[400000]_u0[ALIGNED].pdf} &
+\includegraphics[width=0.33\textwidth]{Plots/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[1.000]_k0[2]_ITERS[400000]_u0[ZERO].pdf} &
+\includegraphics[width=0.33\textwidth]{Plots/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[1.000]_k0[2]_ITERS[400000]_u0[RANDOM].pdf} \\
+\end{tabular}
+\caption{$k_0 = 2$
+}
+\label{fig:k02}
+\end{figure}
+
+
+
+\newpage
+
+
+\subsubsection{Videos, $k_0 = 1$}
+\begin{table}[h!]
+\centering
+\resizebox{\textwidth}{!}{ \begin{tabular}{|r||c|c|c|c|}
+ \hline
+   \multicolumn{5}{|c|}{$N$} \\
+ \hline
+ $\alpha$ & 64 & 128 & 256 & 512 \\
+ \hline
+ \hline
+ 1.20 & A & Non-trivial & Non-trivial & Non-trivial \\
+  % \hline
+ 1.25 & Breather-like & Intermittent Limit cycle $\rightarrow$ C & Limit-Cycle (Intermittent)  & Non-trivial \\
+  % \hline
+ 1.30 & B & Limit Cycle/Travelling Wave & Limit Cycle/Travelling Wave & Limit Cycle/Travelling Wave \\
+  % \hline
+ 1.35 & B & B &  &  Non-trivial (Fixed Point B seen for small k)\\
+  % \hline
+ 1.40 & B & C & D &  Non-trivial (Fixed Point B seen for small k)\\
+  % \hline
+ 1.45 & B & B &  &  \\
+  % \hline
+ 1.50 &  &  &  &  \\
+  % \hline
+ 1.55 &  &  &  &  \\ 
+ % \hline
+ 1.60 &  &  &  &  \\
+  % \hline
+ 1.65 &  &  &  &  \\
+  % \hline
+ 1.70 &  &  &  &  \\
+  % \hline
+ 1.75 &  &  &  &  \\
+ \hline
+\end{tabular}}
+\caption{Summary of the Dynamics}
+\label{table:1}
+\end{table}
+
+
+
+
+\newpage
+
+
+
+
+
+\subsection{New Fixed Point}
+
+\subsubsection{Fixed Point NEW}
+
+For $k_0 = 2$  there appears to be a fixed point of the form
+
+
+\begin{align}
+  \phi_k^\text{NEW} = \begin{cases} 
+      \frac{\pi}{2} & k \equiv 0 \Mod{3} \\
+      \frac{\pi}{6} & k \equiv 1 \Mod{3} \\
+      \frac{5\pi}{6} & k \equiv 2 \Mod{3}
+   \end{cases}
+\end{align}
+
+This fixed point is stable for $\alpha \in [1.45, 2.0]$, $\beta = 0$ for small systems but the interval of stability decreases as $N$ is increased
+
+
+\begin{figure}[h!]
+  \centering
+    \includegraphics[width=0.85\linewidth]{Plots/PropUnstable_Eigenvals_FixedPointA.pdf}
+  \caption{The stability analysis for the above fixed point as a function of $\alpha$, for various system sizes. The proportion of unstable directions vanishes for $\alpha \in [1.5, 2.0]$ - the fixed point becomes stable. The interval of stability .}
+  \label{fig:1_lin}
+\end{figure}
+
+
+\newpage
+
+
+
+\newpage
+
+\section{Other Results}
+
+
+\subsubsection{Aligned Initial Condiion}
+
+\begin{figure}[h!]
+  \centering
+  \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{Plots/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[0.000]_k0[1]_ITERS[400000]_u0[ALIGNED].pdf}
+    \caption{}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{Plots/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[1.000]_k0[1]_ITERS[400000]_u0[ALIGNED].pdf}
+    \caption{}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{Plots/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[0.000]_k0[2]_ITERS[400000]_u0[ALIGNED].pdf}
+    \caption{}
+  \end{subfigure}
+   \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{Plots/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[1.000]_k0[2]_ITERS[400000]_u0[ALIGNED].pdf}
+    \caption{}
+  \end{subfigure}
+  \caption{Plot of the Kaplan-Yorke dimension on linear scales as a function of spectrum slope, $\alpha$, for $k_0 = 1$ (top) and $k_0 = 2$ (bottom) and for both $\beta = 0.0$ (left) and $\beta = 1.0$ (right). There is a notable collapse of attractor dimension near the region when $\alpha \approx 1.25$ in sub-figures (a), (b) and (c). There is also a notable difference in the dynamics for systems with $\alpha > 1.25$ for $k_0 = 2$ where the triads have fallen into fixed points and in some cases limit cycles.}
+  \label{fig:1_lin}
+\end{figure}
+
+\subsubsection{Zero Initial Condiion}
+
+\begin{figure}[h!]
+  \centering
+  \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{Plots/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[0.000]_k0[1]_ITERS[400000]_u0[ZERO].pdf}
+    \caption{}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{Plots/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[1.000]_k0[1]_ITERS[400000]_u0[ZERO].pdf}
+    \caption{}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{Plots/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[0.000]_k0[2]_ITERS[400000]_u0[ZERO].pdf}
+    \caption{}
+  \end{subfigure}
+   \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{Plots/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[1.000]_k0[2]_ITERS[400000]_u0[ZERO].pdf}
+    \caption{}
+  \end{subfigure}
+  \caption{Plot of the Kaplan-Yorke dimension on linear scales as a function of spectrum slope, $\alpha$, for $k_0 = 1$ (top) and $k_0 = 2$ (bottom) and for both $\beta = 0.0$ (left) and $\beta = 1.0$ (right). There is a notable collapse of attractor dimension near the region when $\alpha \approx 1.25$ in sub-figures (a), (b) and (c). There is also a notable difference in the dynamics for systems with $\alpha > 1.25$ for $k_0 = 2$ where the triads have fallen into fixed points and in some cases limit cycles.}
+  \label{fig:1_lin}
+\end{figure}
+
+
+\newpage
+
+\subsubsection{Random Initial Condiion}
+
+\begin{figure}[h!]
+  \centering
+  \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{Plots/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[0.000]_k0[1]_ITERS[400000]_u0[RANDOM].pdf}
+    \caption{}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{Plots/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[1.000]_k0[1]_ITERS[400000]_u0[RANDOM].pdf}
+    \caption{}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{Plots/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[0.000]_k0[2]_ITERS[400000]_u0[RANDOM].pdf}
+    \caption{}
+  \end{subfigure}
+   \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{Plots/KAPLANYORKE_LIN_ALPHA[VARIED]_BETA[1.000]_k0[2]_ITERS[400000]_u0[RANDOM].pdf}
+    \caption{}
+  \end{subfigure}
+  \caption{Plot of the Kaplan-Yorke dimension on linear scales as a function of spectrum slope, $\alpha$, for $k_0 = 1$ (top) and $k_0 = 2$ (bottom) and for both $\beta = 0.0$ (left) and $\beta = 1.0$ (right). There is a notable collapse of attractor dimension near the region when $\alpha \approx 1.25$ in sub-figures (a), (b) and (c). There is also a notable difference in the dynamics for systems with $\alpha > 1.25$ for $k_0 = 2$ where the triads have fallen into fixed points and in some cases limit cycles.}
+  \label{fig:1_lin}
+\end{figure}
+
+
+
+\subsubsection*{Slope Dependent Attractor Dimension (Log scales)}
+
+
+
+\begin{figure}[h!]
+	\centering
+  \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{Plots/KAPLANYORKE_LOG_ALPHA[VARIED]_BETA[0.000]_k0[1]_ITERS[400000]_u0[ALIGNED].pdf}
+    \caption{}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{Plots/KAPLANYORKE_LOG_ALPHA[VARIED]_BETA[1.000]_k0[1]_ITERS[400000]_u0[ALIGNED].pdf}
+    \caption{}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{Plots/KAPLANYORKE_LOG_ALPHA[VARIED]_BETA[0.000]_k0[2]_ITERS[400000]_u0[ALIGNED].pdf}
+    \caption{}
+  \end{subfigure}
+   \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{Plots/KAPLANYORKE_LOG_ALPHA[VARIED]_BETA[1.000]_k0[2]_ITERS[400000]_u0[ALIGNED].pdf}
+    \caption{}
+  \end{subfigure}
+  \caption{Plot of the Kaplan-Yorke dimension on log scales as a function of spectrum slope, $\alpha$, for $k_0 = 1$ (top) and $k_0 = 2$ (bottom) and for both $\beta = 0.0$ (left) and $\beta = 1.0$ (right). There is a notable collapse of attractor dimension near the region when $\alpha \approx 1.25$ in sub-figures (a), (b) and (c). There is also a notable difference in the dynamics for systems with $\alpha > 1.25$ for $k_0 = 2$ where the triads have fallen into fixed points and in some cases limit cycles.}
+  \label{fig:1_log}
+\end{figure}
+
+
+
+\newpage
+
+
+
+\subsubsection*{Sum of Spectra}
+\begin{figure}[h!]
+	\centering
+  \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{Plots/SUM_LIN_ALPHA[VARIED]_BETA[0.000]_k0[1]_ITERS[400000]_u0[ALIGNED].pdf}
+    \caption{}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{Plots/SUM_LIN_ALPHA[VARIED]_BETA[1.000]_k0[1]_ITERS[400000]_u0[ALIGNED].pdf}
+    \caption{}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{Plots/SUM_LIN_ALPHA[VARIED]_BETA[0.000]_k0[2]_ITERS[400000]_u0[ALIGNED].pdf}
+    \caption{}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{Plots/SUM_LIN_ALPHA[VARIED]_BETA[1.000]_k0[2]_ITERS[400000]_u0[ALIGNED].pdf}
+    \caption{}
+  \end{subfigure}
+  \caption{Plots of the sum of Lypunov spectrum as a function of $\alpha$ for $k_0 = 1$ (top) and $k_0 = 2$ (bottom) for both $\beta = 0.0$ (left) and $\beta = 1.0$ (right).}
+  \label{fig:2}
+\end{figure}
+
+\newpage
+
+
+\subsubsection*{Slope Dependent Spectra $k_0 = 1$}
+\begin{figure}[h!]
+  \centering
+  \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{Plots/SPECTRUM_N[64]_ALPHA[VARIED]_BETA[0.000]_k0[1]_ITERS[400000]_u0[ALIGNED].pdf}
+    \caption{}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{Plots/SPECTRUM_N[64]_ALPHA[VARIED]_BETA[1.000]_k0[1]_ITERS[400000]_u0[ALIGNED].pdf}
+    \caption{}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{Plots/SPECTRUM_N[128]_ALPHA[VARIED]_BETA[0.000]_k0[1]_ITERS[400000]_u0[ALIGNED].pdf}
+    \caption{}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{Plots/SPECTRUM_N[128]_ALPHA[VARIED]_BETA[1.000]_k0[1]_ITERS[400000]_u0[ALIGNED].pdf}
+    \caption{}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{Plots/SPECTRUM_N[256]_ALPHA[VARIED]_BETA[0.000]_k0[1]_ITERS[400000]_u0[ALIGNED].pdf}
+    \caption{}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{Plots/SPECTRUM_N[256]_ALPHA[VARIED]_BETA[1.000]_k0[1]_ITERS[400000]_u0[ALIGNED].pdf}
+    \caption{}
+  \end{subfigure}
+  \caption{Plots of the Lyapunov spectra for various values of $\alpha$ with the first mode set to 0 for $\beta = 0.0$ (left) and $\beta = 1.0$ (right).}
+  \label{fig:3}
+\end{figure}
+
+\newpage
+\subsubsection*{Slope Dependent Spectra $k_0 = 2$}
+
+\begin{figure}[h!]
+  \centering
+  \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{Plots/SPECTRUM_N[64]_ALPHA[VARIED]_BETA[0.000]_k0[2]_ITERS[400000]_u0[ALIGNED].pdf}
+    \caption{}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{Plots/SPECTRUM_N[64]_ALPHA[VARIED]_BETA[1.000]_k0[2]_ITERS[400000]_u0[ALIGNED].pdf}
+    \caption{}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{Plots/SPECTRUM_N[128]_ALPHA[VARIED]_BETA[0.000]_k0[2]_ITERS[400000]_u0[ALIGNED].pdf}
+    \caption{}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{Plots/SPECTRUM_N[128]_ALPHA[VARIED]_BETA[1.000]_k0[2]_ITERS[400000]_u0[ALIGNED].pdf}
+    \caption{}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{Plots/SPECTRUM_N[256]_ALPHA[VARIED]_BETA[0.000]_k0[2]_ITERS[400000]_u0[ALIGNED].pdf}
+    \caption{}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.49\linewidth}
+    \includegraphics[width=\linewidth]{Plots/SPECTRUM_N[256]_ALPHA[VARIED]_BETA[1.000]_k0[2]_ITERS[400000]_u0[ALIGNED].pdf}
+    \caption{}
+  \end{subfigure}
+  \caption{Plots of the Lyapunov spectra for various values of $\alpha$ with the first two modes set to 0 for $\beta = 0.0$ (left) and $\beta = 1.0$ (right).}
+  \label{fig:4}
+\end{figure}
+
+\end{document}

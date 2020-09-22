@@ -38,9 +38,6 @@ from numba import jit
 ###########################
 ##	Function Definitions
 ###########################
-###########################
-##	Function Definitions
-###########################
 # For plotting snapshots
 def plot_snaps(i, x, u_urms, du_x_rms, time, triads, kmin, kmax, phases, R, Phi, t0, T, fullTime):
     print("SNAP {}\n".format(i))
@@ -181,8 +178,6 @@ def compute_triads(phases, kmin, kmax):
 	Phi[:] = np.angle(phaseOrder[:] / numTriads)
 
 	return triads, R, Phi
-
-
 
 
 ## Real Space Data

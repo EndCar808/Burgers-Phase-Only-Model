@@ -5,20 +5,20 @@ import re
 
 # Values to run for
 # n = [64, 128, 256, 512]
-n = [256, 512, 1024]
+n = [64, 128, 256, 512]
 k0 = [1]
 
 # a = np.append(np.append(np.arange(0.0, 1.0, 0.05), np.arange(1.0, 2.0, 0.025)), np.arange(2.0, 2.5, 0.05))
-# a = np.arange(0.0, 2.5, 0.05)
+a = np.arange(0.0, 3.5, 0.05)
 # a = np.arange(0.0, 3.5, 0.05)
-a = [35, 350]
+# a = [30, 300]
 print(a)
 
 
 # beta = [0.0 , 1.0];
 beta = [0.0];
 
-u0 = ["RANDOM"]
+u0 = ["ALIGNED"]
 
 ######################
 ##	Create command list
@@ -32,7 +32,7 @@ print(len(cmdList))
 ##	Run commands in parallel
 ######################
 # Set the limit of subprocesses / threads to spawn at any one time	
-procLimit = 3
+procLimit = 20
 
 # Create grouped iterable of subprocess calls to Popen() - see grouper recipe in itertools
 groups = [(Popen(cmd, shell = True, stdout = PIPE, stdin = PIPE, universal_newlines = True) for cmd in cmdList)] * procLimit 

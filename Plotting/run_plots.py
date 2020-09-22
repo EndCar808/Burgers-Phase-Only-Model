@@ -5,9 +5,9 @@ import re
 
 # Values to run for
 k0    = 1
-N     = [256, 512, 1024]
-# alpha = np.arange(2.25, 2.45, 0.05)
-alpha = [2.0, 2.35]
+N     = [64, 128, 256]
+alpha = np.arange(1.05, 2.45, 0.05)
+# alpha = [2.0, 2.35]
 beta  = [0.0]
 iters = 400000
 trans = 0
