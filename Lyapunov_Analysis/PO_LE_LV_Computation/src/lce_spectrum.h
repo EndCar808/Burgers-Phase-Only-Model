@@ -27,7 +27,7 @@ double trace(fftw_complex* u_z, int num_osc, int k0);
 
 void orthonormalize(double* pert, double* R_tmp, int num_osc, int kmin);
 void modified_gs(double* q, double* r, int num_osc, int kmin);
-void compute_CLVs(hid_t file_space, hid_t data_set, hid_t mem_space, double* R, double* GS, int DOF, int numLEs, int m_rev_iters, int m_rev_trans);
+void compute_CLVs(hid_t* file_space, hid_t* data_set, hid_t* mem_space, double* R, double* GS, int DOF, int numLEs, int m_rev_iters, int m_rev_trans);
 
 void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end, int m_iter);
 // ---------------------------------------------------------------------

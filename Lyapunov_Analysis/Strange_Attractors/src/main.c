@@ -1,7 +1,7 @@
 // Enda Carroll
-// May 2020
-// Main function file for calling the Benettin et al., algorithm
-// for computing the Lyapunov spectrum of the Phase Only 1D Burgers equation
+// Sept 2020
+// Main function file for calling the Benettin et al. and Ginelli et al., algorithms
+// for computing the Lyapunov spectrum and vectors of the Lorenz system
 
 // ---------------------------------------------------------------------
 //  Standard Libraries and Headers
@@ -11,11 +11,8 @@
 #include <math.h>
 #include <time.h>
 #include <string.h>
-#include <complex.h>
-#include <fftw3.h>
 #include <hdf5.h>
 #include <hdf5_hl.h>
-#include <omp.h>
 #include <gsl/gsl_cblas.h>
 #include <lapacke.h>
 
@@ -23,8 +20,6 @@
 // ---------------------------------------------------------------------
 //  User Libraries and Headers
 // ---------------------------------------------------------------------
-#include "data_types.h"
-#include "utils.h"
 #include "lce_spectrum.h"
 
 
@@ -41,29 +36,21 @@ int main(int argc, char** argv) {
 	clock_t begin = clock();
 
 
-	// Collocation points
-	int N = atoi(argv[1]);
-
-	// Alpha value
-	double alpha = atof(argv[3]);
-	double beta  = atof(argv[4]);
-	
-	// Kill first k0 modes
-	int k0 = atoi(argv[2]);;
-
-	// Specify initial condition
-	char* u0[128];
-	strcpy(u0, argv[5]);
+	// System dimension
+	int N = 3;
+	int numLEs = N;
 
 	// Integration parameters
-	int m_end  = 8000;
-	int m_iter = 50;
+	int m_trans = 1000;
+	int m_rev_trans = m_trans;
+	int m_end  = 60000000;
+	int m_iter = 1;
 
 
 	// ------------------------------
 	//  Compute Spectrum
 	// ------------------------------
-	compute_lce_spectrum(N, alpha, beta, u0, k0, m_end, m_iter);
+	compute_lce_spectrum(N, numLEs, m_trans, m_rev_trans, m_end, m_iter);
 	// ------------------------------
 	//  Compute Spectrum
 	// ------------------------------
@@ -81,3 +68,6 @@ int main(int argc, char** argv) {
 
 	return 0;
 }
+// ---------------------------------------------------------------------
+//  End of File
+// ---------------------------------------------------------------------

@@ -1,8 +1,7 @@
 # Enda Carroll
-# May 2020
+# Sept 2020
 # Makfile to compile programmes for computing the Lyapunov Spectrum and vectors
-# of the Phase Only Burgers equation
-
+# of the Lorenz System
  
 # ---------------------------------------------------------------------
 #  Compiler flags
@@ -13,7 +12,7 @@ ifeq ($(OS),Ubuntu)
 	# CHIRP
 	GCC := gcc
 	CCFLAG := -O3 -W -Wall
-	LIBFLAG := -fopenmp -lpthread -lfftw3_omp -lfftw3 -lm -lhdf5 -lhdf5_hl
+	LIBFLAG := -lm -lhdf5 -lhdf5_hl #-fopenmp -lpthread -lfftw3_omp -lfftw3
 	GSLFLAG := -lgsl -lgslcblas
 	LAPACKFLAG := -llapacke -llapack -lblas -lgfortran
 	INCDIR = -I/usr/include/hdf5/serial/  -I/usr/include/gsl/ -I../../Libraries/lapack-3.9.0/CBLAS/include/ -I../../Libraries/lapack-3.9.0/LAPACKE/include/
@@ -22,7 +21,7 @@ else ifeq ($(OS), RedHatEnterpriseServer)
 	# SONIC
 	GCC := gcc
 	CCFLAG := -O3 -W -Wall
-	LIBFLAG := -fopenmp -lpthread -lfftw3_omp -lfftw3 -lm -lhdf5 -lhdf5_hl
+	LIBFLAG := -lm -lhdf5 -lhdf5_hl #-fopenmp -lpthread -lfftw3_omp -lfftw3 
 	GSLFLAG := -lgsl -lgslcblas
 	LAPACKFLAG := -llapacke -llapack -lblas -lgfortran
 	INCDIR = -I/opt/software/fftw/3.3.8/include/ -I/opt/software/intel/2019u5/compilers_and_libraries_2019.5.281/linux/mpi/intel64/include -I/opt/software/gsl/include/gsl/ -I/opt/software/hdf5/1.10.5/include/ -I/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Libraries/lapack-3.9.0/CBLAS/include -I/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Libraries/lapack-3.9.0/LAPACKE/include
@@ -31,7 +30,7 @@ else ifeq ($(OS), CentOS)
 	# KAY (ICHEC)
 	GCC := icc
 	CCFLAG := -O3 -W -Wall -std=c11
-	LIBFLAG := -fopenmp -lpthread -lfftw3_omp -lfftw3 -lm -lhdf5 -lhdf5_hl
+	LIBFLAG := -lm -lhdf5 -lhdf5_hl #-fopenmp -lpthread -lfftw3_omp -lfftw3 
 	GSLFLAG := -lgsl -lgslcblas
 	LAPACKFLAG := -llapacke -llapack -lblas -lgfortran
 	INCDIR = -I/ichec/packages/fftw/3.3.8/intel/double/include -I/ichec/packages/hdf5/intel/1.10.1/include -I/ichec/packages/lapack/3.8.0/gcc/static/include/ 

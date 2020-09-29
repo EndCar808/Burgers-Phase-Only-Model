@@ -692,7 +692,7 @@ void open_output_create_slabbed_datasets_lce(hid_t* file_handle, char* output_fi
 	// setting the max dims to NULL defaults to same size as dims
 	mem_space[4] = H5Screate_simple(dim2D, dims2D, NULL);
 
-	// Create attribute data for the triad dimensions
+	// Create attribute data for the CLV dimensions
 	hid_t CLV_attr, CLV_attr_space;
 
 	hsize_t CLV_adims[2];
@@ -713,8 +713,60 @@ void open_output_create_slabbed_datasets_lce(hid_t* file_handle, char* output_fi
 	status = H5Aclose(CLV_attr);
     status = H5Sclose(CLV_attr_space);
 	status = H5Pclose(plist5);
-	#endif
 
+	//
+	//---------- Angles -----------//
+	//	
+	// initialize the hyperslab arrays
+	dims2D[0]      = num_clv_steps;                         // number of timesteps + initial condition
+	dims2D[1]      = (num_osc - kmin) * (num_osc - kmin);   // size of angles array
+	maxdims2D[0]   = H5S_UNLIMITED;                         // setting max time index to unlimited means we must chunk our data
+	maxdims2D[1]   = (num_osc - kmin) * (num_osc - kmin);   // size of angles array
+	chunkdims2D[0] = 1;                                     // 1D chunk to be saved 
+	chunkdims2D[1] = (num_osc - kmin) * (num_osc - kmin);   // size of angles array
+
+	// create the 2D dataspace - setting the no. of dimensions, expected and max size of the dimensions
+	file_space[5] = H5Screate_simple(dim2D, dims2D, maxdims2D);
+
+	// must create a propertly list to enable data chunking due to max time dimension being unlimited
+	// create property list 
+	hid_t plist6;
+	plist6 = H5Pcreate(H5P_DATASET_CREATE);
+
+	// using this property list set the chuncking - stores the chunking info in plist
+	H5Pset_chunk(plist6, dim2D, chunkdims2D);
+
+	// Create the dataset in the previouosly created datafile - using the chunk enabled property list and new compound datatype
+	data_set[5] = H5Dcreate(*file_handle, "Angles", H5T_NATIVE_DOUBLE, file_space[5], H5P_DEFAULT, plist6, H5P_DEFAULT);
+	
+	// create the memory space for the slab
+	dims2D[0] = 1;
+	dims2D[1] = (num_osc - kmin) * (num_osc - kmin);
+
+	// setting the max dims to NULL defaults to same size as dims
+	mem_space[5] = H5Screate_simple(dim2D, dims2D, NULL);
+
+	// Create attribute data for the Angles dimensions
+	CLV_adims[0] = 1;
+	CLV_adims[1] = 2;
+
+	// Create attribute data for the CLV dimensions
+	hid_t Angles_attr, Angles_attr_space;
+
+	Angles_attr_space = H5Screate_simple (2, CLV_adims, NULL);
+
+	Angles_attr = H5Acreate(data_set[5], "Angle_Dims", H5T_NATIVE_INT, Angles_attr_space, H5P_DEFAULT, H5P_DEFAULT);
+
+	CLV_dims[0] = (num_osc - kmin);
+	CLV_dims[1] = (num_osc - kmin);
+
+  	status = H5Awrite(Angles_attr, H5T_NATIVE_INT, CLV_dims);
+
+	// close the created property list
+	status = H5Aclose(Angles_attr);
+    status = H5Sclose(Angles_attr_space);
+	status = H5Pclose(plist6);
+	#endif
 }
 
 

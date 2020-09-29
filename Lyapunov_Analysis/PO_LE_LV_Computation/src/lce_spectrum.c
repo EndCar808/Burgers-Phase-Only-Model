@@ -332,14 +332,30 @@ void orthonormalize(double* pert, double* R_tmp, int num_osc, int kmin) {
 	free(tau);
 }
 
+void compute_angles(double* angles, double* CLV, int DOF, int numLEs) {
 
-void compute_CLVs(hid_t file_space, hid_t data_set, hid_t mem_space, double* R, double* GS, int DOF, int numLEs, int m_rev_iters, int m_rev_trans) {
+	double tmp;
+
+	for (int i = 0; i < DOF; ++i) {
+		for (int j = 0; j < i; ++j)	{
+			
+			// Compute the dot product
+			tmp = cblas_ddot(DOF, &CLV[i], numLEs, &CLV[j], numLEs);
+
+			// Compute the angle
+			angles[i * numLEs + j] = acos(fabs(tmp));
+		}
+	}
+}
+
+
+void compute_CLVs(hid_t* file_space, hid_t* data_set, hid_t* mem_space, double* R, double* GS, int DOF, int numLEs, int m_rev_iters, int m_rev_trans) {
 
 	///---------------------------------------
 	/// Setup and Initialization
 	///---------------------------------------
 	// Allocate Memory
-	double* R_tmp = (double* )malloc(sizeof(double) * DOF * numLEs);	
+	double* R_tmp  = (double* )malloc(sizeof(double) * DOF * numLEs);	
 	mem_chk(R_tmp, "R_tmp");
 	double* GS_tmp = (double* )malloc(sizeof(double) * DOF * numLEs);	
 	mem_chk(GS_tmp, "GS_tmp");
@@ -347,6 +363,8 @@ void compute_CLVs(hid_t file_space, hid_t data_set, hid_t mem_space, double* R, 
 	mem_chk(C, "C");
 	double* CLV    = (double* )malloc(sizeof(double) * DOF * numLEs);	
 	mem_chk(CLV, "CLV");
+	double* angles = (double* )malloc(sizeof(double) * DOF * numLEs);	
+	mem_chk(angles, "angles");
 	int* pivot  = (int* )malloc(sizeof(double) * numLEs);
 	mem_chk(pivot, "pivot");
 	double* sum = (double* )malloc(sizeof(double) * numLEs);
@@ -449,7 +467,13 @@ void compute_CLVs(hid_t file_space, hid_t data_set, hid_t mem_space, double* R, 
 			// Write CLVs to file
 			if (p % SAVE_CLV_STEP == 0) {
 				// Write CLVs
-				write_hyperslab_data_d(file_space, data_set, mem_space, CLV, "CLV", DOF * numLEs, save_clv_indx);
+				write_hyperslab_data_d(file_space[4], data_set[4], mem_space[4], CLV, "CLV", DOF * numLEs, save_clv_indx);
+
+				// compute the angles between the CLVs
+				compute_angles(angles, CLV, DOF, numLEs);
+
+				// // Write angles
+				write_hyperslab_data_d(file_space[5], data_set[5], mem_space[5], angles, "Angles", DOF * numLEs, save_clv_indx);
 
 				// icrement for next iter
 				save_clv_indx++;
@@ -465,6 +489,7 @@ void compute_CLVs(hid_t file_space, hid_t data_set, hid_t mem_space, double* R, 
 	free(C);
 	free(R_tmp);
 	free(GS_tmp);
+	free(angles);
 	free(sum);
 	free(pivot);
 }
@@ -687,9 +712,9 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	hid_t HDF_file_handle;
 
 	// create hdf5 handle identifiers for hyperslabing the full evolution data
-	hid_t HDF_file_space[5];
-	hid_t HDF_data_set[5];
-	hid_t HDF_mem_space[5];
+	hid_t HDF_file_space[6];
+	hid_t HDF_data_set[6];
+	hid_t HDF_mem_space[6];
 
 	// get output file name
 	char output_file_name[512];
@@ -955,7 +980,7 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	//  Compute the CLVs
 	// ------------------------------
 	#ifdef __CLVs
-	compute_CLVs(HDF_file_space[4], HDF_data_set[4], HDF_mem_space[4], R, GS, num_osc - kmin, num_osc - kmin, m_end - trans_m, trans_m);
+	compute_CLVs(HDF_file_space, HDF_data_set, HDF_mem_space, R, GS, num_osc - kmin, num_osc - kmin, m_end - trans_m, trans_m);
 	#endif
 	// ------------------------------
 	// End Algorithm
@@ -1045,6 +1070,9 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	H5Sclose( HDF_mem_space[4] );
 	H5Dclose( HDF_data_set[4] );
 	H5Sclose( HDF_file_space[4] );
+	H5Sclose( HDF_mem_space[5] );
+	H5Dclose( HDF_data_set[5] );
+	H5Sclose( HDF_file_space[5] );
 	#endif
 	#ifdef __RNORM
 	H5Sclose( HDF_mem_space[3] );
