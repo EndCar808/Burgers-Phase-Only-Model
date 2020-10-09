@@ -26,7 +26,9 @@
 #define SIGMA 10.0
 #define BETA 2.6666666666666667
 
-
+#define SAVE_DATA_STEP 100 
+#define SAVE_LCE_STEP  100
+#define SAVE_CLV_STEP  10
 
 
 // ---------------------------------------------------------------------
@@ -41,12 +43,12 @@ void mem_chk (void *arr_ptr, char *name) {
 
 
 
-void get_output_file_name(char* output_file_name, double dt, int m_iters, int m_trans, int m_avg) {
+void get_output_file_name(char* output_file_name, double dt, int m_iter, int m_trans, int m_avg) {
 
 	// Create Output File Locatoin
 	char output_dir[512] = "./Data/";
 	char output_dir_tmp[512];
-	sprintf(output_dir_tmp,  "LorenzData_RHO[%.2lf]_TSTEP[%.6lf]_INTSTEPS[%d]_TRANSSTEPS[%d]_AVGSTEPS[%d].h5", RHO, dt, m_iters, m_trans, m_avg);
+	sprintf(output_dir_tmp,  "LorenzData_RHO[%.2lf]_TSTEP[%.6lf]_INTSTEPS[%d]_TRANSSTEPS[%d]_AVGSTEPS[%d].h5", RHO, dt, m_iter, m_trans, m_avg);
 	strcat(output_dir, output_dir_tmp);
 	strcpy(output_file_name, output_dir);
 
@@ -253,7 +255,7 @@ void open_output_create_slabbed_datasets_lce(hid_t* file_handle, char* output_fi
 	status = H5Aclose(Angles_attr);
     status = H5Sclose(Angles_attr_space);
 	status = H5Pclose(plist6);
-	#endif
+
 }
 
 void write_hyperslab_data_d(hid_t file_space, hid_t data_set, hid_t mem_space, double* data, char* data_name, int n, int index) {
@@ -297,18 +299,18 @@ void initial_conditions_lce(double* pert, double* x, int N, int numLEs) {
 void rhs_extended(double* rhs, double* rhs_ext, double* x_tmp, double* x_pert, int n, int numLEs) {
 
 	// Update RHS
-	rhs[0] = SIGMA * (x_tmp[1] - x_tmp[0])
-	rhs[1] = x_tmp[0] * (RHO - x_tmp[2]) - x_tmp[1]
-	rhs[2] = x_tmp[0] * x_tmp[1] - BETA * x_tmp[2]
+	rhs[0] = SIGMA * (x_tmp[1] - x_tmp[0]);
+	rhs[1] = x_tmp[0] * (RHO - x_tmp[2]) - x_tmp[1];
+	rhs[2] = x_tmp[0] * x_tmp[1] - BETA * x_tmp[2];
 
 	// Create the jacobian
-	double jac = (double* )malloc(sizeof(double) * N * numLEs);
+	double* jac = (double* )malloc(sizeof(double) * n * numLEs);
 	jac[0] = -SIGMA;
 	jac[1] = SIGMA;
 	jac[2] = 0;
 	jac[3] = RHO - x_tmp[2];
 	jac[4] = -1;
-	jac[5] = -x[0];
+	jac[5] = -x_tmp[0];
 	jac[6] = x_tmp[1];
 	jac[9] = x_tmp[0];
 	jac[8] = -BETA;
@@ -355,13 +357,13 @@ void orthonormalize(double* pert, double* R_tmp, int N, int numLEs) {
     }
 
 	// extract the diagonals of R
-	for (int i = 0; i < kdim; ++i) {		
-		for (int j = 0 ; j < kdim; ++j) {
+	for (int i = 0; i < N; ++i) {		
+		for (int j = 0 ; j < numLEs; ++j) {
 			if (j >= i) {
-				R_tmp[i * kdim + j] = pert[i * kdim + j];
+				R_tmp[i * numLEs + j] = pert[i * numLEs + j];
 			}
 			else {
-				R_tmp[i * kdim + j] = 0.0;
+				R_tmp[i * numLEs + j] = 0.0;
 			}
 		}
 	}
@@ -544,9 +546,407 @@ void compute_CLVs(hid_t* file_space, hid_t* data_set, hid_t* mem_space, double* 
 
 void compute_lce_spectrum(int N, int numLEs, int m_trans, int m_rev_trans, int m_end, int m_iter) {
 
+	// ------------------------------
+	//  Variable Definitions
+	// ------------------------------
+	// print update every x iterations
+	int print_every = (m_end >= 10 ) ? (int)((double)m_end * 0.1) : 1;
+	
+	// Looping variables
+	int tmp2;
+	int tmp;
+	int indx;
+
+	// LCE variables
+	double lce_sum;
+	double dim_sum;
+	int dim_indx;
+
+
+	// ------------------------------
+	//  Allocate memory
+	// ------------------------------
+	// Allocate mode related arrays
+	double* x      = (double* ) malloc(sizeof(double) * N);
+	mem_chk(x, "x");
+	double* x_pert = (double* ) malloc(sizeof(double) * N * numLEs);
+	mem_chk(x_pert, "x_pert");
+
+	// LCE Spectrum Arrays
+	double* znorm    = (double* )malloc(sizeof(double) * numLEs);	
+	mem_chk(znorm, "znorm");
+	double* lce      = (double* )malloc(sizeof(double) * numLEs);
+	mem_chk(lce, "lce");
+	double* run_sum  = (double* )malloc(sizeof(double) * numLEs);
+	mem_chk(run_sum, "run_sum");
+
+	// CLV arrays
+	double* R_tmp = (double* )malloc(sizeof(double) * N * numLEs);	
+	mem_chk(R_tmp, "R_tmp");
+	double* R     = (double* )malloc(sizeof(double) * N * numLEs * (m_end - m_trans));	
+	mem_chk(R, "R");
+	double* GS    = (double* )malloc(sizeof(double) * N * numLEs * (m_end - 2 * m_trans));	
+	mem_chk(GS, "GS");
+
+	// ------------------------------
+	// Runge-Kutta Variables / Arrays
+	// ------------------------------
+	// Define RK4 variables
+	static double C2 = 0.5, A21 = 0.5, \
+				  C3 = 0.5,           A32 = 0.5, \
+				  C4 = 1.0,                      A43 = 1.0, \
+				            B1 = 1.0/6.0, B2 = 1.0/3.0, B3 = 1.0/3.0, B4 = 1.0/6.0; 
+
+	// Memory fot the four RHS evaluations in the stages 
+	double* RK1, *RK2, *RK3, *RK4;
+	RK1 = (double* )malloc(sizeof(double) * N);
+	RK2 = (double* )malloc(sizeof(double) * N);
+	RK3 = (double* )malloc(sizeof(double) * N);
+	RK4 = (double* )malloc(sizeof(double) * N);
+	mem_chk(RK1, "RK1");
+	mem_chk(RK2, "RK2");
+	mem_chk(RK3, "RK3");
+	mem_chk(RK4, "RK4");
+
+	// Temp array for intermediate modes
+	double* x_tmp = (double* )malloc(sizeof(double) * N);
+	mem_chk(x_tmp, "x_tmp");
+
+	// Memory for the four RHS evalutions for the perturbed system
+	double* RK1_pert, *RK2_pert, *RK3_pert, *RK4_pert;
+	RK1_pert = (double* )malloc(sizeof(double) * N * numLEs);
+	RK2_pert = (double* )malloc(sizeof(double) * N * numLEs);
+	RK3_pert = (double* )malloc(sizeof(double) * N * numLEs);
+	RK4_pert = (double* )malloc(sizeof(double) * N * numLEs);
+	mem_chk(RK1_pert, "RK1_pert");
+	mem_chk(RK2_pert, "RK2_pert");
+	mem_chk(RK3_pert, "RK3_pert");
+	mem_chk(RK4_pert, "RK4_pert");
+
+	double* x_pert_tmp = (double* ) malloc(sizeof(double) * N * numLEs);
+	mem_chk(x_pert_tmp, "x_pert_tmp");
+
+
+	// ------------------------------
+	//  Get Initial Condition
+	// ------------------------------
+	// Set the initial condition of the perturb system to the identity matrix
+	initial_conditions_lce(x_pert, x, N, numLEs);
+
+
+	// ------------------------------
+	//  Get Timestep & Integration Vars
+	// ------------------------------
+	// Get timestep
+	double dt = 0.0005;
+
+	// LCE algorithm varibales
+	int m = 1;
+	int trans_iters = m_trans * m_iter;
+
+	// Get saving variables
+	int tot_clv_save_steps = (int) (m_end - 2 * m_trans) / SAVE_CLV_STEP;
+	int tot_m_save_steps = (int) (m_end) / SAVE_LCE_STEP;
+	int tot_t_save_steps = (int) ((m_iter * m_end) / SAVE_DATA_STEP);
+	if (m_trans > 0) {
+		tot_t_save_steps += 1;
+	}
+
+	// Solver time varibales 
+	double t0 = m_trans * dt;
+	double T  = t0 + m_iter * dt;	
 	
 
+	// ------------------------------
+	//  HDF5 File Create
+	// ------------------------------
+	// Create the HDF5 file handle
+	hid_t HDF_file_handle;
+
+	// create hdf5 handle identifiers for hyperslabing the full evolution data
+	hid_t HDF_file_space[4];
+	hid_t HDF_data_set[4];
+	hid_t HDF_mem_space[4];
+
+	// get output file name
+	char output_file_name[512];
+	get_output_file_name(output_file_name, dt, m_iter, m_trans, m_end - m_trans);
 	
+	// open output file and create hyperslabbed datasets 
+	open_output_create_slabbed_datasets_lce(&HDF_file_handle, output_file_name, HDF_file_space, HDF_data_set, HDF_mem_space, tot_t_save_steps, tot_m_save_steps, tot_clv_save_steps, N, numLEs);
+
+	// Create arrays for time and phase order to save after algorithm is finished
+	double* time_array      = (double* )malloc(sizeof(double) * (tot_t_save_steps));
+	mem_chk(time_array, "time_array");
+
+
+	// ------------------------------
+	//  Write Initial Conditions to File
+	// ------------------------------
+	if (m_trans == 0) {
+		// write initial state
+		write_hyperslab_data_d(HDF_file_space[0], HDF_data_set[0], HDF_mem_space[0], x, "x", N, 0);
+
+		// Write initial time
+		time_array[0] = 0.0;
+	}
+
+
+
+	// ------------------------------
+	//  Begin Algorithm
+	// ------------------------------
+	double t = 0.0;
+	int iter = 1;
+	int save_data_indx = 0;
+	int save_lce_indx  = 0;
+	if (m_trans > 0) {
+		save_data_indx += 1;
+	}
+	while (m <= m_end) {
+
+		// ------------------------------
+		//  Integrate System Forward
+		// ------------------------------
+		for (int p = 0; p < m_iter; ++p) {
+
+			// Construct the modes
+			for (int i = 0; i < N; ++i) {
+				x_tmp[i] = x[i];
+			}
+
+			//////////////
+			// STAGES
+			//////////////
+			/*---------- STAGE 1 ----------*/
+			// find RHS first and then update stage
+			rhs_extended(RK1, RK1_pert, x_tmp, x_pert, N, numLEs);
+			for (int i = 0; i < N; ++i) {
+				x_tmp[i] = x[i] + A21 * dt * RK1[i];
+				tmp = i * (numLEs);
+				for (int j = 0; j < (numLEs); ++j) {
+					indx = tmp + j;
+					x_pert_tmp[indx] = x_pert[indx] + A21 * dt * RK1_pert[indx];
+				}
+			}
+
+
+			/*---------- STAGE 2 ----------*/
+			// find RHS first and then update stage
+			rhs_extended(RK2, RK2_pert, x_tmp, x_pert_tmp, N, numLEs);
+			for (int i = 0; i < N; ++i) {
+				x_tmp[i] = x[i] + A32 * dt * RK2[i];
+				tmp = i * (numLEs);
+				for (int j = 0; j < (numLEs); ++j) {
+					indx = tmp + j;
+					x_pert_tmp[indx] = x_pert[indx] + A21 * dt * RK2_pert[indx];
+				}
+			}
+			
+
+			/*---------- STAGE 3 ----------*/
+			// find RHS first and then update stage
+			rhs_extended(RK3, RK3_pert, x_tmp, x_pert_tmp, N, numLEs);
+			for (int i = 0; i < N; ++i) {
+				x_tmp[i] = x[i] + A43 * dt * RK3[i];
+				tmp = i * (numLEs);
+				for (int j = 0; j < (numLEs); ++j) {
+					indx = tmp + j;
+					x_pert_tmp[indx] = x_pert[indx] + A43 * dt * RK3_pert[indx];
+				}
+			}
+
+			
+			/*---------- STAGE 4 ----------*/
+			// find RHS first and then update 
+			rhs_extended(RK4, RK4_pert, x_tmp, x_pert_tmp, N, numLEs);
+
+			
+			//////////////
+			// Update
+			//////////////
+			for (int i = 0; i < N; ++i) {
+				x[i] = x[i] + (dt * B1) * RK1[i] + (dt * B2) * RK2[i] + (dt * B3) * RK3[i] + (dt * B4) * RK4[i];  
+				tmp = i * (numLEs);
+				for (int j = 0; j < (numLEs); ++j) {
+					indx = tmp + j;
+					x_pert[indx] = x_pert[indx] + (dt * B1) * RK1_pert[indx] + (dt * B2) * RK2_pert[indx] + (dt * B3) * RK3_pert[indx] + (dt * B4) * RK4_pert[indx];  
+				}
+			}		
+
+
+
+			//////////////
+			// Print to file
+			//////////////
+			if ((iter > trans_iters) && (iter % SAVE_DATA_STEP == 0)) {
+				// Write phases
+				write_hyperslab_data_d(HDF_file_space[0], HDF_data_set[0], HDF_mem_space[0], x, "x", N, save_data_indx);
+
+				// save time
+				time_array[save_data_indx] = iter * dt;
+				
+				// increment indx for next iteration
+				save_data_indx += 1;
+			}
+			
+
+			// increment
+			t    = iter*dt;			
+			iter += 1;		
+		}
+		// ------------------------------
+		//  End Integration
+		// ------------------------------
+		
+		// ------------------------------
+		//  Orthonormalize 
+		// ------------------------------
+		orthonormalize(x_pert, R_tmp, N, numLEs);
+
+		
+		// ------------------------------
+		//  Compute LCEs & Write To File
+		// ------------------------------
+		if (m > m_trans) {
+
+			// Record the GS vectors and R matrix and extract the diagonals of R
+			tmp2 = (m - m_trans - 1) * N * numLEs;
+			for (int i = 0; i < N; ++i) {
+				tmp = i * numLEs;		
+				for (int j = 0 ; j < numLEs; ++j) {
+					// Record upper triangular R matrix
+					if (j >= i) {
+						R[tmp2 + tmp + j] = R_tmp[tmp + j];
+
+						// Record diagonals of R matrix (checking for sign correction)
+						if (i == j) {
+							znorm[i] = fabs(R_tmp[tmp + i]);
+						} 
+					}
+
+					// Record the GS vectors
+					if (m < (m_end - m_trans)) {
+						GS[tmp2 + tmp + j] = x_pert[tmp + j];
+					}
+				}
+			}
+			
+			// Compute the LCEs for the current iteration
+			for (int i = 0; i < numLEs; ++i) {
+				// Compute LCE
+				run_sum[i] = run_sum[i] + log(znorm[i]);
+				lce[i]     = run_sum[i] / (t - t0);
+			}
+
+			// then write the current LCEs to this hyperslab
+			if (m % SAVE_LCE_STEP == 0) {			
+				write_hyperslab_data_d(HDF_file_space[3], HDF_data_set[3], HDF_mem_space[3], lce, "lce", numLEs, save_lce_indx);
+
+				save_lce_indx += 1;
+			}
+
+			// Print update to screen
+			if (m % print_every == 0) {
+				lce_sum = 0.0;
+				dim_sum = 0.0;
+				dim_indx = 0;
+				for (int i = 0; i < numLEs; ++i) {
+					// Get spectrum sum
+					lce_sum += lce[i];
+
+					// Compute attractor dim
+					if (dim_sum + lce[i] > DBL_EPSILON) {
+						dim_sum += lce[i];
+						dim_indx += 1;
+					}
+					else {
+						continue;
+					}
+				}
+				printf("Iter: %d / %d | t: %5.6lf tsteps: %d | Sum: %5.9lf | Dim: %5.9lf\n", m, m_end, t, m_end * m_iter, lce_sum, (dim_indx + (dim_sum / fabs(lce[dim_indx]))));
+				printf("k: \n");
+				for (int j = 0; j < numLEs; ++j) {
+					printf("%5.6lf ", lce[j]);
+				}
+				printf("\n\n");
+			}
+		}
+
+
+		// ------------------------------
+		//  Update For Next Iteration
+		// ------------------------------
+		T = T + m_iter * dt;
+		m += 1;
+		if (m - 1 == m_trans) {
+			printf("\n\t!!Transient Iterations Complete!! - Iters: %d\n\n\n", iter - 1);
+		}
+	}
+	// ------------------------------
+	//  Compute the CLVs
+	// ------------------------------
+	compute_CLVs(HDF_file_space, HDF_data_set, HDF_mem_space, R, GS, N, numLEs, m_end - m_trans, m_trans);
+	// ------------------------------
+	// End Algorithm
+	// ------------------------------
+	
+	// ------------------------------
+	//  Write 1D Arrays Using HDF5Lite
+	// ------------------------------
+	hid_t D1 = 1;
+	hid_t D1dims[D1];
+
+	// Wtie time
+	D1dims[0] = tot_t_save_steps;
+	if ( (H5LTmake_dataset(HDF_file_handle, "Time", D1, D1dims, H5T_NATIVE_DOUBLE, time_array)) < 0) {
+		printf("\n\n!!Failed to make - Time - Dataset!!\n\n");
+	}
+
+
+
+	// ------------------------------
+	//  Clean Up & Exit
+	// ------------------------------	
+	// Free memory
+	free(R);
+	free(R_tmp);
+	free(GS);
+	free(x);
+	free(x_tmp);
+	free(x_pert);
+	free(x_pert_tmp);
+	free(znorm);
+	free(lce);
+	free(run_sum);
+	free(time_array);
+	free(RK1);
+	free(RK2);
+	free(RK3);
+	free(RK4);
+	free(RK1_pert);
+	free(RK2_pert);
+	free(RK3_pert);
+	free(RK4_pert);
+	
+
+	// // Close HDF5 handles
+	H5Sclose( HDF_mem_space[1] );
+	H5Dclose( HDF_data_set[1] );
+	H5Sclose( HDF_file_space[1] );
+	H5Sclose( HDF_mem_space[3] );
+	H5Dclose( HDF_data_set[3] );
+	H5Sclose( HDF_file_space[3] );
+	H5Sclose( HDF_mem_space[0] );
+	H5Dclose( HDF_data_set[0] );
+	H5Sclose( HDF_file_space[0] );
+	H5Sclose( HDF_mem_space[2] );
+	H5Dclose( HDF_data_set[2] );
+	H5Sclose( HDF_file_space[2] );
+
+
+	// Close output file
+	H5Fclose(HDF_file_handle);
 }
 // ---------------------------------------------------------------------
 //  End of File

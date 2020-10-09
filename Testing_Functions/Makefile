@@ -6,3 +6,6 @@ conv:
 
 rhs:
 	gcc -I/usr/include/hdf5/serial/ -I/usr/include/gsl/  -I../Libraries/lapack-3.9.0/CBLAS/include/ -I../Libraries/lapack-3.9.0/LAPACKE/include/ po_rhs.c -L../Libraries/lapack-3.9.0/ -o porhs -fopenmp -lpthread -lgsl -lgslcblas -llapacke -llapack -lblas -lgfortran -lfftw3_omp -lfftw3 -lm
+
+my_dot:
+	gcc -I/usr/include/hdf5/serial/ -I/usr/include/gsl/  -I../Libraries/lapack-3.9.0/CBLAS/include/ -I../Libraries/lapack-3.9.0/LAPACKE/include/ dot_prod.c -L../Libraries/lapack-3.9.0/ -o dot -lgsl -lgslcblas -llapacke -llapack -lblas -lgfortran -lm

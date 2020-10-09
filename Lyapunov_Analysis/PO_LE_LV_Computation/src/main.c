@@ -56,8 +56,8 @@ int main(int argc, char** argv) {
 	strcpy(u0, argv[5]);
 
 	// Integration parameters
-	int m_end  = 80000;
-	int m_iter = 50;
+	int m_end  = argv[6];
+	int m_iter = argv[7];
 
 
 	// ------------------------------

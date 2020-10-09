@@ -283,19 +283,19 @@ if __name__ == '__main__':
 	######################
 	##	Triad Data
 	######################
-	# if 'Triads' in list(HDFfileData.keys()):
-	# 	R      = HDFfileData['PhaseOrderR'][:, :]
-	# 	Phi    = HDFfileData['PhaseOrderPhi'][:, :]
-	# 	triad  = HDFfileData['Triads']
-	# 	# Reshape triads
-	# 	tdims     = triad.attrs['Triad_Dims']
-	# 	triads    = np.array(np.reshape(triad, np.append(triad.shape[0], tdims[0, :])))
+	if 'Triads' in list(HDFfileData.keys()):
+		R      = HDFfileData['PhaseOrderR'][:, :]
+		Phi    = HDFfileData['PhaseOrderPhi'][:, :]
+		triad  = HDFfileData['Triads']
+		# Reshape triads
+		tdims     = triad.attrs['Triad_Dims']
+		triads    = np.array(np.reshape(triad, np.append(triad.shape[0], tdims[0, :])))
 
-	# 	triads_exist = 1
-	# else:
-	# 	## Call triad function
-	# 	triads, R, Phi = compute_triads(phases, kmin, kmax)
-	# 	triads_exist = 0
+		triads_exist = 1
+	else:
+		## Call triad function
+		triads, R, Phi = compute_triads(phases, kmin, kmax)
+		triads_exist = 0
 
 	triads, R, Phi = compute_triads(phases, kmin, kmax)
 	triads_exist   = 0

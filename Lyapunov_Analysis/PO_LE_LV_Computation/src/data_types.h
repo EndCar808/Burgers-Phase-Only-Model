@@ -20,9 +20,10 @@
 // ---------------------------------------------------------------------
 //  Parameters & Constants
 // ---------------------------------------------------------------------
-#define SAVE_DATA_STEP 100	 // Parameter to determine after how many integrations steps data should be saved to output
-#define SAVE_LCE_STEP  10    // Parameter to determine how often to save LCE data
-#define SAVE_CLV_STEP 10     // Parameter to determine how oftern to save the CLV data
+#define PRINT_SCREEN		 // Turn on printing to screen
+#define SAVE_DATA_STEP 500	 // Parameter to determine after how many integrations steps data should be saved to output
+#define SAVE_LCE_STEP 1      // Parameter to determine how often to save LCE data
+#define SAVE_CLV_STEP 1      // Parameter to determine how oftern to save the CLV data
 // #ifdef __TRANSIENTS
 // #define TRANS_STEPS 0.01     // Set the % (of the total iterations) of transient iterations to perform
 // #endif

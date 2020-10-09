@@ -461,7 +461,7 @@ void get_output_file_name(char* output_file_name, int N, int k0, double a, doubl
 	#ifdef __TRANSIENTS	
 	// Print file name to screen
 	printf("\nOutput File: %s \n\n", output_file_name);
-	printf("\n  Performing transient iterations...\n\n");
+	printf("\n\tPerforming transient iterations...\n\n");
 	#else
 	// Print file name to screen
 	printf("\nOutput File: %s \n\n", output_file_name);
@@ -783,12 +783,12 @@ void write_hyperslab_data_d(hid_t file_space, hid_t data_set, hid_t mem_space, d
 
 	// select appropriate hyperslab 
 	if ((H5Sselect_hyperslab(file_space, H5S_SELECT_SET, start_index, NULL, count, NULL)) < 0) {
-		printf("\n!!Error Selecting Hyperslab!! - For %s at Index: %d \n", data_name, index);
+		fprintf(stderr,"\n!!Error Selecting Hyperslab!! - For %s at Index: %d \n", data_name, index);
 	}
 
 	// then write the current modes to this hyperslab
 	if ((H5Dwrite(data_set, H5T_NATIVE_DOUBLE, mem_space, file_space, H5P_DEFAULT, data)) < 0) {
-		printf("\n!!Error Writing Slabbed Data!! - For %s at Index: %d \n", data_name, index);
+		fprintf(stderr,"\n!!Error Writing Slabbed Data!! - For %s at Index: %d \n", data_name, index);
 	}
 }
 // ---------------------------------------------------------------------

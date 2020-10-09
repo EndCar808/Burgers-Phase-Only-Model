@@ -3,6 +3,7 @@
 *.asv
 *.out
 *.output
+*.nfs*
 
 # Data
 *.h5

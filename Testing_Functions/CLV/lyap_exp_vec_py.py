@@ -110,16 +110,21 @@ def jacobian(x, sys):
 
 	return Jac
 
-def compute_clvs(R_avg, T_avg, m_iter, dim, nexps):
+def compute_clvs(R_avg, T_avg, m_iter, m_rev_trans, dim, nexps):
 	## Compute the CLVs by propagating backwards
 	
 	# Random Initial Conditions
 	coeff_mat = np.triu(np.random.rand(dim, nexps))
-	vec_norms = np.zeros((m_iter, nexps))
-	CLVs      = np.zeros((dim, nexps, m_avg))
-	angles    = np.zeros((m_iter, nexps))
+	# coeff_mat = np.array([[1.0, 0.5, 1/3], [0, 0.5, 1/3], [0, 0, 1/3]])
+	vec_norms = np.zeros((m_iter - m_rev_trans, nexps))
+	CLVs      = np.zeros((dim, nexps, m_iter - m_rev_trans))
+	angles    = np.zeros((m_iter - m_rev_trans, nexps))
+
+	print("C init")
+	print(coeff_mat)
 
 	# Propogate backwards
+	back_iter = 0
 	for m in range(m_iter):
 		# Propegate 
 		coeff_mat = np.linalg.solve(R_avg[:, :, -(m + 1)], coeff_mat)
@@ -129,23 +134,23 @@ def compute_clvs(R_avg, T_avg, m_iter, dim, nexps):
 			coeff_mat[:, i] = coeff_mat[:, i] / np.linalg.norm(coeff_mat[:, i])
 
 		# Compute CLVs using coefficient matrix and GS basis vectors
-		CLVs[:, :, -(m + 1)] = np.matmul(T_avg[:, :, -(m + 1)], coeff_mat)
+		if m >= m_rev_trans:
+			CLVs[:, :, -(m - m_rev_trans + 1)] = np.matmul(T_avg[:, :, -(m - m_rev_trans + 1)], coeff_mat)
+			vec_norms[-(m - m_rev_trans + 1), :] = np.linalg.norm(CLVs[:, :, -(m - m_rev_trans + 1)], axis = 0)
 
-		vec_norms[m, :] = np.linalg.norm(CLVs[:, :, m], axis = 0)
+			# Compute angles
+			indx = 0
+			for n in range(nexps):
+				exp = n + 1
+				while exp < nexps:
+					angles[-(m - m_rev_trans + 1), indx] = np.arccos(np.absolute(np.dot(CLVs[:, n, -(m - m_rev_trans + 1)], CLVs[:, exp, -(m - m_rev_trans + 1)])))
+					exp  += 1
+					indx += 1
 
-		# Compute angles
-		indx = 0
-		for n in range(nexps):
-			exp = n + 1
-			while exp < nexps:
-				angles[-(m + 1), indx] = np.arccos(np.absolute(np.dot(CLVs[:, n, -(m + 1)], CLVs[:, exp, -(m + 1)])))
-				exp  += 1
-				indx += 1
+		back_iter+= 1
 
-		if m == m_iter - 1:
-			print("Coeff:")
-			print(coeff_mat[:, :])
-
+	print("C at end")
+	print(coeff_mat)
 	return angles, CLVs, vec_norms
 
 def test_lorenz_angles(x, x_ext, m_end, m_trans, dim, sys):
@@ -220,20 +225,20 @@ def test_henonlozi_angles(x, x_ext, m_end, m_trans, dim, sys):
 	plt.close()
 
 
-def compute_lces(x, x_ext, m_end, m_trans, dim, sys):	
+def compute_lces(x, x_ext, m_end, m_trans, m_rev_trans, dim, sys):	
 	lce     = np.zeros((nexps)) 
 	run_sum = np.zeros((nexps))
 
 	R_avg = np.zeros((dim, nexps, m_avg))
-	T_avg = np.zeros((dim, nexps, m_avg))
+	T_avg = np.zeros((dim, nexps, m_avg - m_rev_trans))
 	lce_out = np.zeros((m_avg, nexps))
 
 	x_out     = np.zeros((m_end, nexps))
-	x_ext_out = np.zeros((dim, nexps, m_avg))
+	x_ext_out = np.zeros((dim, nexps, m_end))
 
 	m     = 1
 	iters = 1
-	while m < m_end:
+	while m <= m_end:
 
 
 		for i in range(m_iters):
@@ -243,42 +248,44 @@ def compute_lces(x, x_ext, m_end, m_trans, dim, sys):
 			else:
 				## Stages
 				RK1, RK1_ext = RHS(x, x_ext, nexps, dim, sys)
-				RK2, RK2_ext = RHS(x + (dt / 2) * RK1, x_ext + (dt / 2) * RK1_ext, nexps, dim, sys)
-				RK3, RK3_ext = RHS(x + (dt / 2) * RK2, x_ext + (dt / 2) * RK2_ext, nexps, dim, sys)
+				RK2, RK2_ext = RHS(x + (0.5 * dt) * RK1, x_ext + (0.5 * dt) * RK1_ext, nexps, dim, sys)
+				RK3, RK3_ext = RHS(x + (0.5 * dt) * RK2, x_ext + (0.5 * dt) * RK2_ext, nexps, dim, sys)
 				RK4, RK4_ext = RHS(x + dt * RK3, x_ext + dt * RK3_ext, nexps, dim, sys)
 
 				## Update
-				x = x + (dt / 6) * (RK1 + 2 * RK2 + 2 * RK3 + RK4)
-				x_ext = x_ext + (dt / 6) * (RK1_ext + 2 * RK2_ext + 2 * RK3_ext + RK4_ext)
+				# x = x + (dt / 6.0) * (RK1 + 2.0 * RK2 + 2.0 * RK3 + RK4)
+				# x_ext = x_ext + (dt / 6.0) * (RK1_ext + 2.0 * RK2_ext + 2.0 * RK3_ext + RK4_ext)
+				x = x + (dt / 6.0) * RK1 + (dt / 3.0) * RK2 + (dt / 3.0) * RK3 + (dt / 6.0) * RK4
+				x_ext = x_ext + (dt / 6.0) * RK1_ext + (dt / 3.0) * RK2_ext + (dt / 3.0) * RK3_ext + (dt / 6.0) * RK4_ext
 
-
+			
+			t     = iters * dt
 			iters += 1
-			t = iters * dt
-
 
 		Q, R = np.linalg.qr(x_ext)
+
 
 		diags = np.diag(R)
 
 		rnorm = np.absolute(diags)
 		x_ext = Q
-		# x_ext = np.matmul(Q, np.diag(np.sign(diags)))
 		
-		x_out[m, :] = x
-		# x_ext_out[:, :, m] = x_ext
+		x_out[m - 1, :] = x
+		x_ext_out[:, :, m - 1] = x_ext
 
-		if m >= m_trans:
+		if m > m_trans:
 
 			## Store the R and Tangent matrices
-			R_avg[:, :, m - m_trans] = R
-			T_avg[:, :, m - m_trans] = x_ext
+			R_avg[:, :, (m - 1) - m_trans] = R
+			if m < (m_end - m_rev_trans):
+				T_avg[:, :, (m - 1) - m_trans] = x_ext
 
 			for n in range(nexps):
 				run_sum[n] = run_sum[n] + np.log(rnorm[n])
 				lce[n]     = run_sum[n] / (t - m_trans * dt)
-				lce_out[m - m_trans, n] = lce[n]
+				lce_out[(m - 1) - m_trans, n] = lce[n]
 			
-			if np.mod(m, 1) == 0:
+			if np.mod(m, (m_end * 0.1)) == 0:
 				lce_sum = 0.0
 				dim_k   = 0
 				for n in range(nexps):
@@ -287,12 +294,12 @@ def compute_lces(x, x_ext, m_end, m_trans, dim, sys):
 						dim_k   += 1
 					else:
 						break
-				# print("Iter: {} | t = {:0.02f} / {} | Sum: {:5.6f} | Dim: {:5.6f}".format(m, t, m_iters * m_end, np.sum(lce), dim_k + (lce_sum / np.absolute(lce[dim_k]))))
-				# print("h = {}".format(lce))
+				print("Iter: {} | t = {:0.02f} / {} | Sum: {:5.6f} | Dim: {:5.6f}".format(m, t, m_iters * m_end, np.sum(lce), dim_k + (lce_sum / np.absolute(lce[dim_k]))))
+				print("h = {}".format(lce))
 
 		m += 1
 
-	return R_avg, T_avg, lce_out, x_out
+	return R_avg, T_avg, lce_out, x_out, x_ext_out, t
 
 
 
@@ -303,8 +310,8 @@ def compute_lces(x, x_ext, m_end, m_trans, dim, sys):
 if __name__ == '__main__':
 
 	## Select systems
-	# sys = "Lorenz63"
-	sys = "Henon2D"
+	sys = "Lorenz63"
+	# sys = "Henon2D"
 	# sys = "Lozi2D"
 	# sys = "Henon3D"
 
@@ -313,22 +320,23 @@ if __name__ == '__main__':
 	m_avg   = 3000000
 	m_end   = m_avg + m_trans
 	m_iters = 1
+	m_rev_trans = 1
 
 	## System parameters
 	if sys == "Lorenz63":
-		m_trans = 100
-		m_avg   = 30000000
+		m_trans = 1000
+		m_avg   = 100000
 		m_end   = m_avg + m_trans
-		m_iters = 1
-
-		sigma = 10
-		rho   = 28
-		beta  = 8/3
+		m_iters = 10
+		m_rev_trans = 1000
+		sigma = 10.0
+		rho   = 28.0
+		beta  = 2.6666666666666667
 		dim   = 3
 		nexps = dim
 		t0    = 0.0
 		t     = t0
-		dt    = 0.001
+		dt    = 0.0005
 		T     = dt * m_iters 
 
 		## Get initial conditions
@@ -376,45 +384,61 @@ if __name__ == '__main__':
 
 
 	if sys == "Lorenz63":
+
 		## Compute LCEs and forward propogation
-		R_avg, T_avg, lce, x_out = compute_lces(x, x_ext, m_end, m_trans, dim, sys)
+		R_avg, T_avg, lce, x_out, x_ext_out, t = compute_lces(x, x_ext, m_end, m_trans, m_rev_trans, dim, sys)
+		print()
+		print("x")
+		print(x_out[-1, :])
+
+		print("x_pert")
+		print(x_ext_out[:, :, -1])
+
+		print("Time: {:5.16f}".format(t))
 
 		# print("R:")
 		# print(R_avg[:, :, 0])
 		# print(R_avg[:, :, -1])
 
-		# print("Vectors:")
-		# print(T_avg[:, :, 0])
+		print("Vectors:")
+		print(T_avg[:, :, 0])
 		# print(T_avg[:, :, -1])
 
 		w = 0
 
 		## Compute CLVs
-		angles, CLVs, vec_norms = compute_clvs(R_avg, T_avg, m_end - m_trans, dim, nexps)
+		angles, CLVs, vec_norms = compute_clvs(R_avg, T_avg, m_end - m_trans, m_rev_trans, dim, nexps)
 
-		rho = 60
+		print("CLVs0")
+		print(CLVs[:, :, 0])
+		print("CLVs1")
+		print(CLVs[:, :, 1])
+		print("CLVs2")
+		print(CLVs[:, :, 2])
 
-		## Compute LCEs and forward propogation
-		R_avg, T_avg, lce, x_out = compute_lces(x, x_ext, m_end, m_trans, dim, sys)
+		# rho = 60
 
-		## Compute CLVs
-		angles_v, CLVs, vec_norms = compute_clvs(R_avg, T_avg, m_end - m_trans, dim, nexps)
+		# ## Compute LCEs and forward propogation
+		# R_avg, T_avg, lce, x_out = compute_lces(x, x_ext, m_end, m_trans, dim, sys)
 
-		plt.figure()
-		hist, bins  = np.histogram(angles[:, 1], range = (0.0, np.pi / 2.0), bins = 900, density = True);
-		bin_centers = (bins[1:] + bins[:-1]) * 0.5
-		plt.plot(bin_centers, hist)
-		hist, bins  = np.histogram(angles_v[:, 1], range = (0.0, np.pi / 2.0), bins = 900, density = True);
-		bin_centers = (bins[1:] + bins[:-1]) * 0.5
-		plt.plot(bin_centers, hist)
-		plt.xlim(0.0, np.pi/2.0)
-		plt.xlabel(r"$\theta$")
-		plt.xticks([0.0, np.pi/4.0, np.pi/2.0],[r"$0$", r"$\frac{\pi}{4}$", r"$\frac{\pi}{2}$"]);
-		plt.legend([r"$\rho = 28$", r"$\rho = 60$"])
-		plt.ylabel(r"PDF")
-		plt.title(r"Distribution of Angles Between Intrinsic Stable and Unstable Directions")
-		plt.savefig("/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Testing_Functions/CLV" + "/AnglesDistribution_Lorenz_paper.pdf")  
-		plt.close()
+		# ## Compute CLVs
+		# angles_v, CLVs, vec_norms = compute_clvs(R_avg, T_avg, m_end - m_trans, dim, nexps)
+
+		# plt.figure()
+		# hist, bins  = np.histogram(angles[:, 1], range = (0.0, np.pi / 2.0), bins = 900, density = True);
+		# bin_centers = (bins[1:] + bins[:-1]) * 0.5
+		# plt.plot(bin_centers, hist)
+		# hist, bins  = np.histogram(angles_v[:, 1], range = (0.0, np.pi / 2.0), bins = 900, density = True);
+		# bin_centers = (bins[1:] + bins[:-1]) * 0.5
+		# plt.plot(bin_centers, hist)
+		# plt.xlim(0.0, np.pi/2.0)
+		# plt.xlabel(r"$\theta$")
+		# plt.xticks([0.0, np.pi/4.0, np.pi/2.0],[r"$0$", r"$\frac{\pi}{4}$", r"$\frac{\pi}{2}$"]);
+		# plt.legend([r"$\rho = 28$", r"$\rho = 60$"])
+		# plt.ylabel(r"PDF")
+		# plt.title(r"Distribution of Angles Between Intrinsic Stable and Unstable Directions")
+		# plt.savefig("/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Testing_Functions/CLV" + "/AnglesDistribution_Lorenz_paper.pdf")  
+		# plt.close()
 	elif sys == "Henon2D":
 
 		sys == "Henon2D_Alt"
