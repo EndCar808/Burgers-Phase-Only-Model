@@ -4,13 +4,15 @@ import numpy as np
 import sys
 import os
 import re
+from datetime import datetime
 
-############################
+#######################################################
 ##	Parameter space
-############################
+#######################################################
 k0     = 1
 N      = [256]
-alpha  = np.arange(0.00, 3.5, 0.05)
+# alpha  = np.arange(0.00, 3.5, 0.05)
+alpha = np.array([2.15, 2.25, 2.3, 2.35, 2.55, 2.85, 3.15])
 beta   = 0.0
 iters  = 4000000
 trans  = 1000
@@ -19,11 +21,9 @@ m_iter = 50
 u0     = "RANDOM"
 
 
-
-
-############################
+#######################################################
 ##	Create command list
-############################
+#######################################################
 input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/RESULTS"
 
 cmdList = []
@@ -40,11 +40,12 @@ for a in alpha:
         else:
             print("No file: a = {}".format(a))
 
-
+print(cmdList)
+print("Commands to perform: {}".format(len(cmdList)))
 
 
 #######################################################
-##	Check cmdlist creation & Run commands in parallel
+##	Check cmdlist & Run commands in parallel
 #######################################################
 if len(cmdList) != alpha.shape[0]:
 	print("Length of command list: {}/{}".format(len(cmdList), alpha.shape[0]))
@@ -55,12 +56,41 @@ else:
 	procLimit = 10
 
 	## Create grouped iterable of subprocess calls to Popen() - see grouper recipe in itertools
-	groups = [(Popen(cmd, shell = True, stdout = PIPE, stdin = PIPE, universal_newlines = True) for cmd in cmdList)] * procLimit 
+	groups = [(Popen(cmd, shell = True, stdout = PIPE,  stderr = PIPE, stdin = PIPE, universal_newlines = True) for cmd in cmdList)] * procLimit 
+
+	# Create output objects to store process error and output
+	output = []
+	error  = []
 
 	## Loop of grouped iterable
 	for processes in zip_longest(*groups): 
 		for proc in filter(None, processes): # filters out 'None' fill values if procLimit does not divide evenly into cmdList
+			
+			# Communicate with process to retrive output and error
 			[runCodeOutput, runCodeErr] = proc.communicate()
+
+			# Append to output and error objects and print both to screen
+			output.append(runCodeOutput)
+			error.append(runCodeErr)
 			print(runCodeOutput)
 			print(runCodeErr)
 			proc.wait()
+
+
+
+#######################################################
+##	Write Output and Error to file
+#######################################################
+# Get data and time
+now = datetime.now()
+d_t = now.strftime("%d%b%Y_%H:%M:%S")
+
+# Write to files
+with open("./Parallel_Run_Status_Reports/par_run_output_{}.txt".format(d_t), "w") as file:
+	for item in output:
+		file.write("%s\n" % item)
+
+with open("./Parallel_Run_Status_Reports/par_run_error_{}.txt".format(d_t), "w") as file:
+	for i, item in enumerate(error):
+		file.write("%s\n" % cmdList[i])
+		file.write("%s\n" % item)

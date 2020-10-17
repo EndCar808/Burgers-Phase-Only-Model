@@ -61,17 +61,14 @@ def compute_zdata(clv, num_tsteps, dof):
     
     return z_data
 
-def compute_angles_subspaces(A1, B1, A2, B2, num_clv_steps):
+def compute_angles_subspaces(A1, B1, num_clv_steps):
     
     angles1 = np.zeros((num_clv_steps))
-    angles2 = np.zeros((num_clv_steps))
     
     for t in range(1, num_clv_steps):
         angles1[t] = subspace_angles(A1[t, :, :], B1[t, :, :])[0]
         
-        angles2[t] = subspace_angles(A2[t, :, :], B2[t, :, :])[0]
-        
-    return angles1, angles2
+    return angles1
 
 
 if __name__ == '__main__':
@@ -141,7 +138,10 @@ if __name__ == '__main__':
     minindx = np.where(np.absolute(lce[-1, :]) == minval)
     minindx_el,  = minindx
     zeroindx     = minindx_el[0]
-    theta1, theta2 = compute_angles_subspaces(CLV[:, :, :zeroindx + 1], CLV[:, :, zeroindx + 1:], CLV[:, :, :zeroindx], CLV[:, :, zeroindx:], num_clv_steps)
+    theta1 = compute_angles_subspaces(CLV[:, :, :zeroindx + 1], CLV[:, :, zeroindx + 1:], num_clv_steps)
+    if zeroindx > 0:
+        theta2 = compute_angles_subspaces(CLV[:, :, :zeroindx], CLV[:, :, zeroindx:], num_clv_steps)
+   
     
 
     
@@ -153,7 +153,7 @@ if __name__ == '__main__':
     
     cmap_new = cm.jet
     
-    # Angles between vectors averaged over time
+    ## Angles between vectors averaged over time
     ax1  = fig.add_subplot(gs[0, 0])
     data = np.mean(angles[:, :, :], axis = 0)
     im1  = ax1.imshow(np.flipud(data + data.T - np.diag(np.diag(data))), cmap = cmap_new, extent = [1, dof, 1, dof], vmin = 0.0, vmax = np.pi/2.0)
@@ -185,7 +185,7 @@ if __name__ == '__main__':
     ax12.legend(loc = "lower right", bbox_to_anchor = (-0.01, -0.1), fancybox = True, framealpha = 1, shadow = True)
     
     
-    # Time averaged squared components of the vectors
+    ## Time averaged squared components of the vectors
     ax2  = fig.add_subplot(gs[0, 1])
     im  = ax2.imshow(np.flipud(zdata), cmap = cm.jet, extent = [1, dof, kmin, num_osc])
     ax2.set_xlabel(r"$j$")
@@ -207,20 +207,21 @@ if __name__ == '__main__':
     ax22.axis("off")
     
     
-    # Distrubution between stable and unstable manifolds
+    ## Distrubution between stable and unstable manifolds
     ax3 = fig.add_subplot(gs[1, 0:])
     hist, bins  = np.histogram(theta1, range = (0.0, np.pi / 2.0), bins = 900, density = True);
     bin_centers = (bins[1:] + bins[:-1]) * 0.5
     plt.plot(bin_centers, hist)
-    hist, bins  = np.histogram(theta2, range = (0.0, np.pi / 2.0), bins = 900, density = True);
-    bin_centers = (bins[1:] + bins[:-1]) * 0.5
-    ax3.plot(bin_centers, hist)
+    if zeroindx > 0:
+        hist, bins  = np.histogram(theta2, range = (0.0, np.pi / 2.0), bins = 900, density = True);
+        bin_centers = (bins[1:] + bins[:-1]) * 0.5
+        ax3.plot(bin_centers, hist)
     ax3.set_xlim(0.0, np.pi/2.0)
     ax3.set_xlabel(r"$\theta$")
     ax3.set_xticks([0.0, np.pi/4.0, np.pi/2.0],[r"$0$", r"$\frac{\pi}{4}$", r"$\frac{\pi}{2}$"]);
     ax3.set_ylabel(r"PDF")
     ax3.set_yscale("log")
-    ax3.legend([r"$\theta_1$", r"$\theta_2$"], fancybox = True, framealpha = 1, shadow = True)
+    ax3.legend([r"$\theta_{\mathbf{E}^+ \oplus \mathbf{E}^0, \mathbf{E}^-}$", r"$\theta_{\mathbf{E}^+, \mathbf{E}^0 \oplus \mathbf{E}^-}$"], fancybox = True, framealpha = 1, shadow = True)
     ax3.set_title(r"Distribution of Angles Between Tangent Subspaces")
     
     plt.suptitle(r"$N = {}, k_0 = {}, \alpha = {:0.3f}, \beta = {:0.3f}$".format(N, k0, alpha, beta))

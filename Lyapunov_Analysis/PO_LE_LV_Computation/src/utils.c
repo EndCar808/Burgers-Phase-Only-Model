@@ -117,7 +117,7 @@ void initial_conditions_lce(double* pert, double* phi, double* amp, fftw_complex
 				u_z[i] = 0.0 + 0.0 * I;
 			} else {
 				amp[i] = pow((double)i, -a) * exp(-b * pow((double) kx[i]/cutoff, 2) );	
-				phi[i] = M_PI / 4.0;	
+				phi[i] = M_PI * ( (double) rand() / (double) RAND_MAX);	 // M_PI / 4.0;	
 				u_z[i] = amp[i] * exp(I * phi[i]);
 			}
 		}
@@ -474,23 +474,24 @@ void open_output_create_slabbed_datasets_lce(hid_t* file_handle, char* output_fi
 	// ------------------------------
 	//  Create file
 	// ------------------------------
-	
 	// create datafile - H5F_ACC_TRUNC overwrites file if it exists already
 	*file_handle = H5Fcreate(output_file_name, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
 
 
-	// ------------------------------
-	//  Create datasets with hyperslabing
-	// ------------------------------
-	//
-	//---------- PHASES -----------//
-	//
 	// create hdf5 dimension arrays for creating the hyperslabs
 	static const int dimensions = 2;
 	hsize_t dims[dimensions];      // array to hold dims of full evolution data
 	hsize_t maxdims[dimensions];   // array to hold max dims of full evolution data
 	hsize_t chunkdims[dimensions]; // array to hold dims of the hyperslab chunks
 
+
+	// ------------------------------
+	//  Create datasets with hyperslabing
+	// ------------------------------
+	#ifdef __PHASES
+	//
+	//---------- PHASES -----------//
+	//
 	// initialize the hyperslab arrays
 	dims[0]      = num_t_steps;             // number of timesteps
 	dims[1]      = num_osc;                 // number of oscillators
@@ -521,6 +522,7 @@ void open_output_create_slabbed_datasets_lce(hid_t* file_handle, char* output_fi
 	mem_space[0] = H5Screate_simple(dimensions, dims, NULL);
 
 	H5Pclose(plist);
+	#endif
 
 	#ifdef __TRIADS
 	//
@@ -584,7 +586,7 @@ void open_output_create_slabbed_datasets_lce(hid_t* file_handle, char* output_fi
 	status = H5Pclose(plist2);
 	#endif
 
-
+	#ifdef __LCE
 	//---------- LCE -----------//
 	//
 	// initialize the hyperslab arrays
@@ -617,6 +619,7 @@ void open_output_create_slabbed_datasets_lce(hid_t* file_handle, char* output_fi
 	mem_space[2] = H5Screate_simple(dimensions, dims, NULL);
 
 	H5Pclose(plist3);
+	#endif
 
 	#ifdef __RNORM
 	//---------- LCE ERROR -----------//
@@ -714,6 +717,7 @@ void open_output_create_slabbed_datasets_lce(hid_t* file_handle, char* output_fi
     status = H5Sclose(CLV_attr_space);
 	status = H5Pclose(plist5);
 
+	#ifdef __ANGLES
 	//
 	//---------- Angles -----------//
 	//	
@@ -766,6 +770,7 @@ void open_output_create_slabbed_datasets_lce(hid_t* file_handle, char* output_fi
 	status = H5Aclose(Angles_attr);
     status = H5Sclose(Angles_attr_space);
 	status = H5Pclose(plist6);
+	#endif
 	#endif
 }
 

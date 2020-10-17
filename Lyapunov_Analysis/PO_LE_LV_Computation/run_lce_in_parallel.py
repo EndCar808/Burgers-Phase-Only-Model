@@ -8,7 +8,7 @@ from datetime import datetime
 ##	Define dataspace
 ######################################
 # n  = [64, 128, 256, 512]
-n     = [128]
+n     = [512]
 k0    = [1]
 a     = np.array([0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.49])
 # a     = np.arange(0.0, 3.5, 0.05)
@@ -16,13 +16,13 @@ a     = np.array([0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.49])
 # beta  = [0.0 , 1.0];
 beta  = [0.0];
 u0    = ["TEST"]
-m_end = (500000, 50000, 25000, 15625, 12500, 10000)
+m_end = (100000, 10000, 5000, 3125, 2500, 2000)
 m_itr = (1, 10, 20, 32, 40, 50)
 
 ######################################
 ##	Create command list
 ######################################
-cmdList = [['./bin/main ' + str(i) + ' ' + str(k) + ' ' + str(j) + ' ' + str(b) + ' ' + str(u), ' ' + str(m_e) + ' ' + str(m_i)] for i in n for k in k0 for j in a for b in beta for u in u0 for m_i, m_e in zip(m_itr, m_end)]
+cmdList = [['./bin/main ' + str(i) + ' ' + str(k) + ' ' + str(j) + ' ' + str(b) + ' ' + str(u) + ' ' + str(m_e) + ' ' + str(m_i)] for i in n for k in k0 for j in a for b in beta for u in u0 for m_i, m_e in zip(m_itr, m_end)]
 
 # print(cmdList)
 print("Commands to perform: {}".format(len(cmdList)))
@@ -44,8 +44,8 @@ error  = []
 
 
 # Loop of grouped iterable
-for np, processes in enumerate(zip_longest(*groups)): 
-	for npp, proc in enumerate(filter(None, processes)): # filters out 'None' fill values if procLimit does not divide evenly into cmdList
+for processes in zip_longest(*groups): 
+	for proc in filter(None, processes): # filters out 'None' fill values if procLimit does not divide evenly into cmdList
 		
 		# Communicate with process to retrive output and error
 		[runCodeOutput, runCodeErr] = proc.communicate()

@@ -363,8 +363,10 @@ void compute_CLVs(hid_t* file_space, hid_t* data_set, hid_t* mem_space, double* 
 	mem_chk(C, "C");
 	double* CLV    = (double* )malloc(sizeof(double) * DOF * numLEs);	
 	mem_chk(CLV, "CLV");
+	#ifdef __ANGLES
 	double* angles = (double* )malloc(sizeof(double) * DOF * numLEs);	
 	mem_chk(angles, "angles");
+	#endif
 	int* pivot  = (int* )malloc(sizeof(double) * numLEs);
 	mem_chk(pivot, "pivot");
 	double* sum = (double* )malloc(sizeof(double) * numLEs);
@@ -469,11 +471,13 @@ void compute_CLVs(hid_t* file_space, hid_t* data_set, hid_t* mem_space, double* 
 				// Write CLVs
 				write_hyperslab_data_d(file_space[4], data_set[4], mem_space[4], CLV, "CLV", DOF * numLEs, save_clv_indx);
 
+				#ifdef __ANGLES
 				// compute the angles between the CLVs
 				compute_angles(angles, CLV, DOF, numLEs);
 
-				// // Write angles
+				// Write angles
 				write_hyperslab_data_d(file_space[5], data_set[5], mem_space[5], angles, "Angles", DOF * numLEs, save_clv_indx);
+				#endif
 
 				// decrement for next iter
 				save_clv_indx--;
@@ -490,9 +494,12 @@ void compute_CLVs(hid_t* file_space, hid_t* data_set, hid_t* mem_space, double* 
 	free(C);
 	free(R_tmp);
 	free(GS_tmp);
-	free(angles);
 	free(sum);
 	free(pivot);
+	#ifdef __ANGLES
+	free(angles);
+	#endif
+	
 }
 
 
@@ -644,9 +651,6 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	// Get timestep
 	double dt = get_timestep(amp, fftw_plan_c2r, fftw_plan_r2c, kx, N, num_osc, k0);
 
-	// LCE algorithm varibales
-	int m = 1;
-
 	// Get number of transient iterations
 	#ifdef __TRANSIENTS
 	#ifdef TRANS_STEPS
@@ -716,19 +720,21 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	// Create arrays for time and phase order to save after algorithm is finished
 	double* time_array      = (double* )malloc(sizeof(double) * (tot_t_save_steps));
 	mem_chk(time_array, "time_array");
+	#ifdef __TRIADS
 	double* phase_order_R   = (double* )malloc(sizeof(double) * (tot_t_save_steps));
 	mem_chk(phase_order_R, "phase_order_R");
 	double* phase_order_Phi = (double* )malloc(sizeof(double) * (tot_t_save_steps));
 	mem_chk(phase_order_Phi, "phase_order_Phi");
-
+	#endif
 	
 
 	// ------------------------------
 	//  Write Initial Conditions to File
 	// ------------------------------
 	#ifndef __TRANSIENTS
+	#ifdef __PHASES
 	write_hyperslab_data_d(HDF_file_space[0], HDF_data_set[0], HDF_mem_space[0], phi, "phi", num_osc, 0);
-
+	#endif
 
 	#ifdef __TRIADS
 	// compute triads for initial conditions
@@ -748,6 +754,7 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	// ------------------------------
 	//  Begin Algorithm
 	// ------------------------------
+	int m    = 1;
 	double t = 0.0;
 	int iter = 1;	
 	#ifdef __TRANSIENTS
@@ -842,8 +849,9 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 			//////////////
 			if ((iter > trans_iters) && (iter % SAVE_DATA_STEP == 0)) {
 				// Write phases
+				#ifdef __PHASES
 				write_hyperslab_data_d(HDF_file_space[0], HDF_data_set[0], HDF_mem_space[0], phi, "phi", num_osc, save_data_indx);
-
+				#endif
 
 				#ifdef __TRIADS
 				// compute triads for initial conditions
@@ -923,9 +931,10 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 
 
 			// then write the current LCEs to this hyperslab
-			if (m % SAVE_LCE_STEP == 0) {			
+			if (m % SAVE_LCE_STEP == 0) {		
+				#ifdef __LCE	
 				write_hyperslab_data_d(HDF_file_space[2], HDF_data_set[2], HDF_mem_space[2], lce, "lce", num_osc - kmin, save_lce_indx);
-
+				#endif
 				#ifdef __RNORM
 				write_hyperslab_data_d(HDF_file_space[3], HDF_data_set[3], HDF_mem_space[3], znorm, "rNorm", num_osc - kmin, save_lce_indx);
 				#endif
@@ -1068,21 +1077,27 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	H5Sclose( HDF_mem_space[4] );
 	H5Dclose( HDF_data_set[4] );
 	H5Sclose( HDF_file_space[4] );
+	#ifdef __ANGLES
 	H5Sclose( HDF_mem_space[5] );
 	H5Dclose( HDF_data_set[5] );
 	H5Sclose( HDF_file_space[5] );
+	#endif
 	#endif
 	#ifdef __RNORM
 	H5Sclose( HDF_mem_space[3] );
 	H5Dclose( HDF_data_set[3] );
 	H5Sclose( HDF_file_space[3] );
 	#endif
+	#ifdef __PHASES
 	H5Sclose( HDF_mem_space[0] );
 	H5Dclose( HDF_data_set[0] );
 	H5Sclose( HDF_file_space[0] );
+	#endif
+	#ifdef __LCE
 	H5Sclose( HDF_mem_space[2] );
 	H5Dclose( HDF_data_set[2] );
 	H5Sclose( HDF_file_space[2] );
+	#endif 
 
 	// Close output file
 	H5Fclose(HDF_file_handle);
