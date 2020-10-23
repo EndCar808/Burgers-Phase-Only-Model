@@ -190,7 +190,7 @@ void open_output_create_slabbed_datasets_lce(hid_t* file_handle, char* output_fi
 
 	CLV_attr_space = H5Screate_simple (2, CLV_adims, NULL);
 
-	CLV_attr = H5Acreate(data_set[4], "CLV_Dims", H5T_NATIVE_INT, CLV_attr_space, H5P_DEFAULT, H5P_DEFAULT);
+	CLV_attr = H5Acreate(data_set[1], "CLV_Dims", H5T_NATIVE_INT, CLV_attr_space, H5P_DEFAULT, H5P_DEFAULT);
 
 	int CLV_dims[2];
 	CLV_dims[0] = N;
@@ -312,7 +312,7 @@ void rhs_extended(double* rhs, double* rhs_ext, double* x_tmp, double* x_pert, i
 	jac[4] = -1;
 	jac[5] = -x_tmp[0];
 	jac[6] = x_tmp[1];
-	jac[9] = x_tmp[0];
+	jac[7] = x_tmp[0];
 	jac[8] = -BETA;
 
 	// Call matrix matrix multiplication - C = alpha*A*B + beta*C => rhs_ext = alpha*jac_tmp*pert + 0.0*C
@@ -414,6 +414,7 @@ void compute_CLVs(hid_t* file_space, hid_t* data_set, hid_t* mem_space, double* 
 	mem_chk(CLV, "CLV");
 	double* angles = (double* )malloc(sizeof(double) * DOF * numLEs);	
 	mem_chk(angles, "angles");
+	memset(angles, 0.0, sizeof(double) * DOF * numLEs);
 	int* pivot  = (int* )malloc(sizeof(double) * numLEs);
 	mem_chk(pivot, "pivot");
 	double* sum = (double* )malloc(sizeof(double) * numLEs);
@@ -435,24 +436,29 @@ void compute_CLVs(hid_t* file_space, hid_t* data_set, hid_t* mem_space, double* 
 	int ldb = numLEs;       // leading dim of B
 	int ldc = numLEs;       // leading dim of C
 
-	// iterator for saving CLVs to file
-	int save_clv_indx = 0;
-
+	// iterator for saving CLVs to file - start at end and decrement
+	int save_clv_indx = (int) (m_rev_iters - m_rev_trans) / SAVE_CLV_STEP - 1;
+	
+	printf("save_indx: %d\n", save_clv_indx);
 	///---------------------------------------
 	/// Initialize the Coefficients matrix
 	///---------------------------------------
 	for (int i = 0; i < DOF; ++i) {
 		for (int j = 0; j < numLEs; ++j) {
 			if(j >= i) {
-				C[i * numLEs + j] = (double) rand() / (double) RAND_MAX;
-				// C[i * numLEs + j] =  (1.0) / ((double)j + 1.0);
+				// C[i * numLEs + j] = (double) rand() / (double) RAND_MAX;
+				C[i * numLEs + j] =  (1.0) / ((double)j + 1.0);
 			} 
 			else {
 				C[i * numLEs + j] = 0.0;
 			}
 			CLV[i * numLEs + j] = 0.0;
+
+			printf("C[%d]: %5.12lf\t", i * numLEs + j, C[i * numLEs + j]);
 		}
+		printf("\n");
 	}
+	printf("\n\n");
 
 
 	///---------------------------------------
@@ -523,14 +529,38 @@ void compute_CLVs(hid_t* file_space, hid_t* data_set, hid_t* mem_space, double* 
 				// // Write angles
 				write_hyperslab_data_d(file_space[2], data_set[2], mem_space[2], angles, "Angles", DOF * numLEs, save_clv_indx);
 
-				// icrement for next iter
-				save_clv_indx++;
+				// Decrement for next iter
+				save_clv_indx--;
 			}
 		}
+		if (p == 0 || p == (m_rev_iters - m_rev_trans - 1)) {
+			printf("CLV\n");
+			for (int i = 0; i < DOF; ++i)
+			{
+				for (int j = 0; j < numLEs; ++j)
+				{
+					printf("CLV[%d]:\t%5.12lf\t", i * numLEs + j, CLV[i * numLEs + j]);
+				}
+				printf("\n");
+			}
+			printf("\n\n");
+
+			printf("Angles\n");
+			for (int i = 0; i < DOF; ++i)
+			{
+				for (int j = 0; j < numLEs; ++j)
+				{
+					printf("A[%d]:\t%5.12lf\t", i * numLEs + j, angles[i * numLEs + j]);
+				}
+				printf("\n");
+			}
+			printf("\n\n");
+		}
 	}
-	///---------------------------------------
-	/// End of Ginelli Algo
-	///---------------------------------------
+	//---------------------------------------
+	// End of Ginelli Algo
+	//---------------------------------------
+	
 
 	// Cleanup and free memory
 	free(CLV);
@@ -567,7 +597,7 @@ void compute_lce_spectrum(int N, int numLEs, int m_trans, int m_rev_trans, int m
 	//  Allocate memory
 	// ------------------------------
 	// Allocate mode related arrays
-	double* x      = (double* ) malloc(sizeof(double) * N);
+	double* x     = (double* ) malloc(sizeof(double) * N);
 	mem_chk(x, "x");
 	double* x_pert = (double* ) malloc(sizeof(double) * N * numLEs);
 	mem_chk(x_pert, "x_pert");
@@ -579,6 +609,7 @@ void compute_lce_spectrum(int N, int numLEs, int m_trans, int m_rev_trans, int m
 	mem_chk(lce, "lce");
 	double* run_sum  = (double* )malloc(sizeof(double) * numLEs);
 	mem_chk(run_sum, "run_sum");
+	memset(run_sum, 0.0, sizeof(double) * numLEs);
 
 	// CLV arrays
 	double* R_tmp = (double* )malloc(sizeof(double) * N * numLEs);	
@@ -641,19 +672,21 @@ void compute_lce_spectrum(int N, int numLEs, int m_trans, int m_rev_trans, int m
 	double dt = 0.0005;
 
 	// LCE algorithm varibales
-	int m = 1;
 	int trans_iters = m_trans * m_iter;
 
 	// Get saving variables
 	int tot_clv_save_steps = (int) (m_end - 2 * m_trans) / SAVE_CLV_STEP;
 	int tot_m_save_steps = (int) (m_end) / SAVE_LCE_STEP;
 	int tot_t_save_steps = (int) ((m_iter * m_end) / SAVE_DATA_STEP);
-	if (m_trans > 0) {
+	if (m_trans == 0) {
 		tot_t_save_steps += 1;
 	}
 
 	// Solver time varibales 
-	double t0 = m_trans * dt;
+	double t0 = (m_trans - 1) * dt;
+	if (m_trans == 0) {
+		t0 = 0.0;
+	}	
 	double T  = t0 + m_iter * dt;	
 	
 
@@ -676,7 +709,7 @@ void compute_lce_spectrum(int N, int numLEs, int m_trans, int m_rev_trans, int m
 	open_output_create_slabbed_datasets_lce(&HDF_file_handle, output_file_name, HDF_file_space, HDF_data_set, HDF_mem_space, tot_t_save_steps, tot_m_save_steps, tot_clv_save_steps, N, numLEs);
 
 	// Create arrays for time and phase order to save after algorithm is finished
-	double* time_array      = (double* )malloc(sizeof(double) * (tot_t_save_steps));
+	double* time_array = (double* )malloc(sizeof(double) * (tot_t_save_steps));
 	mem_chk(time_array, "time_array");
 
 
@@ -692,18 +725,18 @@ void compute_lce_spectrum(int N, int numLEs, int m_trans, int m_rev_trans, int m
 	}
 
 
-
 	// ------------------------------
 	//  Begin Algorithm
 	// ------------------------------
 	double t = 0.0;
+	int m    = 0;
 	int iter = 1;
 	int save_data_indx = 0;
 	int save_lce_indx  = 0;
-	if (m_trans > 0) {
+	if (m_trans == 0) {
 		save_data_indx += 1;
 	}
-	while (m <= m_end) {
+	while (m < m_end) {
 
 		// ------------------------------
 		//  Integrate System Forward
@@ -779,7 +812,7 @@ void compute_lce_spectrum(int N, int numLEs, int m_trans, int m_rev_trans, int m
 			//////////////
 			// Print to file
 			//////////////
-			if ((iter > trans_iters) && (iter % SAVE_DATA_STEP == 0)) {
+			if ((iter >= trans_iters) && (iter % SAVE_DATA_STEP == 0)) {
 				// Write phases
 				write_hyperslab_data_d(HDF_file_space[0], HDF_data_set[0], HDF_mem_space[0], x, "x", N, save_data_indx);
 
@@ -803,15 +836,17 @@ void compute_lce_spectrum(int N, int numLEs, int m_trans, int m_rev_trans, int m
 		//  Orthonormalize 
 		// ------------------------------
 		orthonormalize(x_pert, R_tmp, N, numLEs);
-
+		// ------------------------------
+		//  Orthonormalize 
+		// ------------------------------
 		
 		// ------------------------------
 		//  Compute LCEs & Write To File
 		// ------------------------------
-		if (m > m_trans) {
+		if (m >= m_trans) {
 
 			// Record the GS vectors and R matrix and extract the diagonals of R
-			tmp2 = (m - m_trans - 1) * N * numLEs;
+			tmp2 = (m - m_trans) * N * numLEs;
 			for (int i = 0; i < N; ++i) {
 				tmp = i * numLEs;		
 				for (int j = 0 ; j < numLEs; ++j) {
@@ -824,13 +859,14 @@ void compute_lce_spectrum(int N, int numLEs, int m_trans, int m_rev_trans, int m
 							znorm[i] = fabs(R_tmp[tmp + i]);
 						} 
 					}
-
+					
 					// Record the GS vectors
 					if (m < (m_end - m_trans)) {
 						GS[tmp2 + tmp + j] = x_pert[tmp + j];
 					}
-				}
+				}			
 			}
+
 			
 			// Compute the LCEs for the current iteration
 			for (int i = 0; i < numLEs; ++i) {
@@ -891,6 +927,7 @@ void compute_lce_spectrum(int N, int numLEs, int m_trans, int m_rev_trans, int m
 	// End Algorithm
 	// ------------------------------
 	
+
 	// ------------------------------
 	//  Write 1D Arrays Using HDF5Lite
 	// ------------------------------
@@ -904,6 +941,77 @@ void compute_lce_spectrum(int N, int numLEs, int m_trans, int m_rev_trans, int m
 	}
 
 
+
+	printf("\n\n----------------------------------------------------------------\n\n");
+
+	
+	printf("Soln:\n");
+	for (int i = 0; i < N; ++i)
+	{
+		printf("x[%d]:\t%5.16lf\n", i, x[i]);
+	}
+	printf("\n\n");
+
+	printf("Pert:\n");
+	for (int i = 0; i < N; ++i)
+	{
+		for (int j = 0; j < numLEs; ++j)
+		{
+			printf("x_pert[%d]:\t%5.16lf\t", i * numLEs + j, x_pert[i * numLEs + j]);
+		}
+		printf("\n");
+	}
+	printf("\n\n");
+
+	// printf("\n\n----------------------------------------------------------------\n\n");
+
+	// printf("R_0\n");
+	// tmp2 = 0 * N * numLEs;
+	// for (int i = 0; i < N; ++i) {
+	// 	tmp = i * numLEs;		
+	// 	for (int j = 0 ; j < numLEs; ++j) {
+	// 		printf("R[%d]:\t%5.12lf\t", tmp2 + tmp + j, R[tmp2 + tmp + j]);
+	// 	}
+	// 	printf("\n");
+	// }
+	// printf("\n\n");
+
+	// printf("R_end\n");
+	// tmp2 = (m - m_trans - 1) * N * numLEs;
+	// for (int i = 0; i < N; ++i) {
+	// 	tmp = i * numLEs;		
+	// 	for (int j = 0 ; j < numLEs; ++j) {
+	// 		printf("R[%d]:\t%5.12lf\t", tmp2 + tmp + j, R[tmp2 + tmp + j]);
+	// 	}
+	// 	printf("\n");
+	// }
+	// printf("\n\n");
+
+
+	// printf("GS_0\n");
+	// tmp2 = 0 * N * numLEs;
+	// for (int i = 0; i < N; ++i) {
+	// 	tmp = i * numLEs;		
+	// 	for (int j = 0 ; j < numLEs; ++j) {
+	// 		printf("GS[%d]:\t%5.12lf\t", tmp2 + tmp + j, GS[tmp2 + tmp + j]);
+	// 	}
+	// 	printf("\n");
+	// }
+	// printf("\n\n");
+
+	// printf("GS_end\n");
+	// tmp2 = (m_end - 2 * m_trans - 1) * N * numLEs;
+	// for (int i = 0; i < N; ++i) {
+	// 	tmp = i * numLEs;		
+	// 	for (int j = 0 ; j < numLEs; ++j) {
+	// 		printf("GS[%d]:\t%5.12lf\t", tmp2 + tmp + j, GS[tmp2 + tmp + j]);
+	// 	}
+	// 	printf("\n");
+	// }
+	// printf("\n\n");
+
+
+	
 
 	// ------------------------------
 	//  Clean Up & Exit
@@ -930,7 +1038,7 @@ void compute_lce_spectrum(int N, int numLEs, int m_trans, int m_rev_trans, int m
 	free(RK4_pert);
 	
 
-	// // Close HDF5 handles
+	// Close HDF5 handles
 	H5Sclose( HDF_mem_space[1] );
 	H5Dclose( HDF_data_set[1] );
 	H5Sclose( HDF_file_space[1] );

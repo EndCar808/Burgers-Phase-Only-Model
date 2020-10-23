@@ -21,14 +21,14 @@
 // ---------------------------------------------------------------------
 //  Code Functions
 // ---------------------------------------------------------------------
-#define __FXD_PT_SEARCH__
+// #define __FXD_PT_SEARCH__
 
 // ---------------------------------------------------------------------
 //  Datasets
 // ---------------------------------------------------------------------
-#define __TRIADS
+// #define __TRIADS
 // #define __MODES
-#define __RHS
+// #define __RHS
 // #define __REALSPACE
 // #define __TRANSIENTS
 // #define __STATS
@@ -38,7 +38,7 @@
 // ---------------------------------------------------------------------
 //  Global Variables
 // ---------------------------------------------------------------------
-#define SAVE_DATA_STEP 100	// Parameter to determine after how many integrations steps data should be saved to output
+#define SAVE_DATA_STEP 1	// Parameter to determine after how many integrations steps data should be saved to output
 
 
 

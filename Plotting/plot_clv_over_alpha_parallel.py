@@ -38,7 +38,7 @@ from numba import jit, prange
 #########################
 ##  Function Definitions
 #########################
-# @jit(nopython = True)
+@jit(nopython = True)
 def compute_angles(clv, num_tsteps, dof):
     angles = np.zeros((num_tsteps, dof, dof))
     
@@ -49,7 +49,7 @@ def compute_angles(clv, num_tsteps, dof):
     
     return angles
 
-# @jit(nopython = True)
+@jit(nopython = True)
 def compute_zdata(clv, num_tsteps, dof):
     
     z_data   = np.zeros((dof, dof))
@@ -69,6 +69,162 @@ def compute_angles_subspaces(A1, B1, num_clv_steps):
         angles1[t] = subspace_angles(A1[t, :, :], B1[t, :, :])[0]
         
     return angles1
+
+
+def find_min_max(N, k0, alpha, beta, u0, iters, m_end, m_iter, trans, min_v_z, max_v_z):
+    
+    for a in alpha:
+
+        ## ------- Read in Data
+        ## Create filename from data
+        filename = input_dir + "/RESULTS_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]/CLVData_ITERS[{},{},{}]".format(N, k0, a, beta, u0, iters, m_end, m_iter)
+
+        ## Check if file exists and open
+        if os.path.exists(filename + "_TRANS[{}].h5".format(trans)):
+            HDFfileData = h5py.File(filename + "_TRANS[{}].h5".format(trans), 'r')
+        elif os.path.exists(filename + "_TRANS[{}].h5".format(trans * 10)):
+            HDFfileData = h5py.File(filename + "_TRANS[{}].h5".format(trans * 10), 'r')
+        elif os.path.exists(filename + "_TRANS[{}].h5".format(trans / 10)):
+            HDFfileData = h5py.File(filename + "_TRANS[{}].h5".format(trans / 10), 'r')
+        elif os.path.exists(filename + "_TRANS[{}].h5".format(trans * 100)):
+            HDFfileData = h5py.File(filename + "_TRANS[{}].h5".format(trans * 100), 'r')
+        else: 
+            print("File doesn't exist, check parameters!")
+            sys.exit()
+
+        ## --------- Read in datasets
+        CLVs   = HDFfileData['CLVs']
+        amps   = HDFfileData['Amps'][:]
+        
+        ## --------- System Parameters
+        num_clv_steps = CLVs.shape[0]
+        num_osc       = amps.shape[0];
+        dof           = num_osc - (k0 + 1)
+
+        ## --------- Reshape the CLV and Angles data
+        clv_dims = CLVs.attrs['CLV_Dims']
+        CLV      = np.reshape(CLVs, (CLVs.shape[0], dof, dof))
+    
+        ## --------- Compute time averaged squared vector components
+        zdata  = compute_zdata(CLV, num_clv_steps, dof)
+        
+        ## --------- Find min and max values 
+        min_z = np.amin(zdata)
+        max_z = np.amax(zdata)
+
+        if min_z < min_v_z:
+            min_v_z = min_z
+        if max_z > max_v_z:
+            max_v_z = max_z
+
+    return min_v_z, max_v_z
+
+
+def loop_over_data(N, k0, a, beta, u0, iters, m_end, m_iter, trans, min_v_z, max_v_z):
+
+    ## ------- Read in Data
+    ## Create filename from data
+    input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/RESULTS"
+    filename = input_dir + "/RESULTS_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]/CLVData_ITERS[{},{},{}]".format(N, k0, a, beta, u0, iters, m_end, m_iter)
+
+    ## Check if file exists and open
+    if os.path.exists(filename + "_TRANS[{}].h5".format(trans)):
+        HDFfileData = h5py.File(filename + "_TRANS[{}].h5".format(trans), 'r')
+    elif os.path.exists(filename + "_TRANS[{}].h5".format(trans * 10)):
+        HDFfileData = h5py.File(filename + "_TRANS[{}].h5".format(trans * 10), 'r')
+    elif os.path.exists(filename + "_TRANS[{}].h5".format(trans / 10)):
+        HDFfileData = h5py.File(filename + "_TRANS[{}].h5".format(trans / 10), 'r')
+    elif os.path.exists(filename + "_TRANS[{}].h5".format(trans / 100)):
+        HDFfileData = h5py.File(filename + "_TRANS[{}].h5".format(trans / 100), 'r')
+    elif os.path.exists(filename + "_TRANS[{}].h5".format(trans * 100)):
+        HDFfileData = h5py.File(filename + "_TRANS[{}].h5".format(trans * 100), 'r')
+    else: 
+        print("File doesn't exist, check parameters!")
+        sys.exit()
+
+
+    ## --------- Read in datasets
+    # phases = HDFfileData['Phases'][:, :]
+    time   = HDFfileData['Time'][:]
+    amps   = HDFfileData['Amps'][:]
+    lce    = HDFfileData['LCE'][:, :]
+    CLVs   = HDFfileData['CLVs']
+    angles = HDFfileData['Angles']
+
+    ## --------- System Parameters
+    num_tsteps    = len(time);
+    num_clv_steps = CLVs.shape[0]
+    num_osc       = amps.shape[0];
+    kmin          = k0 + 1;
+    kmax          = num_osc - 1;
+    dof           = num_osc - kmin
+
+    ## --------- Reshape the CLV and Angles data
+    clv_dims = CLVs.attrs['CLV_Dims']
+    CLV      = np.reshape(CLVs, (CLVs.shape[0], dof, dof))
+    ang_dims = angles.attrs['Angle_Dims']
+    angle    = np.reshape(angles, (angles.shape[0], dof, dof))
+
+
+    ## --------- Compute Data
+    ## Time averaged squared vector components
+    zdata  = compute_zdata(CLV, num_clv_steps, dof)
+
+    ## Angles between expanding and contracting submanifolds
+    # Find zero mode exponent
+    minval  = np.amin(np.absolute(lce[-1, :]))
+    minindx = np.where(np.absolute(lce[-1, :]) == minval)
+    minindx_el,  = minindx
+    zeroindx     = minindx_el[0]
+    theta1 = compute_angles_subspaces(CLV[:, :, :zeroindx + 1], CLV[:, :, zeroindx + 1:], num_clv_steps)
+    if zeroindx > 0:
+        theta2 = compute_angles_subspaces(CLV[:, :, :zeroindx], CLV[:, :, zeroindx:], num_clv_steps)
+    else:
+        theta2 = 0
+
+
+    # ## --------- Plot all CLV Data
+    # plot_data(angle, zdata, theta1, theta2, zeroindx, kmin, num_osc, dof, min_v_z, max_v_z, N, k0, a, beta)
+
+    ## -------- Plot Time Averaged CLV plot
+    plot_time_averaged_clv(zdata, a, N, zeroindx, dof, kmin, num_osc)
+
+
+def plot_time_averaged_clv(zdata, a, N, zeroindx, dof, kmin, num_osc):
+    
+    fig = plt.figure(figsize = (24, 24))
+    gs  = GridSpec(1, 1)
+    
+    cmap_new = cm.jet
+    
+    ## Time averaged squared components of the vectors
+    ax2  = fig.add_subplot(gs[0, 0])
+    im  = ax2.imshow(np.flipud(zdata), cmap = cm.jet, extent = [1, dof, kmin, num_osc]) # , vmin = 0.0, vmax = max_v_z
+    ax2.set_xlabel(r"$j$")
+    ax2.set_ylabel(r"$k$")
+    ax2.set_title(r"Time-averaged Components$")
+    div2  = make_axes_locatable(ax2)
+    cax2  = div2.append_axes('right', size = '5%', pad = 0.1)
+    cbar = plt.colorbar(im, cax = cax2, orientation = 'vertical')
+    cbar.set_label(r"$\langle |\mathbf{v}_k^j |^2\rangle$")
+    ax22  = div2.append_axes('bottom', size = '8%', pad = 0.8, sharex = ax2)
+    for i in range(0, dof - 1):
+        if i == zeroindx:
+            ax22.plot(i + 1.5, 0.5, markerfacecolor = 'black', markeredgecolor = 'black', marker = 'o', label = r"$\lambda_i = 0$", c = "w")
+        elif i < zeroindx: 
+            ax22.plot(i + 1.5, 0.5, markerfacecolor = 'blue', markeredgecolor = 'blue', marker = 'o', alpha = (dof - i)/dof, label = r"$\lambda_i > 0$", c = "w")
+        elif i > zeroindx: 
+            ax22.plot(i + 1.5, 0.5, markerfacecolor = 'red', markeredgecolor = 'red', marker = 'o', alpha = (i)/dof, label = r"$\lambda_i < 0$", c = "w")
+    ax22.set_xlim(1, dof)
+    ax22.axis("off")   
+    ax22.legend(loc = "lower right", bbox_to_anchor = (-0.01, -0.1), fancybox = True, framealpha = 1, shadow = True) 
+    ax2.set_title(r"$\alpha = {:0.3f}$".format(a))
+
+    plt.savefig("/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Snapshots/CLVs" + "/TimeAverage_CLV_N[{}]_ALPHA[{:0.3f}].png".format(N, a), format = "png")  
+    plt.close
+    
+    return print("Plotted alpha = {:0.3f}".format(a))
+
 
 def plot_data(angles, zdata, theta1, theta2, zeroindx, kmin, num_osc, dof, min_v_z, max_v_z, N, k0, alpha, beta):
     fig = plt.figure(figsize = (24, 24))
@@ -166,136 +322,53 @@ if __name__ == '__main__':
     ##  Parameter Space
     #########################
     k0     = 1
-    alpha  = np.arange(0, 3.5, 0.05)
+    # alpha  = np.arange(0.0, 3.5, 0.05)
+    alpha  = np.array([0.0, 0.5, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0, 3.45])
     beta   = 0.0
     iters  = 400000
     trans  = 1000
     N      = 256
     u0     = "RANDOM"
-    m_end  = 8000
-    m_iter = 50
+    m_end  = 20000
+    m_iter = 20
 
 
     input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/RESULTS"
     
-
+    min_v_z = 100000
+    max_v_z = 0
     # #######################################
     # ##  First pass: Find min and max vals
     # #######################################
-    min_v_z = 100000
-    max_v_z = 0
+    # 
 
-    print("First Pass over data - find min and max values of CLV data!")
-    for a in alpha:
-
-        ## ------- Read in Data
-        ## Create filename from data
-        filename = input_dir + "/RESULTS_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]/CLVData_ITERS[{},{},{}]".format(N, k0, a, beta, u0, iters, m_end, m_iter)
-
-        ## Check if file exists and open
-        if os.path.exists(filename + "_TRANS[{}].h5".format(trans)):
-            HDFfileData = h5py.File(filename + "_TRANS[{}].h5".format(trans), 'r')
-        elif os.path.exists(filename + "_TRANS[{}].h5".format(trans * 10)):
-            HDFfileData = h5py.File(filename + "_TRANS[{}].h5".format(trans * 10), 'r')
-        elif os.path.exists(filename + "_TRANS[{}].h5".format(trans / 10)):
-            HDFfileData = h5py.File(filename + "_TRANS[{}].h5".format(trans / 10), 'r')
-        elif os.path.exists(filename + "_TRANS[{}].h5".format(trans * 100)):
-            HDFfileData = h5py.File(filename + "_TRANS[{}].h5".format(trans * 100), 'r')
-        else: 
-            print("File doesn't exist, check parameters!")
-            sys.exit()
-
-        ## --------- Read in datasets
-        CLVs   = HDFfileData['CLVs']
-        amps   = HDFfileData['Amps'][:]
-        
-        ## --------- System Parameters
-        num_clv_steps = CLVs.shape[0]
-        num_osc       = amps.shape[0];
-        dof           = num_osc - (k0 + 1)
-
-        ## --------- Reshape the CLV and Angles data
-        clv_dims = CLVs.attrs['CLV_Dims']
-        CLV      = np.reshape(CLVs, (CLVs.shape[0], dof, dof))
-    
-        ## --------- Compute time averaged squared vector components
-        zdata  = compute_zdata(CLV, num_clv_steps, dof)
-        
-        ## --------- Find min and max values 
-        min_z = np.amin(zdata)
-        max_z = np.amax(zdata)
-
-        if min_z < min_v_z:
-            min_v_z = min_z
-        if max_z > max_v_z:
-            max_v_z = max_z
-
+    # print("First Pass over data - find min and max values of CLV data!")
+    # min_v_z, max_v_z = find_min_max()
 
 
     #######################################
     ##  Second pass: Plot Data
     #######################################
     print("Second Pass over data - plotting data!")
-    for a in alpha:
+    
+    ## Create Process list  
+    procLim  = 9
+    
+    
+    #########################
+    ## Plot all CLV Data
+    ## Create iterable group of processes
+    groups_args =  [(mprocs.Process(target = loop_over_data, args = (N, k0, a, beta, u0, iters, m_end, m_iter, trans, min_v_z, max_v_z)) for a in alpha)] * procLim
+    
+      
+    
+    
+    ## Loop of grouped iterable
+    for procs in zip_longest(*groups_args): 
+        processes = []
+        for p in filter(None, procs):
+            processes.append(p)
+            p.start()
 
-        ## ------- Read in Data
-        ## Create filename from data
-        filename = input_dir + "/RESULTS_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]/CLVData_ITERS[{},{},{}]".format(N, k0, a, beta, u0, iters, m_end, m_iter)
-
-        ## Check if file exists and open
-        if os.path.exists(filename + "_TRANS[{}].h5".format(trans)):
-            HDFfileData = h5py.File(filename + "_TRANS[{}].h5".format(trans), 'r')
-        elif os.path.exists(filename + "_TRANS[{}].h5".format(trans * 10)):
-            HDFfileData = h5py.File(filename + "_TRANS[{}].h5".format(trans * 10), 'r')
-        elif os.path.exists(filename + "_TRANS[{}].h5".format(trans / 10)):
-            HDFfileData = h5py.File(filename + "_TRANS[{}].h5".format(trans / 10), 'r')
-        elif os.path.exists(filename + "_TRANS[{}].h5".format(trans * 100)):
-            HDFfileData = h5py.File(filename + "_TRANS[{}].h5".format(trans * 100), 'r')
-        else: 
-            print("File doesn't exist, check parameters!")
-            sys.exit()
-
-
-        ## --------- Read in datasets
-        # phases = HDFfileData['Phases'][:, :]
-        time   = HDFfileData['Time'][:]
-        amps   = HDFfileData['Amps'][:]
-        lce    = HDFfileData['LCE'][:, :]
-        CLVs   = HDFfileData['CLVs']
-        angles = HDFfileData['Angles']
-
-        ## --------- System Parameters
-        num_tsteps    = len(time);
-        num_clv_steps = CLVs.shape[0]
-        num_osc       = amps.shape[0];
-        kmin          = k0 + 1;
-        kmax          = num_osc - 1;
-        dof           = num_osc - kmin
-
-        ## --------- Reshape the CLV and Angles data
-        clv_dims = CLVs.attrs['CLV_Dims']
-        CLV      = np.reshape(CLVs, (CLVs.shape[0], dof, dof))
-        ang_dims = angles.attrs['Angle_Dims']
-        angle    = np.reshape(angles, (angles.shape[0], dof, dof))
-
-
-        ## --------- Compute Data
-        ## Time averaged squared vector components
-        zdata  = compute_zdata(CLV, num_clv_steps, dof)
-
-        ## Angles between expanding and contracting submanifolds
-        # Find zero mode exponent
-        minval  = np.amin(np.absolute(lce[-1, :]))
-        minindx = np.where(np.absolute(lce[-1, :]) == minval)
-        minindx_el,  = minindx
-        zeroindx     = minindx_el[0]
-        theta1 = compute_angles_subspaces(CLV[:, :, :zeroindx + 1], CLV[:, :, zeroindx + 1:], num_clv_steps)
-        if zeroindx > 0:
-            theta2 = compute_angles_subspaces(CLV[:, :, :zeroindx], CLV[:, :, zeroindx:], num_clv_steps)
-        else:
-            theta2 = 0
-
-
-        ## --------- Plot Data
-        plot_data(angle, zdata, theta1, theta2, zeroindx, kmin, num_osc, dof, min_v_z, max_v_z, N, k0, a, beta)
-
+        for process in processes:
+            process.join()

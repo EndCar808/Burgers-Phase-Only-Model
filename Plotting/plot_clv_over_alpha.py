@@ -65,7 +65,7 @@ def compute_angles_subspaces(A1, B1, num_clv_steps):
     
     angles1 = np.zeros((num_clv_steps))
     
-    for t in range(1, num_clv_steps):
+    for t in range(num_clv_steps):
         angles1[t] = subspace_angles(A1[t, :, :], B1[t, :, :])[0]
         
     return angles1
@@ -129,7 +129,7 @@ if __name__ == '__main__':
     ##	Compute Daata
     #########################
     ## Angles and time averaged
-    angles = compute_angles(CLV, num_clv_steps, dof)
+#     angles = compute_angles(CLV, num_clv_steps, dof)
     zdata  = compute_zdata(CLV, num_clv_steps, dof)
     
     ## Angles between expanding and contracting submanifolds

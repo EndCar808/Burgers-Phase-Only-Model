@@ -41,9 +41,9 @@ int main(int argc, char** argv) {
 	int numLEs = N;
 
 	// Integration parameters
-	int m_trans = 10;
+	int m_trans = 0;
 	int m_rev_trans = m_trans;
-	int m_end  = 6000;
+	int m_end  = 200000;
 	int m_iter = 1;
 
 

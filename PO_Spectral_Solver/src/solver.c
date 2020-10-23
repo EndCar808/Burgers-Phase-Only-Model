@@ -503,11 +503,13 @@ void write_hyperslab_data(hid_t file_space, hid_t data_set, hid_t mem_space, hid
 	// select appropriate hyperslab 
 	if ((H5Sselect_hyperslab(file_space, H5S_SELECT_SET, start_index, NULL, count, NULL)) < 0) {
 		printf("\n!!Error Selecting Hyperslab!! - For %s at Index: %d \n", data_name, index);
+		exit(1);
 	}
 
 	// then write the current modes to this hyperslab
 	if ((H5Dwrite(data_set, dtype, mem_space, file_space, H5P_DEFAULT, data)) < 0) {
 		printf("\n!!Error Writing Slabbed Data!! - For %s at Index: %d \n", data_name, index);
+		exit(1);
 	}
 }
 

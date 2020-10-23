@@ -8,16 +8,16 @@ from datetime import datetime
 ##	Define dataspace
 ######################################
 # n  = [64, 128, 256, 512]
-n     = [512]
+n     = [256]
 k0    = [1]
-a     = np.array([0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.49])
+a     = np.array([0.05, 0.55, 1.05, 1.5, 2.05, 2.5, 3.05, 3.45]) 
 # a     = np.arange(0.0, 3.5, 0.05)
 # a     = [30, 300]
 # beta  = [0.0 , 1.0];
 beta  = [0.0];
-u0    = ["TEST"]
-m_end = (100000, 10000, 5000, 3125, 2500, 2000)
-m_itr = (1, 10, 20, 32, 40, 50)
+u0    = ["RANDOM"]
+m_end = [1000000] #(400000, 40000, 20000, 12500, 10000, 8000)
+m_itr = [1] #(1, 10, 20, 32, 40, 50)
 
 ######################################
 ##	Create command list
@@ -33,7 +33,7 @@ print("Commands to perform: {}".format(len(cmdList)))
 ##	Run commands in parallel
 ######################################
 # Set the limit of subprocesses / threads to spawn at any one time	
-procLimit = 12
+procLimit = 8
 
 # Create grouped iterable of subprocess calls to Popen() - see grouper recipe in itertools
 groups = [(Popen(cmd, shell = True, stdout = PIPE, stdin = PIPE, stderr = PIPE, universal_newlines = True) for cmd in cmdList)] * procLimit 

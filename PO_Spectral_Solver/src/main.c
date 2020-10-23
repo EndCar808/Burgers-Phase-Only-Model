@@ -49,8 +49,11 @@ int main(int argc, char** argv) {
 	double alpha = atof(argv[3]);
 	double beta  = atof(argv[4]);
 
-	int tsteps     = 5e5;
+	int tsteps     = atoi(argv[6]);
 	int save_steps = SAVE_DATA_STEP;
+
+
+	printf("tsteps: %d\n", tsteps);
 
 	int Nmax = N * 2;
 

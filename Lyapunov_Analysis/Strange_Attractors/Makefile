@@ -11,7 +11,7 @@ OS = $(shell lsb_release -si)
 ifeq ($(OS),Ubuntu)
 	# CHIRP
 	GCC := gcc
-	CCFLAG := -O3 -W -Wall
+	CCFLAG := -W -Wall -g # -O3
 	LIBFLAG := -lm -lhdf5 -lhdf5_hl #-fopenmp -lpthread -lfftw3_omp -lfftw3
 	GSLFLAG := -lgsl -lgslcblas
 	LAPACKFLAG := -llapacke -llapack -lblas -lgfortran

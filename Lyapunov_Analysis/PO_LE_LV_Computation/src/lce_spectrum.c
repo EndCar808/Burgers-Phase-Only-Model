@@ -504,7 +504,7 @@ void compute_CLVs(hid_t* file_space, hid_t* data_set, hid_t* mem_space, double* 
 
 
 
-void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end, int m_iter) {
+void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end, int m_iter, int dof) {
 
 	// ------------------------------
 	//  Variable Definitions
@@ -685,10 +685,10 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 	// ------------------------------
 	//  CLVs Setup
 	// ------------------------------
-	#ifdef __CLVs
-	// CLV arrays
 	double* R_tmp = (double* )malloc(sizeof(double) * (num_osc - kmin) * (num_osc - kmin));	
 	mem_chk(R_tmp, "R_tmp");
+	#ifdef __CLVs
+	// CLV arrays	
 	double* R     = (double* )malloc(sizeof(double) * (num_osc - kmin) * (num_osc - kmin) * (m_end - trans_m));	
 	mem_chk(R, "R");
 	double* GS    = (double* )malloc(sizeof(double) * (num_osc - kmin) * (num_osc - kmin) * (m_end - 2 * trans_m));	
@@ -844,9 +844,9 @@ void compute_lce_spectrum(int N, double a, double b, char* u0, int k0, int m_end
 			}			
 			
 
-			//////////////
+			/////////////////
 			// Print to file
-			//////////////
+			/////////////////
 			if ((iter > trans_iters) && (iter % SAVE_DATA_STEP == 0)) {
 				// Write phases
 				#ifdef __PHASES
