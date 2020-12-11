@@ -7,17 +7,19 @@
 # ---------------------------------------------------------------------
 #  Compiler flags
 # ---------------------------------------------------------------------
-OS = $(shell lsb_release -si)
+# Get operating system
+OS = $(shell lsb_release -si)   
 
+# Set compile flags dependent on machine
 ifeq ($(OS),Ubuntu)
 	# CHIRP
 	GCC := gcc
-	CCFLAG := -O3 -W -Wall
-	LIBFLAG := -fopenmp -lpthread -lfftw3_omp -lfftw3 -lm -lhdf5 -lhdf5_hl
-	GSLFLAG := -lgsl -lgslcblas
-	LAPACKFLAG := -llapacke -llapack -lblas -lgfortran
-	INCDIR = -I/usr/include/hdf5/serial/  -I/usr/include/gsl/ -I../../Libraries/lapack-3.9.0/CBLAS/include/ -I../../Libraries/lapack-3.9.0/LAPACKE/include/
-	LIBDIR = -L/usr/lib/x86_64-linux-gnu/hdf5/serial/ -L../../Libraries/lapack-3.9.0/
+	CCFLAG := -W -Wall -O3 #-g                                              # Turn on omptimization (-O3) and warnings flags
+	LIBFLAG := -fopenmp -lpthread -lfftw3_omp -lfftw3 -lm -lhdf5 -lhdf5_hl  # compiler flags to enable certain functionality such as fftw, hdf5 etc
+	GSLFLAG := -lgsl -lgslcblas                                             # Flags for using gsl libraby - NOT USED 
+	LAPACKFLAG := -llapacke -llapack -lblas -lgfortran                      # Flags for the LAPACKE & CBLAS (C versions of LAPACK & BLAS) to perform matrix mult
+	INCDIR = -I/usr/include/hdf5/serial/  -I/usr/include/gsl/ -I../../Libraries/lapack-3.9.0/CBLAS/include/ -I../../Libraries/lapack-3.9.0/LAPACKE/include/    # include directories for external libraries
+	LIBDIR = -L/usr/lib/x86_64-linux-gnu/hdf5/serial/ -L../../Libraries/lapack-3.9.0/                                                                          # lininking directores for external libraries
 else ifeq ($(OS), RedHatEnterpriseServer)
 	# SONIC
 	GCC := gcc

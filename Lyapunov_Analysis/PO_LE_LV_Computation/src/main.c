@@ -59,13 +59,23 @@ int main(int argc, char** argv) {
 	int m_end  = atoi(argv[6]);
 	int m_iter = atoi(argv[7]);
 
+	// Number of LEs
+	int numLEs = (int) N / 2 - k0;
+	if (argc == 9) {
+		numLEs = atoi(argv[8]);
+		if (numLEs > (int) N / 2 - k0) {
+			printf("\nNo. of LEs [%d] is too big...setting to max [%d]\n\n", numLEs, (int) N / 2 - k0);
+			numLEs = (int) N / 2 - k0;
+		}
+	}
+
 
 	// ------------------------------
-	//  Compute Spectrum
+	//  Compute Spectrum & CLVs
 	// ------------------------------
-	compute_lce_spectrum(N, alpha, beta, u0, k0, m_end, m_iter);
+	compute_lce_spectrum_clvs(N, alpha, beta, u0, k0, m_end, m_iter, numLEs);
 	// ------------------------------
-	//  Compute Spectrum
+	//  Compute Spectrum & CLVs
 	// ------------------------------
 
 
