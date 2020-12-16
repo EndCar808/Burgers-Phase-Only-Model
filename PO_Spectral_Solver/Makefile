@@ -7,7 +7,7 @@
 #  Compiler flags
 # ---------------------------------------------------------------------
 GCC := gcc
-CCFLAG := -O3 -W -Wall
+CCFLAG := -O3 -W -Wall #-g
 LIBFLAG := -fopenmp -lpthread -lfftw3_omp -lfftw3 -lm -lhdf5 -lhdf5_hl
 GSLFLAG := -lgsl -lgslcblas
 LAPACKFLAG := -llapacke -llapack -lblas -lgfortran
@@ -52,10 +52,10 @@ all: $(BIN)/main
 solver: $(BIN)/main 
 
 $(BIN)/main: $(SRCOBJ) $(DEPS)
-	$(GCC) $(CCFLAG) -o $@ $^ ${INCDIR} ${LIBDIR} $(LIBFLAG)
+	$(GCC) $(CCFLAG) -o $@ $^ ${INCDIR} ${LIBDIR} $(LIBFLAG) $(GSLFLAG)
 
 $(OBJBIN)/%.o: $(SRCDIR)/%.c $(DEPS)
-	$(GCC) $(CCFLAG) -c $^ -o $@ ${INCDIR} ${LIBDIR} $(LIBFLAG)
+	$(GCC) $(CCFLAG) -c $^ -o $@ ${INCDIR} ${LIBDIR} $(LIBFLAG) $(GSLFLAG)
 
 
 

@@ -388,7 +388,10 @@ if __name__ == '__main__':
 		print(x_out[-1, :])
 
 		print("x_pert")
-		print(x_ext_out[:, :, -1])
+		for i in range(1, 6):
+			print(x_ext_out[:, 0, -i])
+
+		
 
 		# print("Time: {:5.16f}".format(t))
 
@@ -416,10 +419,12 @@ if __name__ == '__main__':
 		print("---------------------------")
 
 		print("CLVs0")
-		print(CLVs[:, :, 0])
+		for i in range(5):
+			print(CLVs[:, 0, i])
 
 		print("CLVs_end")
-		print(CLVs[:, :, -1])
+		for i in range(1, 6):
+			print(CLVs[:, 0, -i])
 
 		print("---------------------------")
 		print("Angles0")

@@ -18,6 +18,8 @@
 #include <hdf5_hl.h>
 #include <omp.h>
 #include <gsl/gsl_cblas.h>
+#include <gsl/gsl_histogram.h>
+#include <gsl/gsl_rstat.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 
@@ -266,6 +268,7 @@ void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_n
 	hsize_t maxdims[dimensions];   // array to hold max dims of full evolution data
 	hsize_t chunkdims[dimensions]; // array to hold dims of the hyperslab chunks
 
+	#ifdef __PHASES
 	// initialize the hyperslab arrays
 	dims[0]      = num_t_steps;             // number of timesteps
 	dims[1]      = num_osc;                 // number of oscillators
@@ -296,6 +299,7 @@ void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_n
 	mem_space[0] = H5Screate_simple(dimensions, dims, NULL);
 
 	H5Pclose(plist);
+	#endif
 
 	#ifdef __RHS
 	//-----------------------------//
@@ -379,7 +383,7 @@ void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_n
 	adims[0] = 1;
 	adims[1] = 2;
 
-	triads_attr_space = H5Screate_simple (2, adims, NULL);
+	triads_attr_space = H5Screate_simple(2, adims, NULL);
 
 	triads_attr = H5Acreate(data_set[1], "Triad_Dims", H5T_NATIVE_INT, triads_attr_space, H5P_DEFAULT, H5P_DEFAULT);
 
@@ -435,14 +439,14 @@ void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_n
 	//---------- REALSPACE -----------//
 	//--------------------------------//
 	#ifdef __REALSPACE
-	int N = 2 * (num_osc - 1);
+	int NN = 2 * (num_osc - 1);
 	// initialize the hyperslab arrays
 	dims[0]      = num_t_steps;             // number of timesteps
-	dims[1]      = N;                       // number of collocation points
+	dims[1]      = NN;                       // number of collocation points
 	maxdims[0]   = H5S_UNLIMITED;           // setting max time index to unlimited means we must chunk our data
-	maxdims[1]   = N;                       // number of collocation points
+	maxdims[1]   = NN;                       // number of collocation points
 	chunkdims[0] = 1;                       // 1D chunk to be saved 
-	chunkdims[1] = N;                       // number of collocation points
+	chunkdims[1] = NN;                       // number of collocation points
 
 	// create the 2D dataspace - setting the no. of dimensions, expected and max size of the dimensions
 	file_space[3] = H5Screate_simple(dimensions, dims, maxdims);
@@ -460,17 +464,57 @@ void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_n
 	
 	// create the memory space for the slab
 	dims[0] = 1;
-	dims[1] = N;
+	dims[1] = NN;
 
 	// setting the max dims to NULL defaults to same size as dims
 	mem_space[3] = H5Screate_simple(dimensions, dims, NULL);
 
 	H5Pclose(plist4);
 	#endif
+
+	//--------------------------------//
+	//-------- REALSPACE GRAD --------//
+	//--------------------------------//
+	#ifdef __GRAD
+	int N = 2 * (num_osc - 1);
+	// initialize the hyperslab arrays
+	dims[0]      = num_t_steps;             // number of timesteps
+	dims[1]      = N;                       // number of collocation points
+	maxdims[0]   = H5S_UNLIMITED;           // setting max time index to unlimited means we must chunk our data
+	maxdims[1]   = N;                       // number of collocation points
+	chunkdims[0] = 1;                       // 1D chunk to be saved 
+	chunkdims[1] = N;                       // number of collocation points
+
+	// create the 2D dataspace - setting the no. of dimensions, expected and max size of the dimensions
+	file_space[5] = H5Screate_simple(dimensions, dims, maxdims);
+
+	// must create a propertly list to enable data chunking due to max time dimension being unlimited
+	// create property list 
+	hid_t plist6;
+	plist6 = H5Pcreate(H5P_DATASET_CREATE);
+
+	// using this property list set the chuncking - stores the chunking info in plist
+	H5Pset_chunk(plist6, dimensions, chunkdims);
+
+	// Create the dataset in the previouosly created datafile - using the chunk enabled property list and new compound datatype
+	data_set[5] = H5Dcreate(*file_handle, "RealSpaceGrad", H5T_NATIVE_DOUBLE, file_space[5], H5P_DEFAULT, plist6, H5P_DEFAULT);
+	
+	// create the memory space for the slab
+	dims[0] = 1;
+	dims[1] = N;
+
+	// setting the max dims to NULL defaults to same size as dims
+	mem_space[5] = H5Screate_simple(dimensions, dims, NULL);
+
+	H5Pclose(plist6);
+	#endif
 }
 
 hid_t create_complex_datatype() {
+
+	// Declare HDF5 datatype variable
 	hid_t dtype;
+	
 	// Create compound datatype for complex numbers
 	typedef struct complex_type {
 		double re;   // real part 
@@ -482,7 +526,7 @@ hid_t create_complex_datatype() {
 	cmplex.im = 0.0;
 
 	// create complex compound datatype
-	dtype = H5Tcreate (H5T_COMPOUND, sizeof(cmplex));
+	dtype = H5Tcreate(H5T_COMPOUND, sizeof(cmplex));
   	H5Tinsert(dtype, "r", offsetof(complex_type,re), H5T_NATIVE_DOUBLE);
   	H5Tinsert(dtype, "i", offsetof(complex_type,im), H5T_NATIVE_DOUBLE);
 
@@ -774,6 +818,7 @@ void triad_phases(double* triads, fftw_complex* phase_order, double* phi, int km
 
 	// normalize phase order parameter
 	*phase_order =  phase_order_tmp / (double) num_triads;
+
 }
 
 
@@ -858,9 +903,25 @@ int get_transient_iters(double* amps, fftw_plan plan_c2r, fftw_plan plan_r2c, in
 	// get the no. of iterations
 	trans_iters = pow(10, trans_mag);
 
+
+	// Free memory
+	free(tmp_rhs);
+	fftw_free(u_z_tmp);
+
 	return trans_iters;
 }
 
+double theoretical_energy(double* a_k, int num_osc) {
+
+	// Initialize energy counter
+	double energy = 0.0;
+
+	for(int i = 0; i < num_osc; ++i) {
+		energy += pow(a_k[i], 2);
+	}
+
+	return 2.0 * energy / (num_osc - 1);
+}
 
 
 double system_energy(fftw_complex* u_z, int N) {
@@ -896,18 +957,160 @@ double system_enstrophy(fftw_complex* u_z, int* k, int N) {
 
 void fixed_point_search(int N, int Nmax, int k0, double a, double b, int iters, int save_step, char* u0) {
 
+	// Declare return flag for solver
 	int flag;
 
+	// Search for fixed points by looping over N
 	for (int i = N; i < Nmax; i+= 2)
 	{
 		printf("|------------- System Size N = %d -----------|\n", i);
 		flag = solver(i, k0, a, b, iters, save_step, u0);
 		if (flag == 0) {
 			printf("\n\n!!! No fixed point found - Exiting\n");
+
+			// Cleanup and exit
+			fftw_cleanup_threads();
+			fftw_cleanup();
 			exit(-1);
 		}
 	}
 }	
+
+void set_vel_inc_hist_bin_ranges(gsl_histogram** hist_incr, double* u, double* u_grad, int num_osc) {
+
+	// Initialize variables
+	int r;
+	int N_osc     = num_osc - 1;
+	int num_r_inc = 2;
+	int r_inc[num_r_inc];
+	r_inc[0] = 1;
+	r_inc[1] = N_osc;
+	double vel_inc;
+	double dx = 0.5 / (double)N_osc;
+	double min_bin_edge;
+	double max_bin_edge;
+
+	// Initialize running stats workspace - used to find min & max bin edges
+	gsl_rstat_workspace* vel_inc_stats[num_r_inc + 1];
+
+	
+	////////////////////////
+	// Compute Increments
+	////////////////////////
+	// Compute velocity increments
+	for (int r_indx = 0; r_indx < num_r_inc; ++r_indx) {
+		// Get current incr
+		r = r_inc[r_indx]; 
+	
+		// Initialize stats accumulator
+		vel_inc_stats[r_indx] = gsl_rstat_alloc();
+		for (int i = 0; i < 2 * N_osc; ++i) {
+			// Get current increment
+			vel_inc = (u[(i + r) % 2 * N_osc] - u[i]);
+
+			// Add incr to accumulator
+			gsl_rstat_add(vel_inc, vel_inc_stats[r_indx]);
+		}
+	}
+
+	// Get accumulator for the gradient
+	vel_inc_stats[num_r_inc] = gsl_rstat_alloc();
+	for (int i = 0; i < 2 * N_osc; ++i)
+	{
+		// Add next gradient value to accum
+		gsl_rstat_add(u_grad[i], vel_inc_stats[num_r_inc]);
+	}
+
+	//////////////////////
+	// Set Bin Ranges
+	//////////////////////
+	for (int i = 0; i < num_r_inc; ++i) {
+		// Get min & max of smallest incr
+		min_bin_edge = gsl_rstat_min(vel_inc_stats[i]);
+		max_bin_edge = gsl_rstat_max(vel_inc_stats[i]);
+		// Set bin ranges
+		// if ( (gsl_histogram_set_ranges_uniform(hist_incr[i], min_bin_edge - 0.05*fabs(min_bin_edge), max_bin_edge + 0.05*fabs(max_bin_edge) )) != 0 ) {
+		if ( (gsl_histogram_set_ranges_uniform(hist_incr[i], -BIN_LIM , BIN_LIM )) != 0 ) {
+			fprintf(stderr, "ERROR: unable to set ranges for the GSL histogram: Hist_Incrment[%d]\n", i);
+			exit(1);						
+		}
+	}
+
+	// Get min & max of gradient
+	min_bin_edge = gsl_rstat_min(vel_inc_stats[num_r_inc]);
+	max_bin_edge = gsl_rstat_max(vel_inc_stats[num_r_inc]);
+	// if ( (gsl_histogram_set_ranges_uniform(hist_incr[num_r_inc], min_bin_edge - 0.05*fabs(min_bin_edge), max_bin_edge + 0.05*fabs(max_bin_edge) )) != 0 ) {
+	if ( (gsl_histogram_set_ranges_uniform(hist_incr[num_r_inc], -BIN_LIM , BIN_LIM )) != 0 ) {
+		fprintf(stderr, "ERROR: unable to set ranges for the GSL histogram: %s\n", "VelocityGradient");
+		exit(1);						
+	}	
+
+	// Free memory
+	for (int i = 0; i < num_r_inc + 1; ++i) {
+		gsl_rstat_free(vel_inc_stats[i]);
+	}
+	
+}
+
+
+void compute_real_space_stats(gsl_histogram** hist_incr, gsl_rstat_workspace** incr_stat, double* str_func, double* str_func_abs, double* u, double* u_grad, int num_osc, int max_p) {
+
+	// Initialize variables
+	int r;
+	int N_osc     = num_osc - 1;
+	int num_r_inc = 2;
+	int r_inc[num_r_inc];
+	r_inc[0] = 1;
+	r_inc[1] = N_osc;
+	double vel_inc;
+	double vel_inc_abs;
+	double dx = 0.5 / (double)N_osc;
+
+
+	////////////////////////
+	// Compute Increments
+	////////////////////////
+	// Compute Velocity Incrments
+	for (int r_indx = 0; r_indx < num_r_inc; ++r_indx) {
+		// Get current incr
+		r = r_inc[r_indx]; 
+		
+		for (int i = 0; i < 2 * N_osc; ++i) {
+			// Get current increment
+			vel_inc = u[(i + r) % (2* N_osc)] - u[i];
+
+			// Add current vel inc to appropriate bin
+			gsl_histogram_increment(hist_incr[r_indx], vel_inc);
+
+			// Add current vel inc to accumulator
+			gsl_rstat_add(vel_inc, incr_stat[r_indx]);
+		}
+	}
+	
+	// Compute Gradient Histogram
+	for (int i = 0; i < 2 * N_osc; ++i)	{
+		// Add current gradient to appropriate bin
+		gsl_histogram_increment(hist_incr[num_r_inc], u_grad[i]);
+	}
+
+	///////////////////////////////
+	// Compute Structure Functions
+	///////////////////////////////
+	for (int p = 2; p < max_p; ++p) {
+		for (int r = 0; r < N_osc; ++r) {		
+			vel_inc = 0.0;
+ 			for (int i = 0; i < 2 * N_osc; ++i) {
+				// Get current increment
+				vel_inc     += pow(u[(i + r) % (2 * N_osc)] - u[i], p);
+				// vel_inc_abs += pow(fabs(u[(i + r) % (2 * N_osc)] - u[i]), p);
+			}
+			// Update structure func
+			str_func[(p - 2) * N_osc + r]     += vel_inc * dx;
+			// str_func_abs[(p - 2) * N_osc + r] += vel_inc_abs * dx;
+		}
+	}
+
+}
 
 
 int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0) {
@@ -927,7 +1130,7 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 
 	// Triad phases array
 	int k_range  = kmax - kmin + 1;
-	int k1_range = (int)((kmax - kmin + 1)/ 2.0);
+	int k1_range = (int)(k_range/ 2.0);
 
 	// print update every x iterations
 	int print_update = (iters >= 10 ) ? (int)((double)iters * 0.1) : 1;
@@ -941,17 +1144,18 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	//  Allocate memory
 	// ------------------------------
 	// wavenumbers
-	int* kx = (int* ) malloc(num_osc * sizeof(int));
+	int* kx = (int* ) malloc(sizeof(int) * num_osc);
 	mem_chk(kx, "kx");
 
 	// Oscillator arrays
-	double* amp = (double* ) malloc(num_osc * sizeof(double));
+	double* amp = (double* ) malloc(sizeof(double) * num_osc);
 	mem_chk(amp, "amp");
-	double* phi = (double* ) malloc(num_osc * sizeof(double));
+	double* phi = (double* ) malloc(sizeof(double) * num_osc);
 	mem_chk(phi, "phi");
 	#ifdef __FXD_PT_SEARCH__
-	double* rhs_prev = (double* ) malloc(num_osc * sizeof(double));
-	mem_chk(phi, "rhs_prev");
+	double* rhs_prev = (double* ) malloc(sizeof(double) * num_osc);
+	mem_chk(rhs_prev, "rhs_prev");
+	for (int i = 0; i < num_osc; ++i) rhs_prev[i] = 0.0;
 	double sum;
 	int iters_at_fxd_pt = 0;
 	#endif
@@ -959,10 +1163,6 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	// modes array
 	fftw_complex* u_z = (fftw_complex* ) fftw_malloc(num_osc * sizeof(fftw_complex));
 	mem_chk(u_z, "u_z");
-	#ifdef __REALSPACE
-	double* u = (double* ) malloc(N * sizeof(double));
-	mem_chk(u, "u");
-	#endif
 
 	// padded solution arrays
 	double* u_pad = (double* ) malloc(M * sizeof(double));
@@ -970,20 +1170,84 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	fftw_complex* u_z_pad = (fftw_complex* ) fftw_malloc((2 * num_osc - 1) * sizeof(fftw_complex));
 	mem_chk(u_z_pad, "u_z_pad");
 
-	#ifdef __TRIADS
+	#if defined(__REALSPACE) || defined(__REALSPACE_STATS)
+	double* u = (double* ) malloc(N * sizeof(double));
+	mem_chk(u, "u");
+	for (int i = 0; i < N; ++i) u[i] = 0.0;
+	#endif
+	#if defined(__GRAD) || defined(__REALSPACE_STATS)
+	fftw_complex* u_z_grad = (fftw_complex* ) fftw_malloc(sizeof(fftw_complex) * num_osc);
+	mem_chk(u_z_grad, "u_z_grad");
+	double* u_grad = (double* ) malloc(sizeof(double) * N);
+	mem_chk(u_grad, "u_grad");
+
+	for (int i = 0; i < N; ++i) {
+		u_grad[i] = 0.0;
+		if (i < num_osc){
+			u_z_grad[i] = 0.0 + 0.0 * I;
+		}
+	}
+	#endif
+	#ifdef __REALSPACE_STATS
+	// Initialize vel inc histogram & run stats
+	int num_r_inc = 2;
+	gsl_histogram* vel_inc_hist[num_r_inc + 1];
+	gsl_rstat_workspace* vel_inc_stats[num_r_inc + 1];
+
+	for (int i = 0; i < num_r_inc + 1; ++i) {
+	 	vel_inc_hist[i]  = gsl_histogram_alloc(NBIN_VELINC);
+	 	vel_inc_stats[i] = gsl_rstat_alloc();
+	 } 
+
+	// stucture function array
+	int max_p     = 6;
+	int num_stats = 0;
+	double *str_func     = (double *)malloc(sizeof(double) * (max_p - 2) * (num_osc - 1));
+	mem_chk(str_func, "str_func");
+	double *str_func_abs = (double *)malloc(sizeof(double) * (max_p - 2) * (num_osc - 1));
+	mem_chk(str_func_abs, "str_func_abs");
+	for (int i = 0; i < (max_p - 2); ++i) {
+		for (int j = 0; j < (num_osc - 1); ++j) {
+			str_func[i * (num_osc - 1) + j]     = 0.0;
+			// str_func_abs[i * (num_osc - 1) + j] = 0.0;
+		}
+	}
+	#endif
+	#if  defined(__TRIADS) || defined(__TRIAD_STATS)
+	// Initialize tirad array
 	double* triads = (double* )malloc(k_range * k1_range * sizeof(double));
 	mem_chk(triads, "triads");
 	// initialize triad array to handle empty elements
 	for (int i = 0; i < k_range; ++i) {
-		tmp = i * k1_range;
 		for (int j = 0; j < k1_range; ++j) {
-			indx = tmp + j;
-			triads[indx] = -10.0;
+			triads[i * k1_range + j] = -10.0;
 		}
 	}
-	fftw_complex triad_phase_order = 0.0 + I * 0.0;
-	#endif
 
+	// Initialize phase order variable
+	fftw_complex triad_phase_order = 0.0 + I * 0.0;
+
+	#ifdef __TRIAD_STATS
+	int num_triad_stats = 0;
+	// Initialize triad centroid arrays
+	fftw_complex* triad_centroid = (fftw_complex* )fftw_malloc(k_range * k1_range * sizeof(fftw_complex));
+	mem_chk(triad_centroid, "triad_centroid");
+	double* triad_cent_R         = (double* )malloc(k_range * k1_range * sizeof(double));
+	mem_chk(triad_cent_R, "triad_cent_R");
+	double* triad_cent_Phi       = (double* )malloc(k_range * k1_range * sizeof(double));
+	mem_chk(triad_cent_Phi, "triad_cent_Phi");
+
+	// Set to -10 to make handling empty elements easier later
+	for (int i = 0; i < k_range; ++i) {
+		for (int j = 0; j < k1_range; ++j) {
+			triad_centroid[i * k1_range + j] = -10.0 -10.0 * I;
+			triad_cent_R[i * k1_range + j]   = -10.0;
+			triad_cent_Phi[i * k1_range + j] = -10.0;
+		}
+	}
+	#endif
+	#endif
+	
 
 	// ------------------------------
 	// Runge-Kutta Variables / Arrays
@@ -1018,7 +1282,7 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	// create plans - ensure no overwriting - fill arrays after
 	fftw_plan_r2c_pad = fftw_plan_dft_r2c_1d(M, u_pad, u_z_pad, FFTW_PRESERVE_INPUT); 
 	fftw_plan_c2r_pad = fftw_plan_dft_c2r_1d(M, u_z_pad, u_pad, FFTW_PRESERVE_INPUT);
-	#ifdef __REALSPACE
+	#if defined(__REALSPACE) || defined(__REALSPACE_STATS) || defined(__GRAD)
 	fftw_plan fftw_plan_r2c, fftw_plan_c2r;
 	fftw_plan_r2c = fftw_plan_dft_r2c_1d(N, u, u_z, FFTW_PRESERVE_INPUT); 
 	fftw_plan_c2r = fftw_plan_dft_c2r_1d(N, u_z, u, FFTW_PRESERVE_INPUT);
@@ -1068,16 +1332,16 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 
 
 	// create hdf5 handle identifiers for hyperslabing the full evolution data
-	hid_t HDF_file_space[5];
-	hid_t HDF_data_set[5];
-	hid_t HDF_mem_space[5];
+	hid_t HDF_file_space[6];
+	hid_t HDF_data_set[6];
+	hid_t HDF_mem_space[6];
 
 	// get output file name
 	char output_file_name[512];
 	get_output_file_name(output_file_name, N, k0, a, b, u0, ntsteps, trans_iters);
 
 	// Create complex datatype for hdf5 file if modes are being recorded
-	#ifdef __MODES
+	#if defined(__MODES) || defined(__TRIAD_STATS)
 	hid_t COMPLEX_DATATYPE = create_complex_datatype();
 	#else
 	hid_t COMPLEX_DATATYPE = -1;
@@ -1111,13 +1375,13 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	// compute triads for initial conditions
 	triad_phases(triads, &triad_phase_order, phi, kmin, kmax);
 	
-	// // then write the current modes to this hyperslab
+	// then write the current modes to this hyperslab
 	write_hyperslab_data(HDF_file_space[1], HDF_data_set[1], HDF_mem_space[1], H5T_NATIVE_DOUBLE, triads, "triads", k_range * k1_range, 0);
 
 	// Write initial order param values
 	phase_order_R[0]   = cabs(triad_phase_order);
 	phase_order_Phi[0] = carg(triad_phase_order);
-	#endif __TRIADS
+	#endif
 
 	#ifdef __MODES
 	// Write Initial condition for modes
@@ -1147,6 +1411,9 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	#else
 	int save_data_indx = 1;
 	#endif
+
+	clock_t begin;
+
 
 	// ------------------------------
 	//  Begin Integration
@@ -1206,37 +1473,95 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 		// Print to file
 		////////////
 		if ((iter > trans_iters) && (iter % save_step == 0)) {
+			if (save_data_indx == 0) {
+				begin = clock();
+			}
+			
+			#ifdef __PHASES
 			// Write phases
 			write_hyperslab_data(HDF_file_space[0], HDF_data_set[0], HDF_mem_space[0], H5T_NATIVE_DOUBLE, phi, "phi", num_osc, save_data_indx);
+			#endif
 
-			#ifdef __TRIADS
+			#if defined(__TRIADS) || defined(__TRIAD_STATS)
 			// compute triads for initial conditions
 			triad_phases(triads, &triad_phase_order, phi, kmin, kmax);
+
+	
+			#ifdef __TRIAD_STATS
+			for (int k = kmin; k <= kmax; ++k) {
+				tmp = (k - kmin) * (int) ((kmax - kmin + 1) / 2.0);
+				for (int k1 = kmin; k1 <= (int) (k / 2.0); ++k1) {
+					indx = tmp + (k1 - kmin);
+					// update triad centroid
+					triad_centroid[indx] += cexp(I * triads[indx]);
+				}
+			}
+			// Increment triad stats counter
+			num_triad_stats++;
+			#endif
+			#endif
 			
+			#ifdef __TRIADS
 			// write triads
 			write_hyperslab_data(HDF_file_space[1], HDF_data_set[1], HDF_mem_space[1], H5T_NATIVE_DOUBLE, triads, "triads", k_range * k1_range, save_data_indx);
 
 			phase_order_R[save_data_indx]   = cabs(triad_phase_order);
 			phase_order_Phi[save_data_indx] = carg(triad_phase_order);
 			#endif
-			#ifdef __MODES || __REALSPACE
+
+			#if defined(__MODES) || defined(__GRAD) || defined(__REALSPACE) || defined(__REALSPACE_STATS)
 			// Construct the modes
 			for (int i = 0; i < num_osc; ++i) {
 				u_z[i] = amp[i] * cexp(I * phi[i]);
+
+				#if defined(__GRAD) || defined(__REALSPACE_STATS)
+				u_z_grad[i] = I * kx[i] * u_z[i];
+				#endif
 			}
 			#endif
+
 			#ifdef __MODES
 			// Write current modes
 			write_hyperslab_data(HDF_file_space[2], HDF_data_set[2], HDF_mem_space[2], COMPLEX_DATATYPE, u_z, "u_z", num_osc, save_data_indx);
 			#endif
+
 			#ifdef __RHS
 			// Write RHS
 			write_hyperslab_data(HDF_file_space[4], HDF_data_set[4], HDF_mem_space[4], H5T_NATIVE_DOUBLE, RK1, "RHS", num_osc, save_data_indx);
 			#endif
-			#ifdef __REALSPACE 
+
+			#if defined(__REALSPACE) || defined(__REALSPACE_STATS) 
 			// transform back to Real Space
 			fftw_execute_dft_c2r(fftw_plan_c2r, u_z, u);
+			// fftw_execute_dft_c2r((*plan_c2r_pad), u_z_tmp, u_tmp);
+			for (int i = 0; i < N; ++i)	{
+				u[i] /= (double) N;  // Normalize inverse transfom
+			}
+			#endif
 
+			#if defined(__GRAD) || defined(__REALSPACE_STATS) 
+			// transform back to Real Space
+			fftw_execute_dft_c2r(fftw_plan_c2r, u_z_grad, u_grad);
+			for (int i = 0; i < N; ++i)	{
+				u_grad[i] /= (double) N;  // Normalize inverse transfom
+			}
+			#endif
+
+			#ifdef __REALSPACE_STATS			
+			// If first non-transient iteration - set bin edges
+			if ((trans_iters > 0) && (save_data_indx == 0)) {
+				set_vel_inc_hist_bin_ranges(vel_inc_hist, u, u_grad, num_osc);
+			}
+
+			compute_real_space_stats(vel_inc_hist, vel_inc_stats, str_func, str_func_abs, u, u_grad, num_osc, max_p);
+			num_stats++;
+			#endif
+
+			#ifdef __GRAD
+			// Write real space
+			write_hyperslab_data(HDF_file_space[5], HDF_data_set[5], HDF_mem_space[5], H5T_NATIVE_DOUBLE, u_grad, "u_grad", N, save_data_indx);
+			#endif
+			#ifdef __REALSPACE
 			// Write real space
 			write_hyperslab_data(HDF_file_space[3], HDF_data_set[3], HDF_mem_space[3], H5T_NATIVE_DOUBLE, u, "u", N, save_data_indx);
 			#endif
@@ -1289,9 +1614,23 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 		iter++;
 	}
 	// ------------------------------
+	//  End Integration
+	// ------------------------------
+
+	// Finish timing
+	clock_t end = clock();
+
+	// calculate execution time
+	double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+
+	printf("\n\n\tTotal Execution Time: %20.16lf\n\n", time_spent);
+
+
+
+	// ------------------------------
 	//  Write 1D Arrays Using HDF5Lite
 	// ------------------------------
-	hid_t D1 = 1;
+	const hid_t D1 = 1;
 	hid_t D1dims[D1];
 
 	// Write amplitudes
@@ -1318,14 +1657,127 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 		printf("\n\n!!Failed to make - PhaseOrderPhi - Dataset!!\n\n");
 	}
 	#endif
+	#ifdef __REALSPACE_STATS
+	char dset_name_binedges[256];
+	char dset_name_bincounts[256];
+	double vel_inc_stats_data[num_r_inc + 1][4];
+	for (int i = 0; i < num_r_inc + 1; ++i) {
+		// Set dataset names
+		if (i < num_r_inc) {
+			sprintf(dset_name_binedges, "VelInc[%d]_BinEdges", i);
+			sprintf(dset_name_bincounts, "VelInc[%d]_BinCounts", i);
+		} 
+		else {
+			strcpy(dset_name_binedges, "VelGrad_BinEdges");
+			strcpy(dset_name_bincounts, "VelGrad_BinCounts");
+		}
+		
+		// Write the bin edges
+		D1dims[0] = NBIN_VELINC + 1;
+		if ( (H5LTmake_dataset(HDF_Outputfile_handle, dset_name_binedges, D1, D1dims, H5T_NATIVE_DOUBLE, vel_inc_hist[i]->range)) < 0) {
+			printf("\n\n!!Failed to make - %s - Dataset!!\n\n", dset_name_binedges);
+		}
+		// Write the bin counts
+		D1dims[0] = NBIN_VELINC;
+		if ( (H5LTmake_dataset(HDF_Outputfile_handle, dset_name_bincounts, D1, D1dims, H5T_NATIVE_DOUBLE, vel_inc_hist[i]->bin)) < 0) {
+			printf("\n\n!!Failed to make - %s - Dataset!!\n\n", dset_name_bincounts);
+		}		
+		
+		// Collect Stats
+		vel_inc_stats_data[i][0] = gsl_rstat_mean(vel_inc_stats[i]); 
+		vel_inc_stats_data[i][1] = gsl_rstat_variance(vel_inc_stats[i]); 
+		vel_inc_stats_data[i][2] = gsl_rstat_skew(vel_inc_stats[i]); 
+		vel_inc_stats_data[i][3] = gsl_rstat_kurtosis(vel_inc_stats[i]); 				
+	}	
 
+	// Write stats
+	const hid_t D2 = 2;
+	hid_t D2dims[D2];
+	D2dims[0] = num_r_inc + 1;
+	D2dims[1] = 4;
+	if ( (H5LTmake_dataset(HDF_Outputfile_handle, "VelIncStats", D2, D2dims, H5T_NATIVE_DOUBLE, vel_inc_stats_data)) < 0) {
+		printf("\n\n!!Failed to make - %s - Dataset!!\n\n", "VelIncStats");
+	}	
+
+	// Normalize and write structure functions
+	double str_funcs[max_p - 2][num_osc - 1];
+	double str_funcs_abs[max_p - 2][num_osc - 1];
+	for (int p = 2; p < max_p; ++p) {
+		for (int r = 0; r < num_osc - 1; ++r) {
+			str_funcs[p - 2][r]     = str_func[(p - 2) * (num_osc - 1) + r] / num_stats;
+			str_funcs_abs[p - 2][r] = str_func_abs[(p - 2) * (num_osc - 1) + r] / num_stats;
+		}
+	}
+	D2dims[0] = (max_p - 2);
+	D2dims[1] = (num_osc - 1);
+	if ( (H5LTmake_dataset(HDF_Outputfile_handle, "StructureFuncs", D2, D2dims, H5T_NATIVE_DOUBLE, str_funcs)) < 0) {
+		printf("\n\n!!Failed to make - %s - Dataset!!\n\n", "StructureFuncs");
+	}
+	if ( (H5LTmake_dataset(HDF_Outputfile_handle, "StructureFuncsAbs", D2, D2dims, H5T_NATIVE_DOUBLE, str_funcs_abs)) < 0) {
+		printf("\n\n!!Failed to make - %s - Dataset!!\n\n", "StructureFuncsAbs");
+	}	
+	#endif
+	#ifdef __TRIAD_STATS
+	D1dims[0] = k_range * k1_range;
+
+	for (int k = kmin; k <= kmax; ++k) {
+		tmp = (k - kmin) * (int) ((kmax - kmin + 1) / 2.0);
+		for (int k1 = kmin; k1 <= (int) (k / 2.0); ++k1) {
+			indx = tmp + (k1 - kmin);
+
+			triad_centroid[indx] /= num_triad_stats;
+			triad_cent_R[indx]   = cabs(triad_centroid[indx]);
+			triad_cent_Phi[indx] = carg(triad_centroid[indx]);
+		}
+	}
+	if ( (H5LTmake_dataset(HDF_Outputfile_handle, "TriadCentroid_R", D1, D1dims, H5T_NATIVE_DOUBLE, triad_cent_R)) < 0) {
+		printf("\n\n!!Failed to make - TriadCentroid_R - Dataset!!\n\n");
+	}
+	if ( (H5LTmake_dataset(HDF_Outputfile_handle, "TriadCentroid_Phi", D1, D1dims, H5T_NATIVE_DOUBLE, triad_cent_Phi)) < 0) {
+		printf("\n\n!!Failed to make - TriadCentroid_Phi - Dataset!!\n\n");
+	}
+
+	// Create dataspace
+    hid_t triad_cent_dspace = H5Screate_simple(D1, D1dims, NULL);
+
+    // Create dataset
+	hid_t triad_cent_dset = H5Dcreate2(HDF_Outputfile_handle, "TriadCentroid", COMPLEX_DATATYPE, triad_cent_dspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+
+	// Write dataset
+	H5Dwrite(triad_cent_dset, COMPLEX_DATATYPE, H5S_ALL, H5S_ALL, H5P_DEFAULT, triad_centroid);
+
+
+	// Create attribute data for the triad_centroid dimensions
+	hid_t triad_cent, triad_cent_space;
+
+	hsize_t t_adims[1];
+	t_adims[0] = 2;
+	t_adims[1] = 2;
+
+	triad_cent_space = H5Screate_simple(2, t_adims, NULL);
+
+	triad_cent = H5Acreate(triad_cent_dset, "Triad_Dims", H5T_NATIVE_INT, triad_cent_space, H5P_DEFAULT, H5P_DEFAULT);
+
+	int triad_cent_dims[2];
+	triad_cent_dims[0] = k_range;
+	triad_cent_dims[1] = k1_range;
+
+    herr_t status = H5Awrite(triad_cent, H5T_NATIVE_INT, triad_cent_dims);
+
+	// close the created property list
+	status = H5Aclose(triad_cent);
+    status = H5Sclose(triad_cent_space);
+    // Close datasets and spaces
+	H5Dclose(triad_cent_dset);
+	H5Sclose(triad_cent_dspace);
+	#endif
 
 
 	// ------------------------------
 	//  Clean Up
 	// ------------------------------
 	// destroy fftw plans
-	#ifdef __REALSPACE
+	#if defined(__REALSPACE) || defined(__REALSPACE_STATS) || defined(__GRAD)
 	fftw_destroy_plan(fftw_plan_r2c);
 	fftw_destroy_plan(fftw_plan_c2r);
 	#endif
@@ -1333,17 +1785,45 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	fftw_destroy_plan(fftw_plan_c2r_pad);
 
 
+	#ifdef __REALSPACE_STATS
+	// Free gsl histogram and running stat structs
+	for (int i = 0; i < num_r_inc + 1; ++i){
+		gsl_histogram_free(vel_inc_hist[i]);
+		gsl_rstat_free(vel_inc_stats[i]);
+	}
+	#endif
+
+
 
 	// free memory
 	free(kx);
+	free(amp);
+	free(phi);
 	free(u_pad);
-	#ifdef __REALSPACE
+	#ifdef __FXD_PT_SEARCH__
+	free(rhs_prev);
+	#endif
+	#if defined(__REALSPACE) || defined(__REALSPACE_STATS)
 	free(u);
 	#endif
-	#ifdef __TRIADS
+	#if defined(__GRAD) || defined(__REALSPACE_STATS)
+	fftw_free(u_z_grad);
+	free(u_grad);
+	#endif
+	#if defined(__TRIADS) || defined(__TRIAD_STATS)
 	free(triads);	
+	#endif
+	#ifdef __TRIADS
 	free(phase_order_Phi);
 	free(phase_order_R);
+	#endif	
+	#ifdef __TRIAD_STATS
+	free(triad_centroid);	
+	free(triad_cent_R);
+	free(triad_cent_Phi);
+	#endif
+	#ifdef __REALSPACE_STATS
+	free(str_func);
 	#endif
 	free(time_array);
 	fftw_free(u_z);
@@ -1354,10 +1834,13 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	fftw_free(u_z_tmp);
 	fftw_free(u_z_pad);
 
-	// close HDF5 handles
+
+	// Close HDF5 handles
+	#ifdef __PHASES
 	H5Sclose( HDF_mem_space[0] );
 	H5Dclose( HDF_data_set[0] );
 	H5Sclose( HDF_file_space[0] );
+	#endif
 	#ifdef __TRIADS
 	H5Sclose( HDF_mem_space[1] );
 	H5Dclose( HDF_data_set[1] );
@@ -1377,6 +1860,11 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	H5Sclose( HDF_mem_space[4] );
 	H5Dclose( HDF_data_set[4] );
 	H5Sclose( HDF_file_space[4] );
+	#endif
+	#ifdef __GRAD
+	H5Sclose( HDF_mem_space[5] );
+	H5Dclose( HDF_data_set[5] );
+	H5Sclose( HDF_file_space[5] );
 	#endif
 
 	// Close pipeline to output file

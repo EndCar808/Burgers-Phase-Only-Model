@@ -211,23 +211,23 @@ if __name__ == '__main__':
 	#########################
 	##  Plot data
 	#########################
-	## Create Process list  
-	# procLim  = 9
+	# Create Process list  
+	procLim  = 9
 
 
-	# ## Create iterable group of processes
-	# groups_args =  [(mprocs.Process(target = plot_precession, args = (N, k0, a, beta, u0, iters, trans, win_size)) for a in alpha)] * procLim 
+	## Create iterable group of processes
+	groups_args =  [(mprocs.Process(target = plot_precession, args = (N, k0, a, beta, u0, iters, trans, win_size)) for a in alpha)] * procLim 
 
 
-	# ## Loop of grouped iterable
-	# for procs in zip_longest(*groups_args): 
-	# 	processes = []
-	# 	for p in filter(None, procs):
-	# 	    processes.append(p)
-	# 	    p.start()
+	## Loop of grouped iterable
+	for procs in zip_longest(*groups_args): 
+		processes = []
+		for p in filter(None, procs):
+		    processes.append(p)
+		    p.start()
 
-	# 	for process in processes:
-	# 	    process.join()
+		for process in processes:
+		    process.join()
 		    
 		    
 		    

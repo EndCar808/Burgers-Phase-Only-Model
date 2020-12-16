@@ -16,7 +16,7 @@
 #include <hdf5_hl.h>
 #include <omp.h>
 #include <gsl/gsl_cblas.h>
-
+#include <gsl/gsl_histogram.h>
 
 // ---------------------------------------------------------------------
 //  User Libraries and Headers
@@ -52,14 +52,12 @@ int main(int argc, char** argv) {
 	int tsteps     = atoi(argv[6]);
 	int save_steps = SAVE_DATA_STEP;
 
-
-	printf("tsteps: %d\n", tsteps);
-
 	int Nmax = N * 2;
 
 	// Initial Condition
 	char u0[128];
 	strcpy(u0, argv[5]);
+
 
 	// Get the number of threads 
 	int n_threads = 1;
@@ -93,6 +91,10 @@ int main(int argc, char** argv) {
 	// ------------------------------
 	#endif
 
+
+	// Clean up FFTW
+	fftw_cleanup_threads();
+	fftw_cleanup();
 	
 	// Finish timing
 	clock_t end = clock();

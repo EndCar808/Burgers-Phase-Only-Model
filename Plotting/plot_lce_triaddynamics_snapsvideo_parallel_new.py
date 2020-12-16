@@ -58,26 +58,26 @@ def plot_snaps(i, x, u_urms, du_x_rms, time, triads, kmin, kmax, phases, R, Phi,
     ax1.set_ylim(-3.2, 3.2)
     ax1.set_xlabel(r'$x$')
     ax1.set_ylabel(r'$u(x, t) / u_{rms}(x, t)$', color = 'blue')
-    ax1.set_xticks([0.0, np.pi/2.0, np.pi, 1.5*np.pi, 2*np.pi]);
-    ax1.set_xticklabels([r"$0$", r"$\frac{\pi}{2}$", r"$\pi$", r"$\frac{3\pi}{2}$", r"$2 \pi$"]);
+    ax1.set_xticks([0.0, np.pi/2.0, np.pi, 1.5*np.pi, 2*np.pi])
+    ax1.set_xticklabels([r"$0$", r"$\frac{\pi}{2}$", r"$\pi$", r"$\frac{3\pi}{2}$", r"$2 \pi$"])
     leg1 = mpl.patches.Rectangle((0, 0), 0, 0, alpha = 0.0)
     ax1.legend([leg1], [r"$T=({:04.3f})$".format(time)], handlelength = -0.5, fancybox = True, prop = {'size': 10})
     ax1.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
 
     ## PDF
     ax2 = fig.add_subplot(gs[0, 1])
-    hist, bins  = np.histogram(np.extract(triads != -10, triads).flatten(), range = (0.0 - 0.5, 2.0 * np.pi + 0.5), bins = 100, density = True);
+    hist, bins  = np.histogram(np.extract(triads != -10, triads).flatten(), range = (0.0 - 0.5, 2.0 * np.pi + 0.5), bins = 100, density = True)
     bin_centers = (bins[1:] + bins[:-1]) * 0.5
     ax2.plot(bin_centers, hist)
-    ax2.set_xlim(-0.05, 2 * np.pi+0.05);
+    ax2.set_xlim(-0.05, 2 * np.pi+0.05)
     ax2.set_ylim(1e-4, 10)
-    ax2.axhline(y = 1 / (2 * np.pi), xmin = 0, xmax = 1., ls = '--', c = 'black');
-    ax2.set_xticks([0.0, np.pi/2.0, np.pi, 1.5*np.pi, 2*np.pi]);
-    ax2.set_xticklabels([r"$0$", r"$\frac{\pi}{2}$", r"$\pi$", r"$\frac{3\pi}{2}$", r"$2 \pi$"]);
-    ax2.set_xlabel(r'$\varphi_{k_1, k_3 - k_1}^{k_3}(t)$');
-    ax2.set_ylabel(r'PDF');
-    ax2.set_yscale('log');
-    ax2.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both');
+    ax2.axhline(y = 1 / (2 * np.pi), xmin = 0, xmax = 1., ls = '--', c = 'black')
+    ax2.set_xticks([0.0, np.pi/2.0, np.pi, 1.5*np.pi, 2*np.pi])
+    ax2.set_xticklabels([r"$0$", r"$\frac{\pi}{2}$", r"$\pi$", r"$\frac{3\pi}{2}$", r"$2 \pi$"])
+    ax2.set_xlabel(r'$\varphi_{k_1, k_3 - k_1}^{k_3}(t)$')
+    ax2.set_ylabel(r'PDF')
+    ax2.set_yscale('log')
+    ax2.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
 
     ## PHASES - BARPLOT
     ax3  = fig.add_subplot(gs[1, 0])
@@ -104,7 +104,7 @@ def plot_snaps(i, x, u_urms, du_x_rms, time, triads, kmin, kmax, phases, R, Phi,
     ax5.set_ylabel(r'$\phi_k$', rotation = 0, labelpad = 10)
     ax5.set_yticks([0, np.pi / 2.0, np.pi, 3.0 * np.pi / 2.0, 2.0 * np.pi])
     ax5.set_yticklabels([r"$0$", r"$\frac{\pi}{2}$", r"$\pi$", r"$\frac{3\pi}{2}$", r"$2\pi$"])
-    ax5.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both');
+    ax5.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
 
 
     ## PHASES - vs k
@@ -117,7 +117,7 @@ def plot_snaps(i, x, u_urms, du_x_rms, time, triads, kmin, kmax, phases, R, Phi,
     ax6.set_yticks([0.5, 1.0, np.pi / 2.0, np.pi])
     ax6.set_yticklabels([r"$0.5$", r"$1.0$", r"$\frac{\pi}{2}$", r"$\pi$"])
     ax6.legend([r"$\mathcal{R}(t)$", r"$\Phi(t)$"])
-    ax6.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both');
+    ax6.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
 
 
     ## TRIADS
@@ -272,11 +272,11 @@ if __name__ == '__main__':
 	######################
 	##	Preliminary Calcs
 	######################
-	ntsteps = len(time);
-	num_osc = phases.shape[1];
-	N       = 2 * (num_osc - 1);
-	kmin    = k0 + 1;
-	kmax    = num_osc - 1;
+	ntsteps = len(time)
+	num_osc = phases.shape[1]
+	N       = 2 * (num_osc - 1)
+	kmin    = k0 + 1
+	kmax    = num_osc - 1
 
 
 

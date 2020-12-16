@@ -45,7 +45,7 @@ def compute_triads(phases, kmin, kmax):
 	print("\n...Computing Triads...\n")
 
 	## Variables
-	numTriads  = 0;
+	numTriads  = 0
 	k3_range   = int(kmax - kmin + 1)
 	k1_range   = int((kmax - kmin + 1) / 2)
 	time_steps = phases.shape[0]
@@ -85,7 +85,6 @@ def compute_velinc(u, rlen):
 		for i in range(u.shape[0]):
 			for j in range(u.shape[1]):
 					du_r[i, j, r_indx] = u[i, np.mod(j + r, u.shape[1])] - u[i, j]
-
 
 	return du_r, rList
 

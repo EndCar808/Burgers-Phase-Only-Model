@@ -691,8 +691,12 @@ void compute_lce_spectrum_clvs(int N, double a, double b, char* u0, int k0, int 
 	mem_chk(triads, "triads");
 	
 	// initialize triad array to handle empty elements
-	memset(triads, -10.0, sizeof(double) * k_range * k1_range);
-
+	for (int i = 0; i < k_range; ++i) {
+		for (int j = 0; j < k1_range; ++j) {
+			triads[i * k1_range + j] = -10.0;
+		}
+	}
+	
 	// Initilaize Phase Order peramter
 	fftw_complex triad_phase_order;
 	triad_phase_order = 0.0 + I * 0.0;

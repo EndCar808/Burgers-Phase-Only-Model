@@ -6,8 +6,8 @@
 // ---------------------------------------------------------------------
 //  Standard Libraries and Headers
 // ---------------------------------------------------------------------
-
-
+#include <gsl/gsl_histogram.h>
+#include <gsl/gsl_rstat.h>
 
 // ---------------------------------------------------------------------
 //  User Libraries and Headers
@@ -43,6 +43,9 @@ void conv_direct(fftw_complex* convo, fftw_complex* u_z, int n, int k0);
 void po_rhs(double* rhs, fftw_complex* u_z, fftw_plan *plan_c2r_pad, fftw_plan *plan_r2c_pad, int* kx, int n, int num_osc, int k0);
 
 void triad_phases(double* triads, fftw_complex* phase_order, double* phi, int kmin, int kmax);
+
+void set_vel_inc_hist_bin_ranges(gsl_histogram** hist_incr, double* u, double* u_grad, int num_osc);
+void compute_real_space_stats(gsl_histogram** hist_incr, gsl_rstat_workspace** incr_stat, double* str_func, double* str_func_abs, double* u, double* u_grad, int num_osc, int max_p);
 
 double system_energy(fftw_complex* u_z, int N);
 double system_enstrophy(fftw_complex* u_z, int* k, int N);
