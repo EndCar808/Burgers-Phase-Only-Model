@@ -987,8 +987,7 @@ void set_vel_inc_hist_bin_ranges(gsl_histogram** hist_incr, double* u, double* u
 	r_inc[1] = N_osc;
 	double vel_inc;
 	double dx = 0.5 / (double)N_osc;
-	double min_bin_edge;
-	double max_bin_edge;
+	double varaince;
 
 	// Initialize running stats workspace - used to find min & max bin edges
 	gsl_rstat_workspace* vel_inc_stats[num_r_inc + 1];
@@ -1025,22 +1024,17 @@ void set_vel_inc_hist_bin_ranges(gsl_histogram** hist_incr, double* u, double* u
 	// Set Bin Ranges
 	//////////////////////
 	for (int i = 0; i < num_r_inc; ++i) {
-		// Get min & max of smallest incr
-		min_bin_edge = gsl_rstat_min(vel_inc_stats[i]);
-		max_bin_edge = gsl_rstat_max(vel_inc_stats[i]);
-		// Set bin ranges
-		// if ( (gsl_histogram_set_ranges_uniform(hist_incr[i], min_bin_edge - 0.05*fabs(min_bin_edge), max_bin_edge + 0.05*fabs(max_bin_edge) )) != 0 ) {
-		if ( (gsl_histogram_set_ranges_uniform(hist_incr[i], -BIN_LIM , BIN_LIM )) != 0 ) {
+		// Get the variance of the smallest incr
+		varaince = gsl_rstat_variance(vel_inc_stats[i]);
+		if ( (gsl_histogram_set_ranges_uniform(hist_incr[i], -BIN_LIM * sqrt(varaince), BIN_LIM * sqrt(varaince))) != 0 ) {
 			fprintf(stderr, "ERROR: unable to set ranges for the GSL histogram: Hist_Incrment[%d]\n", i);
 			exit(1);						
 		}
 	}
 
-	// Get min & max of gradient
-	min_bin_edge = gsl_rstat_min(vel_inc_stats[num_r_inc]);
-	max_bin_edge = gsl_rstat_max(vel_inc_stats[num_r_inc]);
-	// if ( (gsl_histogram_set_ranges_uniform(hist_incr[num_r_inc], min_bin_edge - 0.05*fabs(min_bin_edge), max_bin_edge + 0.05*fabs(max_bin_edge) )) != 0 ) {
-	if ( (gsl_histogram_set_ranges_uniform(hist_incr[num_r_inc], -BIN_LIM , BIN_LIM )) != 0 ) {
+	// Get the variance of the gradient
+	varaince = gsl_rstat_variance(vel_inc_stats[num_r_inc]);
+	if ( (gsl_histogram_set_ranges_uniform(hist_incr[num_r_inc], -BIN_LIM * sqrt(varaince), BIN_LIM * sqrt(varaince))) != 0 ) {
 		fprintf(stderr, "ERROR: unable to set ranges for the GSL histogram: %s\n", "VelocityGradient");
 		exit(1);						
 	}	
@@ -1053,7 +1047,7 @@ void set_vel_inc_hist_bin_ranges(gsl_histogram** hist_incr, double* u, double* u
 }
 
 
-void compute_real_space_stats(gsl_histogram** hist_incr, gsl_rstat_workspace** incr_stat, double* str_func, double* str_func_abs, double* u, double* u_grad, int num_osc, int max_p) {
+void compute_real_space_stats(gsl_histogram** hist_incr, gsl_rstat_workspace** incr_stat, double* str_func, double* u, double* u_grad, int num_osc, int max_p) {
 
 	// Initialize variables
 	int r;
@@ -1096,17 +1090,15 @@ void compute_real_space_stats(gsl_histogram** hist_incr, gsl_rstat_workspace** i
 	///////////////////////////////
 	// Compute Structure Functions
 	///////////////////////////////
-	for (int p = 2; p < max_p; ++p) {
-		for (int r = 0; r < N_osc; ++r) {		
+	for (int p = 2; p <= max_p; ++p) {
+		for (int r = 1; r <= N_osc; ++r) {		
 			vel_inc = 0.0;
  			for (int i = 0; i < 2 * N_osc; ++i) {
 				// Get current increment
 				vel_inc     += pow(u[(i + r) % (2 * N_osc)] - u[i], p);
-				// vel_inc_abs += pow(fabs(u[(i + r) % (2 * N_osc)] - u[i]), p);
 			}
 			// Update structure func
-			str_func[(p - 2) * N_osc + r]     += vel_inc * dx;
-			// str_func_abs[(p - 2) * N_osc + r] += vel_inc_abs * dx;
+			str_func[(p - 2) * N_osc + (r - 1)]+= vel_inc * dx;
 		}
 	}
 
@@ -1202,14 +1194,11 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	// stucture function array
 	int max_p     = 6;
 	int num_stats = 0;
-	double *str_func     = (double *)malloc(sizeof(double) * (max_p - 2) * (num_osc - 1));
+	double *str_func     = (double *)malloc(sizeof(double) * (max_p - 2 + 1) * (num_osc - 1));
 	mem_chk(str_func, "str_func");
-	double *str_func_abs = (double *)malloc(sizeof(double) * (max_p - 2) * (num_osc - 1));
-	mem_chk(str_func_abs, "str_func_abs");
-	for (int i = 0; i < (max_p - 2); ++i) {
+	for (int i = 0; i < (max_p - 2 + 1); ++i) {
 		for (int j = 0; j < (num_osc - 1); ++j) {
-			str_func[i * (num_osc - 1) + j]     = 0.0;
-			// str_func_abs[i * (num_osc - 1) + j] = 0.0;
+			str_func[i * (num_osc - 1) + j] = 0.0;
 		}
 	}
 	#endif
@@ -1553,7 +1542,7 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 				set_vel_inc_hist_bin_ranges(vel_inc_hist, u, u_grad, num_osc);
 			}
 
-			compute_real_space_stats(vel_inc_hist, vel_inc_stats, str_func, str_func_abs, u, u_grad, num_osc, max_p);
+			compute_real_space_stats(vel_inc_hist, vel_inc_stats, str_func, u, u_grad, num_osc, max_p);
 			num_stats++;
 			#endif
 
@@ -1700,21 +1689,16 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	}	
 
 	// Normalize and write structure functions
-	double str_funcs[max_p - 2][num_osc - 1];
-	double str_funcs_abs[max_p - 2][num_osc - 1];
-	for (int p = 2; p < max_p; ++p) {
+	double str_funcs[max_p - 2 + 1][num_osc - 1];
+	for (int p = 2; p <= max_p; ++p) {
 		for (int r = 0; r < num_osc - 1; ++r) {
 			str_funcs[p - 2][r]     = str_func[(p - 2) * (num_osc - 1) + r] / num_stats;
-			str_funcs_abs[p - 2][r] = str_func_abs[(p - 2) * (num_osc - 1) + r] / num_stats;
 		}
 	}
-	D2dims[0] = (max_p - 2);
+	D2dims[0] = (max_p - 2 + 1);
 	D2dims[1] = (num_osc - 1);
 	if ( (H5LTmake_dataset(HDF_Outputfile_handle, "StructureFuncs", D2, D2dims, H5T_NATIVE_DOUBLE, str_funcs)) < 0) {
 		printf("\n\n!!Failed to make - %s - Dataset!!\n\n", "StructureFuncs");
-	}
-	if ( (H5LTmake_dataset(HDF_Outputfile_handle, "StructureFuncsAbs", D2, D2dims, H5T_NATIVE_DOUBLE, str_funcs_abs)) < 0) {
-		printf("\n\n!!Failed to make - %s - Dataset!!\n\n", "StructureFuncsAbs");
 	}	
 	#endif
 	#ifdef __TRIAD_STATS

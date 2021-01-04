@@ -49,14 +49,15 @@ int main(int argc, char** argv) {
 	double alpha = atof(argv[3]);
 	double beta  = atof(argv[4]);
 
+	// Initial Condition
+	char u0[128];
+	strcpy(u0, argv[5]);
+
+	// Time steps
 	int tsteps     = atoi(argv[6]);
 	int save_steps = SAVE_DATA_STEP;
 
 	int Nmax = N * 2;
-
-	// Initial Condition
-	char u0[128];
-	strcpy(u0, argv[5]);
 
 
 	// Get the number of threads 

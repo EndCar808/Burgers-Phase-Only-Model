@@ -37,15 +37,16 @@ from numba import jit, njit
 # @njit
 def compute_second_moment(a_k, k0, N):
 
-    dx       = np.pi / N 
-    kx       = np.arange(N + 1)
-    kx[:k0]  = 0.0
+    dx           = np.pi / N 
+    kx           = np.arange(N + 1)
+    kx[:k0 + 1]  = 0.0
+    a_k_sqr      = (a_k ** 2) * (1.0 / float(N**2))
     sec_mmnt = np.zeros((N))
 
     for i in range(1, N + 1):
-        sec_mmnt[i - 1] = np.sum(a_k * (1.0 - np.cos( i * dx * kx)))
+        sec_mmnt[i - 1] = np.sum(a_k_sqr * (1.0 - np.cos( i * dx * kx)))
 
-    return sec_mmnt * (2 / N)
+    return sec_mmnt
 
 def compute_modes_real_space(amps, phases, N):
     print("\n...Creating Real Space Soln...\n")
@@ -65,11 +66,10 @@ def compute_rms(u):
     
     # Compute normalized realspace soln
     u_urms = np.zeros((u.shape[0], u.shape[1]))
-    u_rms  = np.zeros((u.shape[0]))
+    u_rms  = np.sqrt(np.mean(u[10, :]**2))
     
     for i in range(u.shape[0]):    
-        u_rms[i]     = np.sqrt(np.mean(u[i, :]**2))
-        u_urms[i, :] = u[i, :] / u_rms[i] 
+        u_urms[i, :] = u[i, :] / u_rms
     
     return u_rms, u_urms
 
@@ -80,11 +80,25 @@ def compute_grad(u_z, kmin, kmax):
     k            = np.concatenate((np.zeros((kmin)), np.arange(kmin, kmax + 1), -np.flip(np.arange(kmin, kmax)), np.zeros((kmin - 1))))
     grad_u_z     = np.complex(0.0, 1.0) * k * u_z
     du_x         = np.real(np.fft.ifft(grad_u_z, axis = 1))
-#     du_x_rms_tmp = np.sqrt(np.mean(du_x ** 2, axis = 1))
-#     du_x_rms     = np.array([du_x[i, :] / du_x_rms_tmp[i] for i in range(u_z.shape[0])])
+    du_x_rms_tmp = np.sqrt(np.mean(du_x[10, :] ** 2))
+    du_x_rms     = du_x / du_x_rms_tmp
 
-    return du_x # , du_x_rms
+    return du_x , du_x_rms
 
+
+@jit(nopython = True)
+def compute_velinc(u, rlen):
+
+    # rList  = [int(r) for r in np.arange(1, kmax + 1, kmax/rlen)]
+    rList  = [1, kmax]
+    du_r   = np.zeros((u.shape[0], u.shape[1], rlen))
+
+    for r_indx, r in enumerate(rList):
+        for i in range(u.shape[0]):
+            for j in range(u.shape[1]):
+                    du_r[i, j, r_indx] = u[i, np.mod(j + r, u.shape[1])] - u[i, j]
+
+    return du_r, rList
 
 
 if __name__ == '__main__':
@@ -138,11 +152,23 @@ if __name__ == '__main__':
         vel_inc_binedges[i, :] = HDFfileData["VelInc[{}]_BinEdges".format(i)][:]
     grad_bincounts = HDFfileData["VelGrad_BinCounts"][:]
     grad_binedges  = HDFfileData["VelGrad_BinEdges"][:]
-  
     
+    # vel_inc_stats  = HDFfileData["VelIncStats"][:, :]
+    # for i in range(vel_inc_stats.shape[0]- 1 ):
+    #     vel_inc_binedges[i, :] = vel_inc_binedges[i, :] / vel_inc_stats[i, 1] 
+    # grad_binedges = grad_binedges / vel_inc_stats[-1, 1]
+
     u, u_z        = compute_modes_real_space(amps, phases, N)
     u_rms, u_urms = compute_rms(u)
-   
+    
+    du_r, rlist   = compute_velinc(u_urms, 2)
+
+    rms = np.sqrt(np.mean(amps ** 2))
+
+    rlist = [2 ** int(i) for i in np.arange(np.log2(32) + 1)]
+    for i in range(len(rlist)):
+        print(rlist[i])
+    
     plt.figure()
     for i in range(2):
         bin_centers = (vel_inc_binedges[i, 1:] + vel_inc_binedges[i, :-1]) * 0.5
@@ -151,7 +177,6 @@ if __name__ == '__main__':
         # plt.plot(bin_centers, vel_inc_bincounts[i])
     bin_centers = (grad_binedges[1:] + grad_binedges[:-1]) * 0.5
     bin_width   = grad_binedges[1] - grad_binedges[0]
-    # plt.plot(bin_centers, grad_bincounts)
     plt.plot(bin_centers, grad_bincounts / (num_obs * bin_width))
     plt.legend([r"Smallest", r"Largest", r"Gradient"])
     plt.yscale('log')
@@ -162,7 +187,6 @@ if __name__ == '__main__':
     plt.close()
 
     
-
     Triad_Centroid = HDFfileData["TriadCentroid"]
     Triad_Cent_R   = HDFfileData["TriadCentroid_R"]
 
@@ -193,7 +217,7 @@ if __name__ == '__main__':
     ax4.set_xticks([kmin, int((kMax - kMin)/5), int(2 * (kMax - kMin)/5), int(3* (kMax - kMin)/5), int(4 * (kMax - kMin)/5), kMax])
     ax4.set_xticklabels([kmin, int((kmax - kmin)/5), int(2 * (kmax - kmin)/5), int(3* (kmax - kmin)/5), int(4 * (kmax - kmin)/5), kmax])
     ax4.set_yticks([kMin, int((kMax / 2 - kMin)/4), int(2 * (kMax / 2 - kMin)/4), int(3* (kMax / 2 - kMin)/4),  int((kmax)/ 2 - kmin)])
-    ax4.set_yticklabels([kmin + kmin, int((kmax / 2 - kmin)/4) + kmin, int(2 * (kmax / 2 - kmin)/4) + kmin, int(3* (kmax / 2 - kmin)/4) + kmin,  int(kmax / 2)])
+    ax4.set_yticklabels(np.flip([kmin + kmin, int((kmax / 2 - kmin)/4) + kmin, int(2 * (kmax / 2 - kmin)/4) + kmin, int(3* (kmax / 2 - kmin)/4) + kmin,  int(kmax / 2)]))
     ax4.set_xlabel(r'$k$', labelpad = 0)
     ax4.set_ylabel(r'$p$',  rotation = 0, labelpad = 10)
     ax4.set_xlim(left = kmin - 0.5)
@@ -211,19 +235,54 @@ if __name__ == '__main__':
 
 
     str_func     = HDFfileData["StructureFuncs"][:, :]
-    str_func_abs = HDFfileData["StructureFuncsAbs"][:, :]
+    # str_func_abs = HDFfileData["StructureFuncsAbs"][:, :]
 
-    r = np.arange(1, N/2 + 1)
+    print(str_func.shape)
+    r = np.arange(0, N/2)
  
     second_moment = compute_second_moment(amps, k0, int(N/2))
 
+    L = (N / 2)
+
+
+    # urms = np.load("urms.npy")
+    # increment2 = np.load("increment_moment_2.npy")
+
+    # control_moment = np.load("control_second_moment.npy")
+
+    # print(urms)
+    # print(u_rms)
+
+    # # print(urms/u_urms)
+    plt.figure()
+    # plt.plot(r/L, increment2 / urms**2)
+    plt.plot(r/L, np.absolute(str_func[0, :]) / (u_rms**( 2)))
+    plt.plot(r/L, second_moment[:] / u_rms**2, 'k--')
+    # plt.plot(r/L, control_moment / urms**2, )
+    # # print(urms)
+    # print(second_moment / increment2)
+    # print(second_moment[:5])
+    # print(control_moment[:5])
+    plt.yscale('Log')
+    plt.xscale('Log')  
+    plt.legend([r"Structure Func p = 2", r"My 2nd Moment"])
+
+    plt.savefig(output_dir + "/TEST_Structure_Funcs_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]_ITERS[{}]_TRANS[{}].png".format(N, k0, alpha, beta, u0, iters, trans), format='png', dpi = 400)  
+    plt.close()
+
+
+
     plt.figure()
     for i in range(str_func.shape[0]):
-        plt.plot(r/(N/2), np.absolute(str_func[i, :]) )
-    plt.plot(r/(N/2), second_moment[:], 'k--')
-    plt.legend([r"$p = {}$".format(p) for p in range(2, 8 + 1)])
+        plt.plot(r/L, np.absolute(str_func[i, :]) / (u_rms**(i + 2)))
+    plt.plot(r/L, second_moment[:] / u_rms**2, 'k--')
+   
+    plt.legend(np.append([r"$p = {}$".format(p) for p in range(2, 6)], r"Second Moment"))
     plt.yscale('Log')
     plt.xscale('Log')
+    plt.xlabel(r"$r / L$")
+    plt.ylabel(r"$|S^p(r)|/u_{rms}^p$")
+
     
     plt.savefig(output_dir + "/Structure_Funcs_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]_ITERS[{}]_TRANS[{}].png".format(N, k0, alpha, beta, u0, iters, trans), format='png', dpi = 400)  
     plt.close()
@@ -268,14 +327,83 @@ if __name__ == '__main__':
 
 
 
-    # u_z_grad      = compute_grad(u_z, kmin, kmax)
-    # u_grad        = np.real(np.fft.ifft(u_z_grad, axis = 1))
-    # hist, bins  = np.histogram(u_grad.flatten(), bins = 1000, density = True)
-    # bin_centers = (bins[1:] + bins[:-1]) * 0.5
-    # plt.plot(bin_centers, hist)
+    # u_z_grad           = compute_grad(u_z, kmin, kmax)
+
+    # u_grad, u_grad_rms = np.real(np.fft.ifft(u_z_grad, axis = 1))
     
-    # normal_dist = np.random.normal(loc = 0, scale = 1, size = 100 * num_obs)
-    # hist, bins  = np.histogram(normal_dist, range = (-5, 5), bins = 1000, density = True)
-    # bin_centers = (bins[1:] + bins[:-1]) * 0.5
-    # plt.plot(bin_centers, hist, 'k--')
+    # u_grad         = (u_grad * (np.pi / N/2)) / np.std((u_grad * (np.pi / N/2)).flatten())
+    # u_grad_rms     = u_grad_rms / np.std(u_grad_rms.flatten())
+
+    # plt.figure()
+    # hist, bins         = np.histogram(u_grad.flatten(), bins = 1000, density = False)
+    # bin_centers        = (bins[1:] + bins[:-1]) * 0.5
+    # bin_width          = bins[1] - bins[0]
+    # plt.plot(bin_centers, hist / (num_obs * bin_width))
+
+    # bin_centers = (grad_binedges[1:] + grad_binedges[:-1]) * 0.5
+    # bin_width   = grad_binedges[1] - grad_binedges[0]
+    # plt.plot(bin_centers, grad_bincounts / (num_obs * bin_width))
+    # plt.legend([r"Computed Grad", r"Solver Grad"])
     
+    # plt.yscale('log')
+    # # plt.xlim(-5, 5)
+    # plt.savefig(output_dir + "/Gradient_Test.png".format(N, alpha, beta, k0, iters), format='png', dpi = 400)  
+    # plt.close()
+
+
+    # plt.figure()
+    # small_scale = du_r[:, :, 0] / np.std(du_r[:, :, 0].flatten())
+    # hist, bins         = np.histogram(small_scale.flatten(), bins = 1000, density = False)
+    # bin_centers        = (bins[1:] + bins[:-1]) * 0.5
+    # bin_width          = bins[1] - bins[0]
+    # plt.plot(bin_centers, hist / (num_obs * bin_width))
+
+    # large_scale = du_r[:, :, 1] / np.std(du_r[:, :, 1].flatten())
+    # hist, bins         = np.histogram(large_scale.flatten(), bins = 1000, density = False)
+    # bin_centers        = (bins[1:] + bins[:-1]) * 0.5
+    # bin_width          = bins[1] - bins[0]
+    # plt.plot(bin_centers, hist / (num_obs * bin_width))
+    
+    # plt.legend([r"$r = \pi / N$", r"$r = \pi$"])
+    # plt.xlabel(r"$\delta u_r / \sigma$")
+    # plt.ylabel(r"PDF")
+    
+    # plt.yscale('log')
+    # # plt.xlim(-5, 5)
+    # plt.savefig(output_dir + "/Vel_Inc_Test.png".format(N, alpha, beta, k0, iters), format='png', dpi = 400)  
+    # plt.close()
+
+
+
+    # hist, bins         = np.histogram(small_scale.flatten(), bins = 1000, density = False)
+    # bin_centers        = (bins[1:] + bins[:-1]) * 0.5
+    # bin_width          = bins[1] - bins[0]
+    # plt.plot(bin_centers, hist / (num_obs * bin_width))
+
+    # hist, bins         = np.histogram(large_scale.flatten(), bins = 1000, density = False)
+    # bin_centers        = (bins[1:] + bins[:-1]) * 0.5
+    # bin_width          = bins[1] - bins[0]
+    # plt.plot(bin_centers, hist / (num_obs * bin_width))
+
+    # hist, bins         = np.histogram(u_grad.flatten(), bins = 1000, density = False)
+    # bin_centers        = (bins[1:] + bins[:-1]) * 0.5
+    # bin_width          = bins[1] - bins[0]
+    # plt.plot(bin_centers, hist / (num_obs * bin_width))
+
+    # hist, bins         = np.histogram(u_grad_rms.flatten(), bins = 1000, density = False)
+    # bin_centers        = (bins[1:] + bins[:-1]) * 0.5
+    # bin_width          = bins[1] - bins[0]
+    # plt.plot(bin_centers, hist / (num_obs * bin_width))
+
+    # plt.legend([r"Small", r"Large", r"Gradient", r"Gradient RMS"])
+    # plt.yscale('log')
+
+    # plt.savefig(output_dir + "/Vel_Inc+Grad_Test.png".format(N, alpha, beta, k0, iters), format='png', dpi = 400)  
+    # plt.close()
+
+
+    # # normal_dist = np.random.normal(loc = 0, scale = 1, size = 100 * num_obs)
+    # # hist, bins  = np.histogram(normal_dist, range = (-5, 5), bins = 1000, density = True)
+    # # bin_centers = (bins[1:] + bins[:-1]) * 0.5
+    # # plt.plot(bin_centers, hist, 'k--')
+    # # 

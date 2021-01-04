@@ -42,7 +42,7 @@
 // ---------------------------------------------------------------------
 //  Global Variables
 // ---------------------------------------------------------------------
-#define SAVE_DATA_STEP 10	// Parameter to determine after how many integrations steps data should be saved to output
+#define SAVE_DATA_STEP 1	// Parameter to determine after how many integrations steps data should be saved to output
 #ifdef __REALSPACE_STATS
 #define NBIN_VELINC 1000
 #define BIN_LIM 40.0 
