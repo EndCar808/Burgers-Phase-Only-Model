@@ -18,7 +18,6 @@
 // ---------------------------------------------------------------------
 //  Function Prototypes
 // ---------------------------------------------------------------------
-
 void initial_condition(double* phi, double* amp, fftw_complex* u_z, int* kx, int num_osc, int k0, double a, double b, char* IC);
 void max(double* a, int n, int k0, double* max_val);
 void min(double* a, int n, int k0, double* min_val);
@@ -44,9 +43,16 @@ void po_rhs(double* rhs, fftw_complex* u_z, fftw_plan *plan_c2r_pad, fftw_plan *
 
 void triad_phases(double* triads, fftw_complex* phase_order, double* phi, int kmin, int kmax);
 
-void set_vel_inc_hist_bin_ranges(gsl_histogram** hist_incr, double* u, double* u_grad, int num_osc);
-void compute_real_space_stats(gsl_histogram** hist_incr, gsl_rstat_workspace** incr_stat, double* str_func, double* u, double* u_grad, int num_osc, int max_p);
+void linspace(double* arr, double a, double b, int n_points);
+void histogram(double* counts, double* data, double* bins, int num_bins, int num_data);
+void set_vel_inc_hist_bin_ranges(double* bins, double* u, double* u_grad, double vel_sec_mnt, double grad_sec_mnt, int num_osc);
 
+
+void gsl_set_vel_inc_hist_bin_ranges(gsl_histogram** hist_incr, double* u, double* u_grad, double vel_sec_mnt, double grad_sec_mnt, int num_osc);
+void gsl_compute_real_space_stats(gsl_histogram** hist_incr, gsl_rstat_workspace** incr_stat, double* str_func, double* u, double* u_grad, double vel_sec_mnt, double grad_sec_mnt, int num_osc, int max_p);
+
+double gradient_energy(double* a_k, int* k, int num_osc);
+double theoretical_energy(double* a_k, int num_osc);
 double system_energy(fftw_complex* u_z, int N);
 double system_enstrophy(fftw_complex* u_z, int* k, int N);
 // ---------------------------------------------------------------------

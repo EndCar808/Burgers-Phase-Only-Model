@@ -29,7 +29,7 @@
 #define __PHASES
 // #define __TRIADS
 #define __TRIAD_STATS
-// #define __MODES
+#define __MODES
 // #define __RHS
 // #define __REALSPACE
 // #define __GRAD
@@ -44,7 +44,7 @@
 // ---------------------------------------------------------------------
 #define SAVE_DATA_STEP 1	// Parameter to determine after how many integrations steps data should be saved to output
 #ifdef __REALSPACE_STATS
-#define NBIN_VELINC 1000
+#define NBIN_VELINC 8000
 #define BIN_LIM 40.0 
 #else
 #define BIN_LIM 0.0 
