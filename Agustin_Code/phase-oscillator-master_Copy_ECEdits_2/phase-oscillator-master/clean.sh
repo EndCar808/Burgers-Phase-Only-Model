@@ -1,0 +1,12 @@
+rm realspace/*.dat
+rm instances/*.dat
+rm statistics/*.dat
+rm histograms/*.dat
+rm parameters/*.dat
+rm progress/*.dat
+rm figures/*.jpeg
+rm figures/*.pdf
+rm source/*.exe
+rm source/*.mod
+rm source/*.obj
+rm *.exe

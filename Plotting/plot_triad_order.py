@@ -32,7 +32,7 @@ from matplotlib.gridspec import GridSpec
 from matplotlib.pyplot import cm 
 import numpy as np
 np.set_printoptions(threshold=sys.maxsize)
-from numba import jit
+from numba import jit, njit
 
 
 
@@ -42,7 +42,7 @@ def compute_triads(phases, kmin, kmax):
 	print("\n...Computing Triads...\n")
 
 	## Variables
-	numTriads  = 0;
+	numTriads  = 0
 	k3_range   = int(kmax - kmin + 1)
 	k1_range   = int((kmax - kmin + 1) / 2)
 	time_steps = phases.shape[0]
@@ -88,7 +88,7 @@ def compute_phase_order(phases, amps, kmin, kmax):
 			if k_1 < kmax:
 				k1 = -kmax + k_1
 			else:
-				k1 = k_1 - kmax;
+				k1 = k_1 - kmax
 			
 			if k1 < 0:
 				phaseOrder[:, k - kmin] += (amps[np.absolute(k1)] * np.exp(-np.complex(0.0, 1.0) * phases[:, np.absolute(k1)])) * (amps[k - k1] * np.exp(np.complex(0.0, 1.0) * phases[:, k - k1]))
@@ -153,6 +153,75 @@ def plot_phase_order(R_k, Phi_k, kmin, kmax, t):
 
 
 
+def compute_modes_real_space(amps, phases, N):
+    print("\n...Creating Real Space Soln...\n")
+
+    # Create full set of amps and phases
+    amps_full   = np.append(amps[:], np.flipud(amps[1:-1]))
+    phases_full = np.concatenate((phases[:, :], -np.fliplr(phases[:, 1:-1])), axis = 1)
+
+    # Construct modes and realspace soln
+    u_z = amps_full * np.exp(np.complex(0.0, 1.0) * phases_full)
+    u   = np.real(np.fft.ifft(u_z, axis = 1))
+
+    return u, u_z
+
+@njit
+def convolution(u_z, num_osc, k0):
+
+	conv = np.ones((num_osc, )) * np.complex(0.0, 0.0)
+
+	for kk in range(0, num_osc):
+		for k1 in range(-(num_osc -1) + kk, num_osc):
+			if k1 < 0:
+				conv[kk] += np.conjugate(u_z[np.absolute(k1)]) * u_z[kk - k1]
+			elif kk - k1 < 0:
+				conv[kk] += u_z[k1] * np.conjugate(u_z[np.absolute(kk - k1)])
+			else:
+				conv[kk] += u_z[k1] * u_z[kk - k1]
+
+	for i in range(k0 + 1):
+		conv[i] = np.complex(0.0, 0.0)
+
+	return conv
+
+# @njit
+def amp_normalization(amps, n, k0):
+
+	norm = np.zeros((n, ))
+
+	print(-n, n)
+
+	for kk in range(0, n):
+		for k1 in range(-(n - 1) + kk, n):
+			norm[kk] += amps[np.absolute(k1)] * amps[np.absolute(kk - k1)]
+			# if kk == 14:
+			# 	print("({}, {}) \t= ({}, {}) \t= {} \t {}".format(k1, kk - k1, amps[np.absolute(k1)], amps[np.absolute(kk - k1)], amps[np.absolute(k1)] * amps[np.absolute(kk - k1)], norm[kk]))
+				
+	for i in range(k0 + 1):
+		norm[i] = 0.0
+
+	return norm
+
+
+def convolution_fft(u_z, N, num_osc, k0):
+
+	M = 2 * N
+	norm_fac = 1 / M
+
+	conv = np.ones((num_osc, )) * np.complex(0.0, 0.0)
+		
+	u_tmp = (np.real(np.fft.ifft(u_z, n = M) * 2*M)) ** 2
+
+	u_z_tmp = np.fft.fft(u_tmp, n= M)
+	
+	for i in range(num_osc):
+		if i <= k0:
+			conv[i] = np.complex(0.0, 0.0)
+		else:
+			conv[i] = u_z_tmp[i] * norm_fac
+
+	return conv
 
 
 if __name__ == '__main__':
@@ -171,7 +240,7 @@ if __name__ == '__main__':
 	    N     = int(sys.argv[6])
 	    u0    = str(sys.argv[7])
 	results_dir = "/RESULTS_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]".format(N, k0, alpha, beta, u0)
-	filename    = "/LCEData_ITERS[{}]_TRANS[{}]".format(iters, trans)
+	filename    = "/SolverData_ITERS[{}]_TRANS[{}]".format(iters, trans)
 
 	######################
 	##	Input & Output Dir
@@ -199,11 +268,12 @@ if __name__ == '__main__':
 	# print input file name to screen
 	# print("\n\nData File: %s.h5\n" % filename)
 	print("\n\nData File: {}.h5\n".format(results_dir + filename))
+	print(list(HDFfileData.keys()))
 
 	######################
 	##	Read in Datasets
 	######################
-	phases = HDFfileData['Phases'][:, :]
+	phi    = HDFfileData['Phases'][:, :]
 	time   = HDFfileData['Time'][:]
 	amps   = HDFfileData['Amps'][:]
 
@@ -213,30 +283,69 @@ if __name__ == '__main__':
 	######################
 	##	Preliminary Calcs
 	######################
-	ntsteps = len(time);
-	num_osc = phases.shape[1];
-	N       = 2 * (num_osc - 1);
-	kmin    = k0 + 1;
-	kmax    = num_osc - 1;
+	ntsteps = len(time)
+	num_osc = phi.shape[1]
+	N       = 2 * (num_osc - 1)
+	kmin    = k0 + 1
+	kmax    = num_osc - 1
 
 
 
 	######################
 	##	Triad Data
 	######################
-	triads, R, Phi = compute_triads(phases, kmin, kmax)
-	triads_exist   = 0
+	# triads, R, Phi = compute_triads(phases, kmin, kmax)
+	# triads_exist   = 0
 
-	R_k, Phi_k = compute_phase_order(phases, amps, kmin, kmax)
+	# R_k, Phi_k = compute_phase_order(phases, amps, kmin, kmax)
 
-	print(R_k.shape)
-	print(Phi_k.shape)
-
+	# print(R_k.shape)
+	# print(Phi_k.shape)
 
 	######################
 	##	Plot Data
 	######################
+	# for t in range(len(time)):
+	# 	print("Plotting SNAP {}".format(t))
+	# 	plot_phase_order(R_k[t, :], Phi_k[t, :], kmin, kmax, t)
 
-	for t in range(len(time)):
-		print("Plotting SNAP {}".format(t))
-		plot_phase_order(R_k[t, :], Phi_k[t, :], kmin, kmax, t)
+
+	######################
+	##	Test
+	######################
+	# u, u_z = compute_modes_real_space(amps, phases, N)
+	# u_z = amps * np.exp(np.complex(0.0, 1.0) * phi[:, :])
+
+	num_osc = 33
+	u_z = amps[:num_osc] * np.exp(np.complex(0.0, 1.0) * np.pi/4)
+
+	for i in range(num_osc):
+		print("amp[{}]: {:.16f}  ||  u_z[{}]: {:.16f} {:.16f} I".format(i, amps[i], i, np.real(u_z[i]), np.imag(u_z[i])))
+	print()
+	
+	conv = convolution(u_z, num_osc, k0)
+	conv_fft = convolution_fft(u_z, 32, num_osc, k0)
+
+	norm = amp_normalization(amps[:num_osc], num_osc, k0)
+
+	for i in range(num_osc):
+		print("conv[{}]: {:.16f} {:.16f} I".format(i, np.real(conv[i]), np.imag(conv[i])))
+	print()
+
+	for i in range(num_osc):
+		print("conv_fft[{}]: {:.16f} {:.16f} I".format(i, np.real(conv_fft[i]), np.imag(conv_fft[i])))
+	print()
+
+	print("---------------------------")
+
+	for i in range(num_osc):
+		print("amp[{}]: {:.16f}".format(i, np.absolute(conv[i])))
+	print()
+
+	for i in range(num_osc):
+		print("amp_fft[{}]: {:.16f}".format(i, np.absolute(conv_fft[i])))
+	print()
+
+	for i in range(num_osc):
+		print("amp_n[{}]: {:.16f}".format(i, norm[i]))
+	print()

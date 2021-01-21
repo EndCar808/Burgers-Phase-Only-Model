@@ -29,6 +29,7 @@
 // ---------------------------------------------------------------------
 #include "data_types.h"
 #include "utils.h"
+#include "stats.h"
 
 
 
@@ -256,9 +257,9 @@ void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_n
 	*file_handle = H5Fcreate(output_file_name, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
 
 
-	// ------------------------------
+	// ---------------------------------------
 	//  Create datasets with hyperslabing
-	// ------------------------------
+	// ---------------------------------------
 	//-----------------------------//
 	//---------- PHASES -----------//
 	//-----------------------------//
@@ -508,6 +509,42 @@ void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_n
 
 	H5Pclose(plist6);
 	#endif
+
+	//-------------------------------------------------//
+	//---------- SCALE TRIAD ORDER PARMETER -----------//
+	//-------------------------------------------------//
+	#ifdef __TRIAD_ORDER
+	// initialize the hyperslab arrays
+	dims[0]      = num_t_steps;              // number of timesteps
+	dims[1]      = num_osc;                 // number of oscillators
+	maxdims[0]   = H5S_UNLIMITED;           // setting max time index to unlimited means we must chunk our data
+	maxdims[1]   = num_osc;                 // same as before = number of modes
+	chunkdims[0] = 1;                       // 1D chunk to be saved 
+	chunkdims[1] = num_osc;                 // 1D chunk of size number of modes
+
+	// create the 2D dataspace - setting the no. of dimensions, expected and max size of the dimensions
+	file_space[6] = H5Screate_simple(dimensions, dims, maxdims);
+
+	// must create a propertly list to enable data chunking due to max time dimension being unlimited
+	// create property list 
+	hid_t plist7;
+	plist7 = H5Pcreate(H5P_DATASET_CREATE);
+
+	// using this property list set the chuncking - stores the chunking info in plist
+	H5Pset_chunk(plist7, dimensions, chunkdims);
+
+	// Create the dataset in the previouosly created datafile - using the chunk enabled property list and new compound datatype
+	data_set[6] = H5Dcreate(*file_handle, "ScaleOrderParam", dtype, file_space[6], H5P_DEFAULT, plist7, H5P_DEFAULT);
+	
+	// create the memory space for the slab
+	dims[0] = 1;
+	dims[1] = num_osc;
+
+	// setting the max dims to NULL defaults to same size as dims
+	mem_space[6] = H5Screate_simple(dimensions, dims, NULL);
+
+	H5Pclose(plist7);
+	#endif
 }
 
 hid_t create_complex_datatype() {
@@ -616,22 +653,22 @@ void conv_2N_pad(fftw_complex* convo, fftw_complex* uz, fftw_plan *fftw_plan_r2c
 	double norm_fact = 1.0 / (double) m;
 
 	// Allocate temporary arrays
-	double* u_tmp;
-	u_tmp = (double*)malloc(m*sizeof(double));
-	fftw_complex* uz_pad;
-	uz_pad = (fftw_complex*)malloc(2*num_osc*sizeof(fftw_complex));
-	
+	double* u_tmp = (double* )malloc(m*sizeof(double));
+	mem_chk(u_tmp, "u_tmp");
+	fftw_complex* u_z_tmp = (fftw_complex* )fftw_malloc((2*num_osc - 1)*sizeof(fftw_complex));
+	mem_chk(u_z_tmp, "u_z_tmp");
+
 	// write input data to padded array
-	for (int i = 0; i < 2*num_osc; ++i)	{
+	for (int i = 0; i < (2*num_osc - 1); ++i)	{
 		if(i < num_osc){
-			uz_pad[i] = uz[i];
+			u_z_tmp[i] = uz[i];
 		} else {
-			uz_pad[i] = 0.0 + 0.0*I;
+			u_z_tmp[i] = 0.0 + 0.0*I;
 		}
 	}
 
 	// // transform back to Real Space
-	fftw_execute_dft_c2r((*fftw_plan_c2r_ptr), uz_pad, u_tmp);
+	fftw_execute_dft_c2r((*fftw_plan_c2r_ptr), u_z_tmp, u_tmp);
 
 	// // square
 	for (int i = 0; i < m; ++i)	{
@@ -639,14 +676,14 @@ void conv_2N_pad(fftw_complex* convo, fftw_complex* uz, fftw_plan *fftw_plan_r2c
 	}
 
 	// here we move the derivative from real to spectral space so that the derivatives can be returned in spectral space
-	fftw_execute_dft_r2c((*fftw_plan_r2c_ptr), u_tmp, uz_pad);
+	fftw_execute_dft_r2c((*fftw_plan_r2c_ptr), u_tmp, u_z_tmp);
 
 	// // normalize
 	for (int i = 0; i < num_osc; ++i)	{
 		if (i <= k0) {
 			convo[i] = 0.0 + 0.0*I;
 		} else {
-			convo[i] = uz_pad[i]*(norm_fact);
+			convo[i] = u_z_tmp[i]*(norm_fact);
 		}		
 	}
 
@@ -654,7 +691,7 @@ void conv_2N_pad(fftw_complex* convo, fftw_complex* uz, fftw_plan *fftw_plan_r2c
 	/// Free temp memory
 	///---------------
 	free(u_tmp);
-	fftw_free(uz_pad);
+	fftw_free(u_z_tmp);
 }
 
 
@@ -761,7 +798,6 @@ void po_rhs(double* rhs, fftw_complex* u_z, fftw_plan *plan_c2r_pad, fftw_plan *
 		u_tmp[i] = pow(u_tmp[i], 2);
 	}
 
-
 	// transform forward to Fourier space
 	fftw_execute_dft_r2c((*plan_r2c_pad), u_tmp, u_z_tmp);
 
@@ -772,8 +808,10 @@ void po_rhs(double* rhs, fftw_complex* u_z, fftw_plan *plan_c2r_pad, fftw_plan *
 		if (k <= k0) {
 			rhs[k] = 0.0;
 		} else {
-			pre_fac = (-I * kx[k]) / (u_z[k]);
-			rhs[k]  = cimag( pre_fac* (u_z_tmp[k] * norm_fac) );
+			// pre_fac = (-I * kx[k]) / (u_z[k]);
+			// rhs[k]  = cimag( pre_fac* (u_z_tmp[k] * norm_fac) );
+			pre_fac = -kx[k] / cabs(u_z[k]);
+			rhs[k]  = pre_fac * creal(cexp(-I * carg(u_z[k])) * (u_z_tmp[k] * norm_fac));
 		}		
 	}
 
@@ -819,6 +857,31 @@ void triad_phases(double* triads, fftw_complex* phase_order, double* phi, int km
 	// normalize phase order parameter
 	*phase_order =  phase_order_tmp / (double) num_triads;
 
+}
+
+void amp_normalize(double* norm, double* amp, int num_osc, int k0) {
+
+	// Initialize variables
+	int k1;
+	int N = num_osc - 1;
+
+	// Compute the sum for each k
+	for (int kk = 0; kk <= N; ++kk) {
+		for (int k_1 = 0; k_1 < 2 * N; ++k_1) {
+			if (k_1 <= N) {     // Adjust for the correct k1 value
+				k1 = -N + 1 + k_1;
+			}
+			else  {
+				k1 = k_1 - N;
+			}
+			if (kk <= k0) {
+				norm[kk] = 0.0;
+			}
+			else {
+				norm[kk] += amp[abs(k1)] * amp[abs(kk - k1)];
+			}
+		}
+	}
 }
 
 
@@ -988,239 +1051,7 @@ void fixed_point_search(int N, int Nmax, int k0, double a, double b, int iters, 
 	}
 }	
 
-void linspace(double* arr, double a, double b, int n_points) {
 
-	// Fill first element
-	arr[0] = a;
-
-	// Get the step
-	// double step = (b - a) / (n_points - 1);
-	printf("a-b: %6.16lf\n step: %6.16lf", b - a, (b - a) / (n_points - 1));
-
-	// Loop through and fill array
-	for (int i = 1; i < n_points - 1; ++i) {
-		arr[i] = a + (b - a) * ((double) i) / (n_points - 1);
-	}
-
-	// Fill last element
-	arr[n_points - 1] = b;
-}
-
-void histogram(double* counts, double* data, double* bins, int num_bins, int num_data) {
-
-	// Temp varaiabels
-	double tmp_sample;
-
-	for (int i = 0; i < num_data; ++i) {
-		tmp_sample = data[i];
-		for (int j = 0; j < num_bins - 1; ++j) {
-			if(tmp_sample >= bins[j] || tmp_sample <= bins[j + 1]) {
-				counts[j] += 1;
-			}
-			else {
-				continue;
-			}
-		}
-	}
-}
-
-void set_vel_inc_hist_bin_ranges(double* bins, double* u, int num_osc, int r) {
-
-	// Initialize variables
-	int N_osc     = num_osc - 1;
-	double vel_inc;
-	double dx = 0.5 / (double)N_osc;
-	double tmp_incr;
-	double norm;
-
-	/////////////////////////
-	// Compute Std Devs
-	/////////////////////////
-	// Compute std dev of velocity increment
-	tmp_incr = 0.0;
-	for (int i = 0; i < 2 * N_osc; ++i) {
-		vel_inc = u[(i + r) % (2 * N_osc)] - u[i];
-
-		tmp_incr += pow(vel_inc, 2);
-	}
-	// Calculate the variance
-	norm = sqrt(tmp_incr * dx);
-
-	/////////////////////////
-	// Compute Bin Edges
-	/////////////////////////
-	linspace(bins, -BIN_LIM * norm, BIN_LIM * norm, NBIN_VELINC + 1);
-
-}
-
-
-void gsl_set_vel_inc_hist_bin_ranges(gsl_histogram** hist_incr, double* u, double* u_grad, double vel_sec_mnt, double grad_sec_mnt, int num_osc) {
-
-	// Initialize variables
-	int r;
-	int N_osc     = num_osc - 1;
-	int num_r_inc = 2;
-	int r_inc[num_r_inc];
-	r_inc[0] = 1;
-	r_inc[1] = N_osc;
-	double vel_inc;
-	double dx = 0.5 / (double)N_osc;
-	double std_dev;
-
-	// double incr;
-	// double norms[2];
-	// printf("\n\n");
-
-	// Initialize running stats workspace - used to find min & max bin edges
-	gsl_rstat_workspace* vel_inc_stats[num_r_inc + 1];
-
-	////////////////////////
-	// Compute Increments
-	////////////////////////
-	// Compute velocity increments for Std Dev
-	for (int r_indx = 0; r_indx < num_r_inc; ++r_indx) {
-		// Get current incr
-		r = r_inc[r_indx]; 
-	
-		// Initialize stats accumulator
-		vel_inc_stats[r_indx] = gsl_rstat_alloc();
-		for (int i = 0; i < 2 * N_osc; ++i) {
-			// Get current increment
-			vel_inc = u[(i + r) % (2 * N_osc)] - u[i];
-
-			// printf("u_r[%d]: %6.16lf | u[%d]: %6.16lf | vel[%d]: %6.16lf\n", (i + r) % (2 * N_osc), u[(i + r) % (2 * N_osc)], i, u[i], i, vel_inc);
-
-			// Add incr to accumulator
-			gsl_rstat_add(vel_inc, vel_inc_stats[r_indx]);
-		}
-	}
-
-	// Set accumulator for the gradient
-	vel_inc_stats[num_r_inc] = gsl_rstat_alloc();
-	for (int i = 0; i < 2 * N_osc; ++i)
-	{
-		// Add next gradient value to accum
-		gsl_rstat_add(u_grad[i], vel_inc_stats[num_r_inc]);
-	}
-
-	//////////////////////
-	// Set Bin Edges
-	//////////////////////
-	// Bin ranges will be set to +-BIN_LIM*Std Dev
-	for (int i = 0; i < num_r_inc; ++i) {
-		// Get the std dev of the smallest incr
-		std_dev = gsl_rstat_rms(vel_inc_stats[i]);
-		// printf("rms: %6.16lf\n", std_dev);
-		if ( (gsl_histogram_set_ranges_uniform(hist_incr[i], -BIN_LIM * std_dev, BIN_LIM * std_dev)) != 0 ) {
-			fprintf(stderr, "ERROR: unable to set ranges for the GSL histogram: Hist_Incrment[%d]\n", i);
-			exit(1);						
-		}
-		// printf("\n\n");
-		// for (int j = 0; j < NBIN_VELINC; ++j) {
-		// 	printf("bins_%d[%d]: %6.16lf\n", i, j, hist_incr[i]->range[j]);
-		// }
-		// printf("\n\n");
-	}
-	
-
-	// Get the std dev of the gradient
-	std_dev = grad_sec_mnt * M_PI / (double) N_osc;
-	// std_dev = gsl_rstat_rms(vel_inc_stats[num_r_inc]) * M_PI / (double) N_osc;
-	// printf("rms: %6.16lf\n", std_dev);
-	if ( (gsl_histogram_set_ranges_uniform(hist_incr[num_r_inc], -BIN_LIM * std_dev, BIN_LIM * std_dev)) != 0 ) {
-		fprintf(stderr, "ERROR: unable to set ranges for the GSL histogram: %s\n", "VelocityGradient");
-		exit(1);						
-	}	
-	// for (int j = 0; j < NBIN_VELINC; ++j) {
-	// 	printf("bins_%d[%d]: %6.16lf\n", num_r_inc, j, hist_incr[num_r_inc]->range[j]);
-	// }
-	// printf("\n\n");
-
-	// Free memory
-	for (int i = 0; i < num_r_inc + 1; ++i) {
-		gsl_rstat_free(vel_inc_stats[i]);
-	}
-	
-}
-
-
-void gsl_compute_real_space_stats(gsl_histogram** hist_incr, gsl_rstat_workspace** incr_stat, double* str_func, double* u, double* u_grad, double vel_sec_mnt, double grad_sec_mnt, int num_osc, int max_p) {
-
-	// Initialize variables
-	int r;
-	int N_osc     = num_osc - 1;
-	int num_r_inc = 2;
-	int r_inc[num_r_inc];
-	r_inc[0] = 1;
-	r_inc[1] = N_osc;
-	double vel_inc;
-	double vel_inc_abs;
-	double dx = 0.5 / (double)N_osc;
-
-
-	////////////////////////
-	// Compute Increments
-	////////////////////////
-	// Compute Velocity Incrments
-	for (int r_indx = 0; r_indx < num_r_inc; ++r_indx) {
-		// Get current incr
-		r = r_inc[r_indx]; 
-
-		// printf("r = %d\n", r);
-
-		// printf("\n\n");
-		// for (int j = 0; j < NBIN_VELINC + 1; ++j) {
-		// 	printf("bins_%d[%d]: %6.16lf\n", r_indx, j, hist_incr[r_indx]->range[j]);
-		// }
-		
-		for (int i = 0; i < 2 * N_osc; ++i) {
-			// Get current increment
-			vel_inc = u[(i + r) % (2* N_osc)] - u[i];
-
-			// printf("u_r[%d]: %6.16lf | u[%d]: %6.16lf | vel[%d]: %6.16lf\n", (i + r) % (2 * N_osc), u[(i + r) % (2 * N_osc)], i, u[i], i, vel_inc);
-
-
-			// Add current vel inc to appropriate bin
-			gsl_histogram_increment(hist_incr[r_indx], vel_inc);
-
-			// Add current vel inc to accumulator
-			gsl_rstat_add(vel_inc, incr_stat[r_indx]);
-		}
-		// for (int j = 0; j < NBIN_VELINC; ++j) {
-		// 	printf("counts_%d[%d]: %6.16lf\n", r_indx, j, hist_incr[r_indx]->bin[j]);
-		// }
-		// printf("\n\n");
-	}
-	
-	// Compute Gradient Histogram
-	for (int i = 0; i < 2 * N_osc; ++i)	{
-		// Add current gradient to appropriate bin
-		gsl_histogram_increment(hist_incr[num_r_inc], u_grad[i] * M_PI / N_osc);
-		// printf("u_grad[%d]: %5.16lf \t u_grad[%d]: %5.16lf\n", i, u_grad[i] / grad_sec_mnt, i, u_grad[i]);
-	}
-	// for (int j = 0; j < NBIN_VELINC; ++j) {
-	// 	printf("counts_%d[%d]: %6.16lf\n", num_r_inc, j, hist_incr[num_r_inc]->bin[j]);
-	// }
-	// printf("\n\n");
-
-	///////////////////////////////
-	// Compute Structure Functions
-	///////////////////////////////
-	#ifdef __STR_FUNCS
-	for (int p = 2; p <= max_p; ++p) {
-		for (int r = 1; r <= N_osc; ++r) {		
-			vel_inc = 0.0;
- 			for (int i = 0; i < 2 * N_osc; ++i) {
-				// Get current increment
-				vel_inc += pow(u[(i + r) % (2 * N_osc)] - u[i], p);
-			}
-			// Update structure func
-			str_func[(p - 2) * N_osc + (r - 1)] += vel_inc * dx;
-		}
-	}
-	#endif
-
-}
 
 
 int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0) {
@@ -1310,23 +1141,26 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	} 
 
 
-	double* small_bins   = (double* )malloc(sizeof(double) * (num_r_inc + 1) * (NBIN_VELINC + 1));
-	double* large_bins   = (double* )malloc(sizeof(double) * (num_r_inc + 1) * (NBIN_VELINC + 1));
-	double* grad_bins    = (double* )malloc(sizeof(double) * (num_r_inc + 1) * (NBIN_VELINC + 1));
-	double* small_counts = (double* )malloc(sizeof(double) * (num_r_inc + 1) * NBIN_VELINC);
-	double* large_counts = (double* )malloc(sizeof(double) * (num_r_inc + 1) * NBIN_VELINC);
-	double* grad_counts  = (double* )malloc(sizeof(double) * (num_r_inc + 1) * NBIN_VELINC);
+	// double* small_bins   = (double* )malloc(sizeof(double) * (num_r_inc + 1) * (NBIN_VELINC + 1));
+	// double* large_bins   = (double* )malloc(sizeof(double) * (num_r_inc + 1) * (NBIN_VELINC + 1));
+	// double* grad_bins    = (double* )malloc(sizeof(double) * (num_r_inc + 1) * (NBIN_VELINC + 1));
+	// double* small_counts = (double* )malloc(sizeof(double) * (num_r_inc + 1) * NBIN_VELINC);
+	// double* large_counts = (double* )malloc(sizeof(double) * (num_r_inc + 1) * NBIN_VELINC);
+	// double* grad_counts  = (double* )malloc(sizeof(double) * (num_r_inc + 1) * NBIN_VELINC);
 
 	
 	// Second moment variables
 	double vel_sec_mnt;
 	double grad_sec_mnt;	
 
-	#ifdef __STR_FUNCS
+	// Stats counter
+	int num_stats = 0;
 	// stucture function array
 	int max_p     = 6;
-	int num_stats = 0;
-	double *str_func     = (double *)malloc(sizeof(double) * (max_p - 2 + 1) * (num_osc - 1));
+	double *str_func = NULL;
+
+	#ifdef __STR_FUNCS	
+	str_func = (double *)malloc(sizeof(double) * (max_p - 2 + 1) * (num_osc - 1));
 	mem_chk(str_func, "str_func");
 	for (int i = 0; i < (max_p - 2 + 1); ++i) {
 		for (int j = 0; j < (num_osc - 1); ++j) {
@@ -1335,7 +1169,7 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	}
 	#endif
 	#endif
-	#if  defined(__TRIADS) || defined(__TRIAD_STATS)
+	#if  defined(__TRIADS) || defined(__TRIAD_STATS) || defined(__TRIAD_ORDER)
 	// Initialize tirad array
 	double* triads = (double* )malloc(k_range * k1_range * sizeof(double));
 	mem_chk(triads, "triads");
@@ -1368,6 +1202,19 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 		}
 	}
 	#endif
+	#endif
+	#ifdef __TRIAD_ORDER
+	fftw_complex* triad_order_k = (fftw_complex* )fftw_malloc(sizeof(fftw_complex) * num_osc);
+	fftw_complex* conv          = (fftw_complex* )fftw_malloc(sizeof(fftw_complex) * num_osc);
+	double* amp_norm            = (double* )malloc(sizeof(double) * num_osc);
+	mem_chk(triad_order_k, "triad_order_k");
+	mem_chk(conv, "conv");
+	mem_chk(amp_norm, "amp_norm");
+	for (int i = 0; i < num_osc; ++i) {
+		triad_order_k[i] = 0.0 + 0.0 * I;
+		conv[i]          = 0.0 + 0.0 * I;
+		amp_norm[i]      = 0.0;
+	}
 	#endif
 	
 
@@ -1432,7 +1279,6 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	int ntsteps = iters; 
 	double dt   = get_timestep(amp, fftw_plan_c2r_pad, fftw_plan_r2c_pad, kx, N, num_osc, k0);
 
-	printf("\ndt: %6.16lf\n", dt);
 
 	// If calculating stats or integrating until transient get required iters
 	#ifdef __TRANSIENTS
@@ -1457,16 +1303,16 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 
 
 	// create hdf5 handle identifiers for hyperslabing the full evolution data
-	hid_t HDF_file_space[6];
-	hid_t HDF_data_set[6];
-	hid_t HDF_mem_space[6];
+	hid_t HDF_file_space[7];
+	hid_t HDF_data_set[7];
+	hid_t HDF_mem_space[7];
 
 	// get output file name
 	char output_file_name[512];
 	get_output_file_name(output_file_name, N, k0, a, b, u0, ntsteps, trans_iters);
 
 	// Create complex datatype for hdf5 file if modes are being recorded
-	#if defined(__MODES) || defined(__TRIAD_STATS)
+	#if defined(__MODES) || defined(__TRIAD_STATS) || defined(__TRIAD_ORDER)
 	hid_t COMPLEX_DATATYPE = create_complex_datatype();
 	#else
 	hid_t COMPLEX_DATATYPE = -1;
@@ -1477,7 +1323,6 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 
 
 	
-
 	// ------------------------------
 	//  Write Initial Conditions to File
 	// ------------------------------
@@ -1554,6 +1399,8 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 			printf("Iter: %d/%d | t = %4.4lf |\n", iter, ntsteps + trans_iters, t);
 		}		
 
+
+
 		//////////////
 		// STAGES
 		//////////////
@@ -1591,12 +1438,14 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 			phi[i] = phi[i] + (dt * B1) * RK1[i] + (dt * B2) * RK2[i] + (dt * B3) * RK3[i] + (dt * B4) * RK4[i];  
 		}
 
-	
 
-		////////////
+
+		//////////////////
 		// Print to file
-		////////////
+		//////////////////
 		if ((iter > trans_iters) && (iter % save_step == 0)) {
+
+			
 						
 			#ifdef __PHASES
 			// Write phases
@@ -1630,7 +1479,7 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 			phase_order_Phi[save_data_indx] = carg(triad_phase_order);
 			#endif
 
-			#if defined(__MODES) || defined(__GRAD) || defined(__REALSPACE) || defined(__REALSPACE_STATS)
+			#if defined(__MODES) || defined(__GRAD) || defined(__REALSPACE) || defined(__REALSPACE_STATS) || defined(__TRIAD_ORDER)
 			// Construct the modes
 			for (int i = 0; i < num_osc; ++i) {
 				u_z[i] = amp[i] * cexp(I * phi[i]);
@@ -1653,13 +1502,10 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 
 			#if defined(__REALSPACE) || defined(__REALSPACE_STATS) 
 			// transform back to Real Space
-			fftw_execute_dft_c2r(fftw_plan_c2r, u_z, u);
-			// fftw_execute_dft_c2r((*plan_c2r_pad), u_z_tmp, u_tmp);
+			fftw_execute_dft_c2r(fftw_plan_c2r, u_z, u);			
 			for (int i = 0; i < N; ++i)	{
-				u[i] /= sqrt((double) N);  // Normalize inverse transfom
-				// printf("u[%d]: %6.16lf\n", i, u[i]);
+				u[i] /= sqrt((double) N);  // Normalize inverse transfom	
 			}
-			// printf("\n\n");
 			#endif
 
 			#if defined(__GRAD) || defined(__REALSPACE_STATS) 
@@ -1667,42 +1513,47 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 			fftw_execute_dft_c2r(fftw_plan_c2r, u_z_grad, u_grad);
 			for (int i = 0; i < N; ++i)	{
 				u_grad[i] /= sqrt((double) N);  // Normalize inverse transfom
-				// printf("u_grad[%d]: %6.16lf\n", i, u_grad[i]);
 			}
-			// printf("\n\n");
+			#endif
+
+			#ifdef __TRIAD_ORDER
+			// Get the normalization constant
+			if (iter - trans_iters == 1) {
+				amp_normalize(amp_norm, amp, num_osc, k0);
+			}
+
+			// Get the convolution
+			conv_2N_pad(conv, u_z, &fftw_plan_r2c_pad, &fftw_plan_c2r_pad, N, num_osc, k0);
+
+			// compute scale dependent triad phase order
+			for (int i = k0 + 1; i < num_osc; ++i) {
+				triad_order_k[i] = -I * (conv[i] / amp_norm[i]);
+			}
+
+			// Write the scale order parameter
+			write_hyperslab_data(HDF_file_space[6], HDF_data_set[6], HDF_mem_space[6], COMPLEX_DATATYPE, triad_order_k, "ScaleOrderParam", num_osc, save_data_indx);
 			#endif
 
 			#ifdef __REALSPACE_STATS			
 			// If first non-transient iteration - set bin edges
 			if ((trans_iters != 0) && (save_data_indx == 0)) {
 				vel_sec_mnt  = sqrt(theoretical_energy(amp, num_osc));
-				grad_sec_mnt = sqrt(gradient_energy(amp, kx, num_osc));
-
-				// printf("\n\nu_norm = %6.16lf\nnorm_grad = %6.16lf\n\n", vel_sec_mnt, grad_sec_mnt);
-				// for (int i = 0; i < num_osc; ++i) {
-				// 	printf("phi[%d]: %6.16lf\n", i, phi[i]);
-				// }				
+				grad_sec_mnt = sqrt(gradient_energy(amp, kx, num_osc));				
 								
-				// gsl_set_vel_inc_hist_bin_ranges(vel_inc_hist, u, u_grad, vel_sec_mnt, grad_sec_mnt, num_osc);
-				set_vel_inc_hist_bin_ranges(small_bins, u, num_osc, 1);
-				printf("\n\nSmall Scale\n");
-				for (int i = 0; i < NBIN_VELINC+1; ++i) {
-					printf("du_%d[%d]: %6.16lf\n", 1, i, small_bins[i]);
-				}
-				set_vel_inc_hist_bin_ranges(large_bins, u, num_osc, num_osc - 1);
-				printf("\n\nLarge Scale\n");
-				for (int i = 0; i < NBIN_VELINC+1; ++i) {
-					printf("du_%d[%d]: %6.16lf\n", 1, i, large_bins[i]);
-				}
-				linspace(grad_bins, -BIN_LIM * grad_sec_mnt * M_PI / (num_osc - 1), BIN_LIM * grad_sec_mnt * M_PI / (num_osc - 1), NBIN_VELINC + 1);
-				printf("\n\nGrad\n");
-				for (int i = 0; i < NBIN_VELINC+1; ++i) {
-					printf("du_%d[%d]: %6.16lf\n", 1, i, grad_bins[i]);
-				}
+				gsl_set_vel_inc_hist_bin_ranges(vel_inc_hist, u, u_grad, vel_sec_mnt, grad_sec_mnt, num_osc);
+				// set_vel_inc_hist_bin_ranges(small_bins, u, num_osc, 1);
+				// set_vel_inc_hist_bin_ranges(large_bins, u, num_osc, num_osc - 1);
+				// linspace(grad_bins, -BIN_LIM * grad_sec_mnt * M_PI / (num_osc - 1), BIN_LIM * grad_sec_mnt * M_PI / (num_osc - 1), NBIN_VELINC + 1);
 			}
+			// printf("i = %d\n", iter - trans_iters);
+			// for (int i = 0; i < N; ++i)
+			// {
+			// 	printf("RS[%d]: %6.16lf \t| Grad[%d]: %6.16lf\n", i, u[i], i, u_grad[i]);
+			// }
+			// printf("\n");
 
-			// gsl_compute_real_space_stats(vel_inc_hist, vel_inc_stats, str_func, u, u_grad, vel_sec_mnt, grad_sec_mnt, num_osc, max_p);
-			// compute_real_space_stats(bins, counts, str_func, u, u_grad, vel_sec_mnt, grad_sec_mnt, num_osc, max_p);
+			gsl_compute_real_space_stats(vel_inc_hist, vel_inc_stats, str_func, u, u_grad, vel_sec_mnt, grad_sec_mnt, num_osc, max_p);
+			// compute_real_space_stats(small_counts, small_bins, large_counts, large_bins, grad_counts, grad_bins, u, u_grad, num_osc);
 			num_stats++;
 			#endif
 
@@ -1958,9 +1809,12 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	free(triad_cent_R);
 	free(triad_cent_Phi);
 	#endif
-	#ifdef __REALSPACE_STATS
-	free(str_func);
+	#ifdef __TRIAD_ORDER
+	fftw_free(triad_order_k);	
+	fftw_free(conv);
+	free(amp_norm);
 	#endif
+	free(str_func);
 	free(time_array);
 	fftw_free(u_z);
 	fftw_free(RK1);
@@ -2001,6 +1855,11 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	H5Sclose( HDF_mem_space[5] );
 	H5Dclose( HDF_data_set[5] );
 	H5Sclose( HDF_file_space[5] );
+	#endif
+	#ifdef __TRIAD_ORDER
+	H5Sclose( HDF_mem_space[6] );
+	H5Dclose( HDF_data_set[6] );
+	H5Sclose( HDF_file_space[6] );
 	#endif
 
 	// Close pipeline to output file

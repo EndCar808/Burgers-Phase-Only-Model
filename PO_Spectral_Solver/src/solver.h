@@ -6,8 +6,7 @@
 // ---------------------------------------------------------------------
 //  Standard Libraries and Headers
 // ---------------------------------------------------------------------
-#include <gsl/gsl_histogram.h>
-#include <gsl/gsl_rstat.h>
+
 
 // ---------------------------------------------------------------------
 //  User Libraries and Headers
@@ -42,14 +41,7 @@ void conv_direct(fftw_complex* convo, fftw_complex* u_z, int n, int k0);
 void po_rhs(double* rhs, fftw_complex* u_z, fftw_plan *plan_c2r_pad, fftw_plan *plan_r2c_pad, int* kx, int n, int num_osc, int k0);
 
 void triad_phases(double* triads, fftw_complex* phase_order, double* phi, int kmin, int kmax);
-
-void linspace(double* arr, double a, double b, int n_points);
-void histogram(double* counts, double* data, double* bins, int num_bins, int num_data);
-void set_vel_inc_hist_bin_ranges(double* bins, double* u, double* u_grad, double vel_sec_mnt, double grad_sec_mnt, int num_osc);
-
-
-void gsl_set_vel_inc_hist_bin_ranges(gsl_histogram** hist_incr, double* u, double* u_grad, double vel_sec_mnt, double grad_sec_mnt, int num_osc);
-void gsl_compute_real_space_stats(gsl_histogram** hist_incr, gsl_rstat_workspace** incr_stat, double* str_func, double* u, double* u_grad, double vel_sec_mnt, double grad_sec_mnt, int num_osc, int max_p);
+void amp_normalize(double* norm, double* amp, int num_osc, int k0);
 
 double gradient_energy(double* a_k, int* k, int num_osc);
 double theoretical_energy(double* a_k, int num_osc);

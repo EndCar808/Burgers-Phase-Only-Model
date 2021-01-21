@@ -24,6 +24,7 @@
 #include "data_types.h"
 #include "utils.h"
 #include "solver.h"
+#include "stats.h"
 
 
 
