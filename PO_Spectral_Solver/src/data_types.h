@@ -26,13 +26,13 @@
 // ---------------------------------------------------------------------
 //  Datasets
 // ---------------------------------------------------------------------
-#define __PHASES
+// #define __PHASES
 // #define __TRIADS
 // #define __TRIAD_STATS
-#define __TRIAD_ORDER
+// #define __TRIAD_ORDER
 // #define __MODES
 // #define __RHS
-#define __REALSPACE
+// #define __REALSPACE
 // #define __GRAD
 #define __REALSPACE_STATS
 // #define __STR_FUNCS
@@ -45,12 +45,9 @@
 //  Global Variables
 // ---------------------------------------------------------------------
 #define SAVE_DATA_STEP 100	// Parameter to determine after how many integrations steps data should be saved to output
-#ifdef __REALSPACE_STATS
 #define NBIN_VELINC 8000
 #define BIN_LIM 40.0 
-#else
-#define BIN_LIM 0.0 
-#endif
+
 
 // #ifndef M_PI
 //     #define M_PI 3.14159265358979323846

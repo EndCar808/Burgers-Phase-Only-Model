@@ -253,31 +253,22 @@ void gsl_compute_real_space_stats(gsl_histogram** hist_incr, gsl_rstat_workspace
 			// Get current increment
 			vel_inc = u[(i + r) % (2* N_osc)] - u[i];
 
-			// printf("u_r[%d]: %6.16lf | u[%d]: %6.16lf | vel[%d]: %6.16lf\n", (i + r) % (2 * N_osc), u[(i + r) % (2 * N_osc)], i, u[i], i, vel_inc);
-
-
 			// Add current vel inc to appropriate bin
 			gsl_histogram_increment(hist_incr[r_indx], vel_inc);
 
-			// Add current vel inc to accumulator
+			// Add current vel inc to stats accumulator
 			gsl_rstat_add(vel_inc, incr_stat[r_indx]);
 		}
-		// for (int j = 0; j < NBIN_VELINC; ++j) {
-		// 	printf("counts_%d[%d]: %6.16lf\n", r_indx, j, hist_incr[r_indx]->bin[j]);
-		// }
-		// printf("\n\n");
 	}
 	
-	// Compute Gradient Histogram
+	// Compute the Gradient Histogram
 	for (int i = 0; i < 2 * N_osc; ++i)	{
 		// Add current gradient to appropriate bin
 		gsl_histogram_increment(hist_incr[num_r_inc], u_grad[i] * M_PI / N_osc);
-		// printf("u_grad[%d]: %5.16lf \t u_grad[%d]: %5.16lf\n", i, u_grad[i] / grad_sec_mnt, i, u_grad[i]);
+		
+		// Add current gradient to stats accumulator
+		gsl_rstat_add(u_grad[i] * M_PI / N_osc, incr_stat[num_r_inc]);
 	}
-	// for (int j = 0; j < NBIN_VELINC; ++j) {
-	// 	printf("counts_%d[%d]: %6.16lf\n", num_r_inc, j, hist_incr[num_r_inc]->bin[j]);
-	// }
-	// printf("\n\n");
 
 	///////////////////////////////
 	// Compute Structure Functions

@@ -247,12 +247,38 @@ void get_output_file_name(char* output_file_name, int N, int k0, double a, doubl
 	#endif	
 }
 
+void create_hdf5_slabbed_dset(hid_t* file_handle, char* dset_name, hid_t* file_space, hid_t* data_set, hid_t* mem_space, hid_t dtype, hid_t* dset_dims, hid_t* dset_max_dims, hid_t* dset_chunk_dims, const int num_dims) {
+
+	// Error handling variable
+	herr_t status;
+
+	// Create the 2D dataspace - setting the no. of dimensions, expected and max size of the dimensions
+	*file_space = H5Screate_simple(num_dims, dset_dims, dset_max_dims);
+
+	// Must create a propertly list to enable data chunking due to max dimension being unlimited
+	// Create property list 
+	hid_t plist;
+	plist = H5Pcreate(H5P_DATASET_CREATE);
+
+	// Using this property list set the chuncking - stores the chunking info in plist
+	status = H5Pset_chunk(plist, num_dims, dset_chunk_dims);
+
+	// Create the dataset in the previouosly created datafile - using the chunk enabled property list and new compound datatype
+	*data_set = H5Dcreate(*file_handle, dset_name, dtype, *file_space, H5P_DEFAULT, plist, H5P_DEFAULT);
+	
+	// Create the memory space for the slab
+	// setting the max dims to NULL defaults to same size as dims
+	*mem_space = H5Screate_simple(num_dims, dset_chunk_dims, NULL);
+
+	// Close the property list object
+	status = H5Pclose(plist);
+}
+
 void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_name, hid_t* file_space, hid_t* data_set, hid_t* mem_space, hid_t dtype, int num_t_steps, int num_osc, int k_range, int k1_range) {
 
 	// ------------------------------
 	//  Create file
-	// ------------------------------
-	
+	// ------------------------------	
 	// create datafile - H5F_ACC_TRUNC overwrites file if it exists already
 	*file_handle = H5Fcreate(output_file_name, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
 
@@ -264,7 +290,7 @@ void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_n
 	//---------- PHASES -----------//
 	//-----------------------------//
 	// create hdf5 dimension arrays for creating the hyperslabs
-	static const int dimensions = 2;
+	const int dimensions = 2;
 	hsize_t dims[dimensions];      // array to hold dims of full evolution data
 	hsize_t maxdims[dimensions];   // array to hold max dims of full evolution data
 	hsize_t chunkdims[dimensions]; // array to hold dims of the hyperslab chunks
@@ -278,34 +304,15 @@ void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_n
 	chunkdims[0] = 1;                       // 1D chunk to be saved 
 	chunkdims[1] = num_osc;                 // 1D chunk of size number of modes
 
-	// create the 2D dataspace - setting the no. of dimensions, expected and max size of the dimensions
-	file_space[0] = H5Screate_simple(dimensions, dims, maxdims);
-
-	// must create a propertly list to enable data chunking due to max time dimension being unlimited
-	// create property list 
-	hid_t plist;
-	plist = H5Pcreate(H5P_DATASET_CREATE);
-
-	// using this property list set the chuncking - stores the chunking info in plist
-	H5Pset_chunk(plist, dimensions, chunkdims);
-
-	// Create the dataset in the previouosly created datafile - using the chunk enabled property list and new compound datatype
-	data_set[0] = H5Dcreate(*file_handle, "Phases", H5T_NATIVE_DOUBLE, file_space[0], H5P_DEFAULT, plist, H5P_DEFAULT);
-	
-	// create the memory space for the slab
-	dims[0] = 1;
-	dims[1] = num_osc;
-
-	// setting the max dims to NULL defaults to same size as dims
-	mem_space[0] = H5Screate_simple(dimensions, dims, NULL);
-
-	H5Pclose(plist);
+	// Create the phases dataset
+	create_hdf5_slabbed_dset(file_handle, "Phases", &file_space[0], &data_set[0], &mem_space[0], H5T_NATIVE_DOUBLE, dims, maxdims, chunkdims, dimensions);
 	#endif
 
-	#ifdef __RHS
+	
 	//-----------------------------//
 	//----------- RHS -------------//
 	//-----------------------------//
+	#ifdef __RHS
 	// initialize the hyperslab arrays
 	dims[0]      = num_t_steps;             // number of timesteps
 	dims[1]      = num_osc;                 // number of oscillators
@@ -314,69 +321,26 @@ void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_n
 	chunkdims[0] = 1;                       // 1D chunk to be saved 
 	chunkdims[1] = num_osc;                 // 1D chunk of size number of modes
 
-	// create the 2D dataspace - setting the no. of dimensions, expected and max size of the dimensions
-	file_space[4] = H5Screate_simple(dimensions, dims, maxdims);
-
-	// must create a propertly list to enable data chunking due to max time dimension being unlimited
-	// create property list 
-	hid_t plist5;
-	plist5 = H5Pcreate(H5P_DATASET_CREATE);
-
-	// using this property list set the chuncking - stores the chunking info in plist
-	H5Pset_chunk(plist5, dimensions, chunkdims);
-
-	// Create the dataset in the previouosly created datafile - using the chunk enabled property list and new compound datatype
-	data_set[4] = H5Dcreate(*file_handle, "RHS", H5T_NATIVE_DOUBLE, file_space[4], H5P_DEFAULT, plist5, H5P_DEFAULT);
-	
-	// create the memory space for the slab
-	dims[0] = 1;
-	dims[1] = num_osc;
-
-	// setting the max dims to NULL defaults to same size as dims
-	mem_space[4] = H5Screate_simple(dimensions, dims, NULL);
-
-	H5Pclose(plist5);
+	// Create the dataset for the RHS
+	create_hdf5_slabbed_dset(file_handle, "RHS", &file_space[4], &data_set[4], &mem_space[4], H5T_NATIVE_DOUBLE, dims, maxdims, chunkdims, dimensions);
 	#endif
 	
+
 	//-----------------------------//
 	//---------- TRIADS -----------//
 	//-----------------------------//
 	#ifdef __TRIADS
-	// create hdf5 dimension arrays for creating the hyperslabs
-	static const int dim2 = 2;
-	hsize_t dims2[dim2];      // array to hold dims of full evolution data
-	hsize_t maxdims2[dim2];   // array to hold max dims of full evolution data
-	hsize_t chunkdims2[dim2]; // array to hold dims of the hyperslab chunks
-
 	// initialize the hyperslab arrays
-	dims2[0]      = num_t_steps;             // number of timesteps + initial condition
-	dims2[1]      = k_range * k1_range;      // size of triads array
-	maxdims2[0]   = H5S_UNLIMITED;           // setting max time index to unlimited means we must chunk our data
-	maxdims2[1]   = k_range * k1_range;      // size of triads array
-	chunkdims2[0] = 1;                       // 1D chunk to be saved 
-	chunkdims2[1] = k_range*k1_range;         // size of triad array
-
-	// create the 2D dataspace - setting the no. of dimensions, expected and max size of the dimensions
-	file_space[1] = H5Screate_simple(dim2, dims2, maxdims2);
-
-	// must create a propertly list to enable data chunking due to max time dimension being unlimited
-	// create property list 
-	hid_t plist2;
-	plist2 = H5Pcreate(H5P_DATASET_CREATE);
-
-	// using this property list set the chuncking - stores the chunking info in plist
-	H5Pset_chunk(plist2, dim2, chunkdims2);
-
-	// Create the dataset in the previouosly created datafile - using the chunk enabled property list and new compound datatype
-	data_set[1] = H5Dcreate(*file_handle, "Triads", H5T_NATIVE_DOUBLE, file_space[1], H5P_DEFAULT, plist2, H5P_DEFAULT);
+	dims[0]      = num_t_steps;             // number of timesteps + initial condition
+	dims[1]      = k_range * k1_range;      // size of triads array
+	maxdims[0]   = H5S_UNLIMITED;           // setting max time index to unlimited means we must chunk our data
+	maxdims[1]   = k_range * k1_range;      // size of triads array
+	chunkdims[0] = 1;                       // 1D chunk to be saved 
+	chunkdims[1] = k_range*k1_range;        // size of triad array
 	
-	// create the memory space for the slab
-	dims2[0] = 1;
-	dims2[1] = k_range*k1_range;
-
-	// setting the max dims to NULL defaults to same size as dims
-	mem_space[1] = H5Screate_simple(dim2, dims2, NULL);
-
+	// Create the dataset for the Triads
+	create_hdf5_slabbed_dset(file_handle, "Triads", &file_space[1], &data_set[1], &mem_space[1], H5T_NATIVE_DOUBLE, dims, maxdims, chunkdims, dimensions);
+	
 	// Create attribute data for the triad dimensions
 	hid_t triads_attr, triads_attr_space;
 
@@ -394,11 +358,11 @@ void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_n
 
     herr_t status = H5Awrite(triads_attr, H5T_NATIVE_INT, triads_dims);
 
-	// close the created property list
+	// close the created attributes obkects
 	status = H5Aclose(triads_attr);
-    status = H5Sclose(triads_attr_space);
-	status = H5Pclose(plist2);
+    status = H5Sclose(triads_attr_space);	
 	#endif
+
 
 	//----------------------------//
 	//---------- MODES -----------//
@@ -412,29 +376,10 @@ void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_n
 	chunkdims[0] = 1;                       // 1D chunk to be saved 
 	chunkdims[1] = num_osc;                 // 1D chunk of size number of modes
 
-	// create the 2D dataspace - setting the no. of dimensions, expected and max size of the dimensions
-	file_space[2] = H5Screate_simple(dimensions, dims, maxdims);
-
-	// must create a propertly list to enable data chunking due to max time dimension being unlimited
-	// create property list 
-	hid_t plist3;
-	plist3 = H5Pcreate(H5P_DATASET_CREATE);
-
-	// using this property list set the chuncking - stores the chunking info in plist
-	H5Pset_chunk(plist3, dimensions, chunkdims);
-
-	// Create the dataset in the previouosly created datafile - using the chunk enabled property list and new compound datatype
-	data_set[2] = H5Dcreate(*file_handle, "Modes", dtype, file_space[2], H5P_DEFAULT, plist3, H5P_DEFAULT);
-	
-	// create the memory space for the slab
-	dims[0] = 1;
-	dims[1] = num_osc;
-
-	// setting the max dims to NULL defaults to same size as dims
-	mem_space[2] = H5Screate_simple(dimensions, dims, NULL);
-
-	H5Pclose(plist3);
+	// Create the dataset for the Modes
+	create_hdf5_slabbed_dset(file_handle, "Modes", &file_space[2], &data_set[2], &mem_space[2], dtype, dims, maxdims, chunkdims, dimensions);
 	#endif
+
 
 	//--------------------------------//
 	//---------- REALSPACE -----------//
@@ -449,29 +394,10 @@ void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_n
 	chunkdims[0] = 1;                       // 1D chunk to be saved 
 	chunkdims[1] = NN;                       // number of collocation points
 
-	// create the 2D dataspace - setting the no. of dimensions, expected and max size of the dimensions
-	file_space[3] = H5Screate_simple(dimensions, dims, maxdims);
-
-	// must create a propertly list to enable data chunking due to max time dimension being unlimited
-	// create property list 
-	hid_t plist4;
-	plist4 = H5Pcreate(H5P_DATASET_CREATE);
-
-	// using this property list set the chuncking - stores the chunking info in plist
-	H5Pset_chunk(plist4, dimensions, chunkdims);
-
-	// Create the dataset in the previouosly created datafile - using the chunk enabled property list and new compound datatype
-	data_set[3] = H5Dcreate(*file_handle, "RealSpace", H5T_NATIVE_DOUBLE, file_space[3], H5P_DEFAULT, plist4, H5P_DEFAULT);
-	
-	// create the memory space for the slab
-	dims[0] = 1;
-	dims[1] = NN;
-
-	// setting the max dims to NULL defaults to same size as dims
-	mem_space[3] = H5Screate_simple(dimensions, dims, NULL);
-
-	H5Pclose(plist4);
+	// Create the dataset for the real space velocity field
+	create_hdf5_slabbed_dset(file_handle, "RealSpace", &file_space[3], &data_set[3], &mem_space[3], H5T_NATIVE_DOUBLE, dims, maxdims, chunkdims, dimensions);
 	#endif
+
 
 	//--------------------------------//
 	//-------- REALSPACE GRAD --------//
@@ -486,29 +412,11 @@ void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_n
 	chunkdims[0] = 1;                       // 1D chunk to be saved 
 	chunkdims[1] = N;                       // number of collocation points
 
-	// create the 2D dataspace - setting the no. of dimensions, expected and max size of the dimensions
-	file_space[5] = H5Screate_simple(dimensions, dims, maxdims);
 
-	// must create a propertly list to enable data chunking due to max time dimension being unlimited
-	// create property list 
-	hid_t plist6;
-	plist6 = H5Pcreate(H5P_DATASET_CREATE);
-
-	// using this property list set the chuncking - stores the chunking info in plist
-	H5Pset_chunk(plist6, dimensions, chunkdims);
-
-	// Create the dataset in the previouosly created datafile - using the chunk enabled property list and new compound datatype
-	data_set[5] = H5Dcreate(*file_handle, "RealSpaceGrad", H5T_NATIVE_DOUBLE, file_space[5], H5P_DEFAULT, plist6, H5P_DEFAULT);
-	
-	// create the memory space for the slab
-	dims[0] = 1;
-	dims[1] = N;
-
-	// setting the max dims to NULL defaults to same size as dims
-	mem_space[5] = H5Screate_simple(dimensions, dims, NULL);
-
-	H5Pclose(plist6);
+	// Create the dataset for the real space velocity field
+	create_hdf5_slabbed_dset(file_handle, "RealSpaceGrad", &file_space[5], &data_set[5], &mem_space[5], H5T_NATIVE_DOUBLE, dims, maxdims, chunkdims, dimensions);
 	#endif
+
 
 	//-------------------------------------------------//
 	//---------- SCALE TRIAD ORDER PARMETER -----------//
@@ -522,28 +430,14 @@ void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_n
 	chunkdims[0] = 1;                       // 1D chunk to be saved 
 	chunkdims[1] = num_osc;                 // 1D chunk of size number of modes
 
-	// create the 2D dataspace - setting the no. of dimensions, expected and max size of the dimensions
-	file_space[6] = H5Screate_simple(dimensions, dims, maxdims);
+	// Create the dataset for the real space velocity field
+	create_hdf5_slabbed_dset(file_handle, "ScaleOrderParam", &file_space[6], &data_set[6], &mem_space[6], dtype, dims, maxdims, chunkdims, dimensions);
 
-	// must create a propertly list to enable data chunking due to max time dimension being unlimited
-	// create property list 
-	hid_t plist7;
-	plist7 = H5Pcreate(H5P_DATASET_CREATE);
+	// Create the dataset for the real space velocity field
+	create_hdf5_slabbed_dset(file_handle, "AgustinsScaleOrderParam", &file_space[7], &data_set[7], &mem_space[7], dtype, dims, maxdims, chunkdims, dimensions);
 
-	// using this property list set the chuncking - stores the chunking info in plist
-	H5Pset_chunk(plist7, dimensions, chunkdims);
-
-	// Create the dataset in the previouosly created datafile - using the chunk enabled property list and new compound datatype
-	data_set[6] = H5Dcreate(*file_handle, "ScaleOrderParam", dtype, file_space[6], H5P_DEFAULT, plist7, H5P_DEFAULT);
-	
-	// create the memory space for the slab
-	dims[0] = 1;
-	dims[1] = num_osc;
-
-	// setting the max dims to NULL defaults to same size as dims
-	mem_space[6] = H5Screate_simple(dimensions, dims, NULL);
-
-	H5Pclose(plist7);
+	// Create the dataset for the real space velocity field
+	create_hdf5_slabbed_dset(file_handle, "TriadScaleOrderParam", &file_space[8], &data_set[8], &mem_space[8], dtype, dims, maxdims, chunkdims, dimensions);
 	#endif
 }
 
@@ -551,6 +445,9 @@ hid_t create_complex_datatype() {
 
 	// Declare HDF5 datatype variable
 	hid_t dtype;
+
+	// error handling var
+	herr_t status;
 	
 	// Create compound datatype for complex numbers
 	typedef struct complex_type {
@@ -564,8 +461,8 @@ hid_t create_complex_datatype() {
 
 	// create complex compound datatype
 	dtype = H5Tcreate(H5T_COMPOUND, sizeof(cmplex));
-  	H5Tinsert(dtype, "r", offsetof(complex_type,re), H5T_NATIVE_DOUBLE);
-  	H5Tinsert(dtype, "i", offsetof(complex_type,im), H5T_NATIVE_DOUBLE);
+  	status = H5Tinsert(dtype, "r", offsetof(complex_type,re), H5T_NATIVE_DOUBLE);
+  	status = H5Tinsert(dtype, "i", offsetof(complex_type,im), H5T_NATIVE_DOUBLE);
 
   	return dtype;
 }
@@ -736,29 +633,36 @@ void conv_23(fftw_complex* convo, fftw_complex* uz, fftw_plan *fftw_plan_r2c_ptr
 
 void conv_direct(fftw_complex* convo, fftw_complex* u_z, int n, int k0) {
 	
-	// Set the 0 to k0 modes to 0;
-	for (int i = 0; i <= k0; ++i) {
-		convo[0] = 0.0 + 0.0*I;
-	}
-	
-	// Compute the convolution on the remaining wavenumbers
+	// Initialize variables
 	int k1;
-	for (int kk = k0 + 1; kk < n; ++kk)	{
-		for (int k_1 = 1 + kk; k_1 < 2*n; ++k_1)	{
-			// Get correct k1 value
-			if(k_1 < n) {
-				k1 = -n + k_1;
-			} else {
-				k1 = k_1 - n;
-			}
-			if (k1 < 0) {
-				convo[kk] += conj(u_z[abs(k1)])*u_z[kk - k1]; 	
-			} else if (kk - k1 < 0) {
-				convo[kk] += u_z[k1]*conj(u_z[abs(kk - k1)]); 
-			} else {
-				convo[kk] += u_z[k1]*u_z[kk - k1];
-			}			
+	int N = n - 1;
+	
+	// Compute the convolution for each wavenumber
+	for (int kk = 0; kk <= N; ++kk)	{
+		if (kk <= 0) {
+			convo[kk] = 0.0 + 0.0 * I;
 		}
+		else {
+			for (int k_1 = 0; k_1 <= 2*N; ++k_1)	{
+				// Get correct k1 value
+				if(k_1 < N) {
+					k1 = -N + k_1;
+				} else {
+					k1 = k_1 - N;
+				}
+
+				// Compute the convolution
+				if (k1 >= -N + kk) {
+					if (k1 < 0) {
+						convo[kk] += conj(u_z[abs(k1)])*u_z[kk - k1]; 	
+					} else if (kk - k1 < 0) {
+						convo[kk] += u_z[k1]*conj(u_z[abs(kk - k1)]); 
+					} else {
+						convo[kk] += u_z[k1]*u_z[kk - k1];
+					}					
+				}							
+			}
+		}		
 	}
 }
 
@@ -867,22 +771,29 @@ void amp_normalize(double* norm, double* amp, int num_osc, int k0) {
 
 	// Compute the sum for each k
 	for (int kk = 0; kk <= N; ++kk) {
-		for (int k_1 = 0; k_1 < 2 * N; ++k_1) {
-			if (k_1 <= N) {     // Adjust for the correct k1 value
-				k1 = -N + 1 + k_1;
-			}
-			else  {
-				k1 = k_1 - N;
-			}
-			if (kk <= k0) {
-				norm[kk] = 0.0;
-			}
-			else {
-				norm[kk] += amp[abs(k1)] * amp[abs(kk - k1)];
+		if (kk <= k0) {
+			norm[kk] = 0.0;
+		}
+		else {
+			for (int k_1 = 0; k_1 <= 2 * N; ++k_1) {
+				// Adjust for the correct k1 value
+				if (k_1 <= N) {     
+					k1 = -N + k_1;
+				}
+				else  {
+					k1 = k_1 - N;
+				}
+				
+				// Compute the convolution
+				if (k1 >= - N + kk) {
+					norm[kk] +=  amp[abs(k1)] * amp[abs(kk - k1)];
+				}
 			}
 		}
+		
 	}
 }
+
 
 
 double get_timestep(double* amps, fftw_plan plan_c2r, fftw_plan plan_r2c, int* kx, int n, int num_osc, int k0) {
@@ -1103,7 +1014,7 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 
 	// modes array
 	fftw_complex* u_z = (fftw_complex* ) fftw_malloc(num_osc * sizeof(fftw_complex));
-	mem_chk(u_z, "u_z");
+	mem_chk(u_z, "u_z"); 
 
 	// padded solution arrays
 	double* u_pad = (double* ) malloc(M * sizeof(double));
@@ -1139,15 +1050,6 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	 	vel_inc_hist[i]  = gsl_histogram_alloc(NBIN_VELINC);
 	 	vel_inc_stats[i] = gsl_rstat_alloc();
 	} 
-
-
-	// double* small_bins   = (double* )malloc(sizeof(double) * (num_r_inc + 1) * (NBIN_VELINC + 1));
-	// double* large_bins   = (double* )malloc(sizeof(double) * (num_r_inc + 1) * (NBIN_VELINC + 1));
-	// double* grad_bins    = (double* )malloc(sizeof(double) * (num_r_inc + 1) * (NBIN_VELINC + 1));
-	// double* small_counts = (double* )malloc(sizeof(double) * (num_r_inc + 1) * NBIN_VELINC);
-	// double* large_counts = (double* )malloc(sizeof(double) * (num_r_inc + 1) * NBIN_VELINC);
-	// double* grad_counts  = (double* )malloc(sizeof(double) * (num_r_inc + 1) * NBIN_VELINC);
-
 	
 	// Second moment variables
 	double vel_sec_mnt;
@@ -1155,6 +1057,7 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 
 	// Stats counter
 	int num_stats = 0;
+	
 	// stucture function array
 	int max_p     = 6;
 	double *str_func = NULL;
@@ -1169,7 +1072,7 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	}
 	#endif
 	#endif
-	#if  defined(__TRIADS) || defined(__TRIAD_STATS) || defined(__TRIAD_ORDER)
+	#if  defined(__TRIADS) || defined(__TRIAD_STATS)
 	// Initialize tirad array
 	double* triads = (double* )malloc(k_range * k1_range * sizeof(double));
 	mem_chk(triads, "triads");
@@ -1204,16 +1107,25 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	#endif
 	#endif
 	#ifdef __TRIAD_ORDER
+	// Allocate scale dependent order paramter arrays
+	fftw_complex* order_k = (fftw_complex* )fftw_malloc(sizeof(fftw_complex) * num_osc);
+	mem_chk(order_k, "order_k");
 	fftw_complex* triad_order_k = (fftw_complex* )fftw_malloc(sizeof(fftw_complex) * num_osc);
-	fftw_complex* conv          = (fftw_complex* )fftw_malloc(sizeof(fftw_complex) * num_osc);
-	double* amp_norm            = (double* )malloc(sizeof(double) * num_osc);
 	mem_chk(triad_order_k, "triad_order_k");
+	fftw_complex* agustins_order_k = (fftw_complex* )fftw_malloc(sizeof(fftw_complex) * num_osc);
+	mem_chk(agustins_order_k, "agustins_order_k");
+	fftw_complex* conv = (fftw_complex* )fftw_malloc(sizeof(fftw_complex) * num_osc);
 	mem_chk(conv, "conv");
+	double* amp_norm = (double* )malloc(sizeof(double) * num_osc);
 	mem_chk(amp_norm, "amp_norm");
+
+	// Initialize the arrays
 	for (int i = 0; i < num_osc; ++i) {
-		triad_order_k[i] = 0.0 + 0.0 * I;
-		conv[i]          = 0.0 + 0.0 * I;
-		amp_norm[i]      = 0.0;
+		order_k[i]          = 0.0 + 0.0 * I;
+		agustins_order_k[i] = 0.0 + 0.0 * I;
+		triad_order_k[i]    = 0.0 + 0.0 * I;
+		conv[i]             = 0.0 + 0.0 * I;
+		amp_norm[i]         = 0.0;
 	}
 	#endif
 	
@@ -1283,7 +1195,6 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	// If calculating stats or integrating until transient get required iters
 	#ifdef __TRANSIENTS
 	int trans_iters    = get_transient_iters(amp, fftw_plan_c2r_pad, fftw_plan_r2c_pad, kx, N, num_osc, k0);
-	// int trans_iters    = 1;
 	int num_save_steps = ntsteps / SAVE_DATA_STEP; 
 	#else 
 	int trans_iters    = 0;
@@ -1301,11 +1212,14 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	// Create the HDF5 file handle
 	hid_t HDF_Outputfile_handle;
 
+	// HDF5 error handling variable
+	herr_t status;
+
 
 	// create hdf5 handle identifiers for hyperslabing the full evolution data
-	hid_t HDF_file_space[7];
-	hid_t HDF_data_set[7];
-	hid_t HDF_mem_space[7];
+	hid_t HDF_file_space[9];
+	hid_t HDF_data_set[9];
+	hid_t HDF_mem_space[9];
 
 	// get output file name
 	char output_file_name[512];
@@ -1518,42 +1432,42 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 
 			#ifdef __TRIAD_ORDER
 			// Get the normalization constant
-			if (iter - trans_iters == 1) {
+			if (save_data_indx == 0) {
 				amp_normalize(amp_norm, amp, num_osc, k0);
 			}
 
 			// Get the convolution
 			conv_2N_pad(conv, u_z, &fftw_plan_r2c_pad, &fftw_plan_c2r_pad, N, num_osc, k0);
 
-			// compute scale dependent triad phase order
+			// compute scale dependent phase order parameter
 			for (int i = k0 + 1; i < num_osc; ++i) {
-				triad_order_k[i] = -I * (conv[i] / amp_norm[i]);
-			}
+				order_k[i]          = -I * (conv[i] / amp_norm[i]);
+				triad_order_k[i]    = -I * cexp(I * 2.0 *  phi[i]) * conj(conv[i]); 
+				agustins_order_k[i] = (- (double) kx[i] / amp[i]) * conv[i];
+				// printf("O[%d]: %0.16lf %0.16lf I \t A[%d]: %0.16lf %0.16lf I \t T[%d]: %0.16lf %0.16lf I\n", i, order_k[i], i, agustins_order_k[i], i, triad_order_k[i]);
+			}			
 
 			// Write the scale order parameter
-			write_hyperslab_data(HDF_file_space[6], HDF_data_set[6], HDF_mem_space[6], COMPLEX_DATATYPE, triad_order_k, "ScaleOrderParam", num_osc, save_data_indx);
+			write_hyperslab_data(HDF_file_space[6], HDF_data_set[6], HDF_mem_space[6], COMPLEX_DATATYPE, order_k, "ScaleOrderParam", num_osc, save_data_indx);
+			write_hyperslab_data(HDF_file_space[7], HDF_data_set[7], HDF_mem_space[7], COMPLEX_DATATYPE, agustins_order_k, "AgustinsScaleOrderParam", num_osc, save_data_indx);
+			write_hyperslab_data(HDF_file_space[8], HDF_data_set[8], HDF_mem_space[8], COMPLEX_DATATYPE, triad_order_k, "TriadScaleOrderParam", num_osc, save_data_indx);
 			#endif
 
 			#ifdef __REALSPACE_STATS			
 			// If first non-transient iteration - set bin edges
 			if ((trans_iters != 0) && (save_data_indx == 0)) {
+				// Compute the second moments of the velocity and gradient fields
 				vel_sec_mnt  = sqrt(theoretical_energy(amp, num_osc));
 				grad_sec_mnt = sqrt(gradient_energy(amp, kx, num_osc));				
-								
+				
+				// Initialize the histogram bins for the PDFs
 				gsl_set_vel_inc_hist_bin_ranges(vel_inc_hist, u, u_grad, vel_sec_mnt, grad_sec_mnt, num_osc);
-				// set_vel_inc_hist_bin_ranges(small_bins, u, num_osc, 1);
-				// set_vel_inc_hist_bin_ranges(large_bins, u, num_osc, num_osc - 1);
-				// linspace(grad_bins, -BIN_LIM * grad_sec_mnt * M_PI / (num_osc - 1), BIN_LIM * grad_sec_mnt * M_PI / (num_osc - 1), NBIN_VELINC + 1);
 			}
-			// printf("i = %d\n", iter - trans_iters);
-			// for (int i = 0; i < N; ++i)
-			// {
-			// 	printf("RS[%d]: %6.16lf \t| Grad[%d]: %6.16lf\n", i, u[i], i, u_grad[i]);
-			// }
-			// printf("\n");
-
+			
+			// Compute velocity increment PDFs, stats, structure funcs etc.
 			gsl_compute_real_space_stats(vel_inc_hist, vel_inc_stats, str_func, u, u_grad, vel_sec_mnt, grad_sec_mnt, num_osc, max_p);
-			// compute_real_space_stats(small_counts, small_bins, large_counts, large_bins, grad_counts, grad_bins, u, u_grad, num_osc);
+
+			// Increment the stats counter
 			num_stats++;
 			#endif
 
@@ -1732,7 +1646,7 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	hid_t triad_cent_dset = H5Dcreate2(HDF_Outputfile_handle, "TriadCentroid", COMPLEX_DATATYPE, triad_cent_dspace, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
 
 	// Write dataset
-	H5Dwrite(triad_cent_dset, COMPLEX_DATATYPE, H5S_ALL, H5S_ALL, H5P_DEFAULT, triad_centroid);
+	status H5Dwrite(triad_cent_dset, COMPLEX_DATATYPE, H5S_ALL, H5S_ALL, H5P_DEFAULT, triad_centroid);
 
 
 	// Create attribute data for the triad_centroid dimensions
@@ -1750,17 +1664,17 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	triad_cent_dims[0] = k_range;
 	triad_cent_dims[1] = k1_range;
 
-    herr_t status = H5Awrite(triad_cent, H5T_NATIVE_INT, triad_cent_dims);
+    status = H5Awrite(triad_cent, H5T_NATIVE_INT, triad_cent_dims);
 
 	// close the created property list
 	status = H5Aclose(triad_cent);
     status = H5Sclose(triad_cent_space);
     // Close datasets and spaces
-	H5Dclose(triad_cent_dset);
-	H5Sclose(triad_cent_dspace);
+	status = H5Dclose(triad_cent_dset);
+	status = H5Sclose(triad_cent_dspace);
 	#endif
 
-
+	
 	// ------------------------------
 	//  Clean Up
 	// ------------------------------
@@ -1810,11 +1724,13 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	free(triad_cent_Phi);
 	#endif
 	#ifdef __TRIAD_ORDER
-	fftw_free(triad_order_k);	
+	fftw_free(order_k);	
 	fftw_free(conv);
 	free(amp_norm);
 	#endif
+	#ifdef __REALSPACE_STATS
 	free(str_func);
+	#endif
 	free(time_array);
 	fftw_free(u_z);
 	fftw_free(RK1);
@@ -1824,46 +1740,56 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	fftw_free(u_z_tmp);
 	fftw_free(u_z_pad);
 
+	// destroy the complex comound datatype
+	#if defined(__MODES) || defined(__TRIAD_STATS) || defined(__TRIAD_ORDER)
+	status = H5Tclose(COMPLEX_DATATYPE);
+	#endif
 
 	// Close HDF5 handles
 	#ifdef __PHASES
-	H5Sclose( HDF_mem_space[0] );
-	H5Dclose( HDF_data_set[0] );
-	H5Sclose( HDF_file_space[0] );
+	status = H5Sclose( HDF_mem_space[0] );
+	status = H5Dclose( HDF_data_set[0] );
+	status = H5Sclose( HDF_file_space[0] );
 	#endif
 	#ifdef __TRIADS
-	H5Sclose( HDF_mem_space[1] );
-	H5Dclose( HDF_data_set[1] );
-	H5Sclose( HDF_file_space[1] );
+	status = H5Sclose( HDF_mem_space[1] );
+	status = H5Dclose( HDF_data_set[1] );
+	status = H5Sclose( HDF_file_space[1] );
 	#endif
 	#ifdef __MODES
-	H5Sclose( HDF_mem_space[2] );
-	H5Dclose( HDF_data_set[2] );
-	H5Sclose( HDF_file_space[2] );
+	status = H5Sclose( HDF_mem_space[2] );
+	status = H5Dclose( HDF_data_set[2] );
+	status = H5Sclose( HDF_file_space[2] );
 	#endif 
 	#ifdef __REALSPACE
-	H5Sclose( HDF_mem_space[3] );
-	H5Dclose( HDF_data_set[3] );
-	H5Sclose( HDF_file_space[3] );
+	status = H5Sclose( HDF_mem_space[3] );
+	status = H5Dclose( HDF_data_set[3] );
+	status = H5Sclose( HDF_file_space[3] );
 	#endif
 	#ifdef __RHS
-	H5Sclose( HDF_mem_space[4] );
-	H5Dclose( HDF_data_set[4] );
-	H5Sclose( HDF_file_space[4] );
+	status = H5Sclose( HDF_mem_space[4] );
+	status = H5Dclose( HDF_data_set[4] );
+	status = H5Sclose( HDF_file_space[4] );
 	#endif
 	#ifdef __GRAD
-	H5Sclose( HDF_mem_space[5] );
-	H5Dclose( HDF_data_set[5] );
-	H5Sclose( HDF_file_space[5] );
+	status = H5Sclose( HDF_mem_space[5] );
+	status = H5Dclose( HDF_data_set[5] );
+	status = H5Sclose( HDF_file_space[5] );
 	#endif
 	#ifdef __TRIAD_ORDER
-	H5Sclose( HDF_mem_space[6] );
-	H5Dclose( HDF_data_set[6] );
-	H5Sclose( HDF_file_space[6] );
+	status = H5Sclose( HDF_mem_space[6] );
+	status = H5Dclose( HDF_data_set[6] );
+	status = H5Sclose( HDF_file_space[6] );
+	status = H5Sclose( HDF_mem_space[7] );
+	status = H5Dclose( HDF_data_set[7] );
+	status = H5Sclose( HDF_file_space[7] );
+	status = H5Sclose( HDF_mem_space[8] );
+	status = H5Dclose( HDF_data_set[8] );
+	status = H5Sclose( HDF_file_space[8] );
 	#endif
 
 	// Close pipeline to output file
-	H5Fclose(HDF_Outputfile_handle);
+	status = H5Fclose(HDF_Outputfile_handle);
 
 	// Check if fixed point found 
 	#ifdef __FXD_PT_SEARCH__

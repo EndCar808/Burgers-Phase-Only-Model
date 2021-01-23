@@ -152,7 +152,7 @@ def compute_triads(phases, kmin, kmax):
 	print("\n...Computing Triads...\n")
 
 	## Variables
-	numTriads  = 0;
+	numTriads  = 0
 	k3_range   = int(kmax - kmin + 1)
 	k1_range   = int((kmax - kmin + 1) / 2)
 	time_steps = phases.shape[0]

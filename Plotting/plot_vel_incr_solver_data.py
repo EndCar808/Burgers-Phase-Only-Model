@@ -37,6 +37,14 @@ import numpy as np
 np.set_printoptions(threshold=sys.maxsize)
 from numba import jit, njit
 
+
+
+
+
+
+######################
+##  Function Definitions
+######################
 # @njit
 def compute_second_moment(a_k, k0, N):
 
@@ -129,7 +137,20 @@ def load_parameters(base_dir='../',
     return pars
 
 
+
+
+
+
+
+######################
+##  Main
+######################
 if __name__ == '__main__':
+
+
+    save_data = False
+
+    
 
     #########################
     ##  Get Input Parameters
@@ -152,11 +173,20 @@ if __name__ == '__main__':
     kmax    = num_osc - 1
     kmin    = k0 + 1
     num_obs = N * iters
+
+
+
     ######################
     ##  Input & Output Dir
     ######################
     input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/RESULTS"
-    output_dir = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Snapshots/Stats"
+    output_dir = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Snapshots/Stats/" + "N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]_ITERS[{}]_TRANS[{}]".format(N, k0, alpha, beta, u0, iters, trans)
+
+
+    if os.path.isdir(output_dir) != True:
+        print("Creating Output folder...")
+        os.mkdir(output_dir)
+
 
 
     ######################
@@ -166,28 +196,262 @@ if __name__ == '__main__':
 
     # print input file name to screen
     print("\n\nData File: %s.h5\n" % filename)
-    print(list(HDFfileData.keys()))
+    # print(list(HDFfileData.keys()))
 
 
     ######################
-    ##  Read in Datasets
+    ##  Velocity Incrments
     ######################   
-    phases = HDFfileData["Phases"][:, :]
-    amps   = HDFfileData["Amps"][:]
     vel_inc_bincounts = np.zeros((2, 8000))
     vel_inc_binedges  = np.zeros((2, 8001))
     for i in range(2):
         vel_inc_bincounts[i, :] = HDFfileData["VelInc[{}]_BinCounts".format(i)][:]
         vel_inc_binedges[i, :] = HDFfileData["VelInc[{}]_BinEdges".format(i)][:]
     grad_bincounts = HDFfileData["VelGrad_BinCounts"][:]
-    grad_binedges  = HDFfileData["VelGrad_BinEdges"][:]
+    grad_binedges  = HDFfileData["VelGrad_BinEdges"][:] 
+    # vel_inc_stats = HDFfileData["VelIncStats"][:, :]
     
+    
+    plt.figure()
+    for i in reversed(range(2)):
+        bin_centers = (vel_inc_binedges[i, 1:] + vel_inc_binedges[i, :-1]) * 0.5
+        bin_width   = (vel_inc_binedges[i, 1] - vel_inc_binedges[i, 0]) #/ vel_inc_stats[i, 1]
+        args        = np.argwhere(vel_inc_bincounts[i, :] != 0)
+        counts      = vel_inc_bincounts[i, args] / np.sum(vel_inc_bincounts[i, :] * bin_width)#* vel_inc_stats[i, 1]
+        bin_pts     = bin_centers[args] #/ vel_inc_stats[i, 1]
+        var         = np.sqrt(np.sum(counts * bin_pts**2 * bin_width))
+        counts      *= var
+        bin_pts     /= var
+        bin_width   /= var
+        plt.plot(bin_pts, counts) # / float(pars['dur_norm'])
+
+        if save_data == True:
+            if i == 0:
+                np.save(output_dir + "/endas_small_scale_bins.npy", bin_pts)
+                np.save(output_dir + "/endas_small_scale_pdf.npy", counts)
+            else:
+                np.save(output_dir + "/endas_large_scale_bins.npy", bin_pts)
+                np.save(output_dir + "/endas_large_scale_pdf.npy", counts)
+
+
+    bin_centers = (grad_binedges[1:] + grad_binedges[:-1]) * 0.5
+    bin_width   = (grad_binedges[1] - grad_binedges[0]) #/ vel_inc_stats[i, 1]
+    args        = np.argwhere(grad_bincounts[:] != 0)
+    counts      = grad_bincounts[args] / np.sum(grad_bincounts[:] * bin_width)#* vel_inc_stats[2, 1]
+    bin_pts     = bin_centers[args] #/ vel_inc_stats[2, 1]
+    var         = np.sqrt(np.sum(counts * bin_pts**2 * bin_width))
+    counts      *= var
+    bin_pts     /= var
+    bin_width   /= var
+    plt.plot(bin_pts, counts ) #/ float(pars['dur_norm'])
+    plt.legend([r"Largest", r"Smallest", r"Gradient"])
+    plt.yscale('log')
+    plt.grid(True)
+
+    if save_data == True:
+        np.save(output_dir + "/endas_grad_bins.npy", bin_pts)
+        np.save(output_dir + "/endas_grad_pdf.npy", counts)
+
+
+    plt.savefig(output_dir + "/PDF_Vel_Incrments_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]_ITERS[{}]_TRANS[{}].png".format(N, k0, alpha, beta, u0, iters, trans), format='png', dpi = 400)  
+    plt.close()
+
+
+
+   
+    
+    ######################
+    ##  Triad Centroid
+    #####################   
+    ## Read in data
+    Triad_Centroid = HDFfileData["TriadCentroid"]
+    Triad_Cent_R   = HDFfileData["TriadCentroid_R"]
+
+    # Reshape triads
+    tdims    = Triad_Centroid.attrs['Triad_Dims']
+    k_range  = tdims[0, 0] # kmax - kmin + 1
+    k1_range = tdims[0, 1] # int(k_range / 2)
+
+    triad_cent   = np.reshape(Triad_Centroid[:], (k_range, k1_range))
+    Triad_Cent_R = np.reshape(Triad_Cent_R[:], (k_range, k1_range))
+
+    ## Generate colour map
+    myjet   = cm.jet(np.arange(255))
+    norm    = mpl.colors.Normalize(vmin = 0.0, vmax = 1.0)
+    my_mjet = mpl.colors.LinearSegmentedColormap.from_list('my_map', myjet, N = kmax) # set N to inertial range
+    my_mjet.set_under('1.0')
+    m       = cm.ScalarMappable(norm = norm, cmap = my_mjet)     
+
+    ## Plot data
+    fig = plt.figure(figsize = (16, 9), tight_layout = True)
+    gs  = GridSpec(1, 1)
+    ax4  = fig.add_subplot(gs[0, 0])
+    im   = ax4.imshow(np.flipud(np.transpose(Triad_Cent_R)), cmap = my_mjet, norm = norm)
+    kMax = kmax - kmin # Adjusted indices in triads matrix
+    kMin = kmin - kmin # Adjusted indices in triads matrix
+    ax4.set_xticks([kmin, int((kMax - kMin)/5), int(2 * (kMax - kMin)/5), int(3* (kMax - kMin)/5), int(4 * (kMax - kMin)/5), kMax])
+    ax4.set_xticklabels([kmin, int((kmax - kmin)/5), int(2 * (kmax - kmin)/5), int(3* (kmax - kmin)/5), int(4 * (kmax - kmin)/5), kmax])
+    ax4.set_yticks([kMin, int((kMax / 2 - kMin)/4), int(2 * (kMax / 2 - kMin)/4), int(3* (kMax / 2 - kMin)/4),  int((kmax)/ 2 - kmin)])
+    ax4.set_yticklabels(np.flip([kmin + kmin, int((kmax / 2 - kmin)/4) + kmin, int(2 * (kmax / 2 - kmin)/4) + kmin, int(3* (kmax / 2 - kmin)/4) + kmin,  int(kmax / 2)]))
+    ax4.set_xlabel(r'$k$', labelpad = 0)
+    ax4.set_ylabel(r'$p$',  rotation = 0, labelpad = 10)
+    ax4.set_xlim(left = kmin - 0.5)
+    ax4.set_ylim(bottom = int((kmax)/ 2 - kmin) + 0.5)
+    div4  = make_axes_locatable(ax4)
+    cax4  = div4.append_axes('right', size = '5%', pad = 0.1)
+    cbar4 = plt.colorbar(im, cax = cax4, orientation='vertical')
+    cbar4.set_ticks([ 0.0, 0.5, 1])
+    cbar4.set_ticklabels([r"$0$", r"$0.5$", r"$1$"])
+    cbar4.set_label(r"$\mathcal{R}_{k, p}$")
+
+    plt.savefig(output_dir + "/Triad_Centroid_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]_ITERS[{}]_TRANS[{}].png".format(N, k0, alpha, beta, u0, iters, trans), format='png', dpi = 400)  
+    plt.close()
+
+
+    if save_data == True:
+        np.save(output_dir + "/endas_triad_centroid.npy", np.flipud(np.transpose(Triad_Cent_R)))
+
+
+
+
+   
+
+
+
+
+    ######################
+    ##  Str Funcs Plots
+    ######################   
+    ## Read in Data
+    str_func = HDFfileData["StructureFuncs"][:, :]
+    amps     = HDFfileData["Amps"][:]
+    rms      = np.sqrt(np.mean(amps ** 2)) #* 1/N)
+
+    ## Compute control second memont
+    second_moment = compute_second_moment(amps, k0, int(N/2))
+
+    ## Scale variables
+    r = np.arange(1, N/2 + 1)
+    L = (N / 2)
+
+    ## Plot figure
+    plt.figure()
+    for i in range(str_func.shape[0]):
+        plt.plot(r/L, np.absolute(str_func[i, :]) / (rms**(i + 2)))
+    plt.plot(r/L, second_moment[:] * N  / rms**2, 'k--')
+   
+    plt.legend(np.append([r"$p = {}$".format(p) for p in range(2, 6 + 1)], r"Second Moment"))
+    plt.yscale('Log')
+    plt.xscale('Log')
+    plt.xlabel(r"$r / L$")
+    plt.ylabel(r"$|S^p(r)|/u_{rms}^p$")
+    plt.xlim(left = 1 / L, right = 1)
+    plt.ylim(bottom = 1/(10**4))    
+    plt.savefig(output_dir + "/Structure_Funcs_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]_ITERS[{}]_TRANS[{}].png".format(N, k0, alpha, beta, u0, iters, trans), format='png', dpi = 400)  
+    plt.close()
+
+    if save_data == True:
+        np.save(output_dir + "/endas_str_funcs.npy", str_func)
+    
+    
+
+
+
+
+
+
+    ######################
+    ##  Space Time Plots
+    ######################   
+    ## Read in data
+    phases = HDFfileData["Phases"][:, :]
+    amps   = HDFfileData["Amps"][:]
+    
+    ## Compute real space 
     u, u_z        = compute_modes_real_space(amps, phases, N)
     u_rms, u_urms = compute_rms(u)
     
-    du_r, rlist   = compute_velinc(u_urms, 2)
+    # du_r, rlist   = compute_velinc(u_urms, 2)
 
-    rms = np.sqrt(np.mean(amps ** 2))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 9))
+    fig.suptitle(r'$N = {} \quad \alpha = {} \quad \beta = {} \quad k_0 = {}$'.format(N, alpha, beta, k0))
+
+    ## REAL SPACE
+    im1 = ax1.imshow(np.flipud(u_urms), cmap = "bwr", extent = [0, N, 0, u_urms.shape[0]])
+    ax1.set_aspect('auto')
+    ax1.set_title(r"Real Space")
+    ax1.set_xlabel(r"$x$")
+    ax1.set_ylabel(r"$t$")
+    ax1.set_xticks([0.0, np.ceil(N / 4), np.ceil(2 * N / 4), np.ceil(3 * N / 4), N])
+    ax1.set_xticklabels([r"$0$", r"$\frac{\pi}{2}$", r"$\pi$", r"$\frac{3\pi}{2}$", r"$2 \pi$"])
+    div1  = make_axes_locatable(ax1)
+    cbax1 = div1.append_axes("right", size = "10%", pad = 0.05)
+    cb1   = plt.colorbar(im1, cax = cbax1)
+    cb1.set_label(r"$u(x, t) / u^{rms}(x, t)$")
+
+    ## PHASES
+    im2  = ax2.imshow(np.flipud(np.mod(phases[:, kmin:], 2.0*np.pi)), cmap = "Blues", vmin = 0.0, vmax = 2.0 * np.pi, extent = [kmin, kmax, 0, u_urms.shape[0]])
+    ax2.set_aspect('auto')
+    ax2.set_title(r"Phases")
+    ax2.set_xlabel(r"$k$")
+    ax2.set_ylabel(r"$t$")
+    div2  = make_axes_locatable(ax2)
+    cbax2 = div2.append_axes("right", size = "10%", pad = 0.05)
+    cb2   = plt.colorbar(im2, cax = cbax2)
+    cb2.set_ticks([ 0.0, np.pi/2.0, np.pi, 3.0*np.pi/2.0, 2.0*np.pi])
+    cb2.set_ticklabels([r"$0$", r"$\frac{\pi}{2}$", r"$\pi$", r"$\frac{3\pi}{2}$", r"$2\pi$"])
+    cb2.set_label(r"$\phi_k(t)$")
+
+    plt.tight_layout(rect = (0, 0, 1, 0.96))
+    plt.savefig(output_dir + "/SPACETIME_N[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(N, alpha, beta, k0, iters), format='png', dpi = 400)  
+    plt.close()
+
+
+
+
+    ######################
+    ##  End of File
+    ######################   
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -219,138 +483,80 @@ if __name__ == '__main__':
     # plt.close()
 
 
-    a_data_dir = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Agustin_Code/phase-oscillator-master_Copy_ECEdits_2/phase-oscillator-master/source/"
-    name = "N10_k0_1"
-    subname = "Grad"
-    f=FortranFile(a_data_dir + 'histograms/bins_'+subname+'_'+name+'.dat', 'r')
-    bins=f.read_reals(kr)
-    f.close
+    # a_data_dir = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Agustin_Code/phase-oscillator-master_Copy_ECEdits_2/phase-oscillator-master/source/"
+    # name = "N10_k0_1"
+    # subname = "du"
+    # f=FortranFile(a_data_dir + 'histograms/bins_'+subname+'_'+name+'.dat', 'r')
+    # bins=f.read_reals(kr)
+    # f.close
 
-    f=FortranFile(a_data_dir + 'histograms/Hist_'+subname+'_'+name+'.dat', 'r')
-    H=f.read_reals(ki)
-    f.close
+    # f=FortranFile(a_data_dir + 'histograms/Hist_'+subname+'_'+name+'.dat', 'r')
+    # H=f.read_reals(ki)
+    # f.close
 
-    pars = load_parameters(a_data_dir, name)
+    # pars = load_parameters(a_data_dir, name)
 
 
-    dx=(bins[1]-bins[0])
-    args =np.argwhere(H != 0)
-    bins=bins[args]
-    H=H[args]
-    H=H/np.sum(H*dx)
-    H/=float(pars['dur_norm'])
+    # dx=(bins[1]-bins[0])
+    # args =np.argwhere(H != 0)
+    # bins=bins[args]
+    # H=H[args]
+    # H=H/np.sum(H*dx)
+    # # H/=float(pars['dur_norm'])
+    # var=np.sqrt(np.sum(H*bins**2*dx))
+    # H*=var
+    # dx/=var
+    # bins/=var
+    # plt.plot(bins, H)
+
+    # print(H.shape)
+   
+
+
+    # d = 0
+    # bin_centers = (vel_inc_binedges[d, 1:] + vel_inc_binedges[d, :-1]) * 0.5
+    # print(bin_centers.shape)
+    # bin_width   = vel_inc_binedges[d, 1] - vel_inc_binedges[d, 0]
+    # args        = np.argwhere(vel_inc_bincounts[d, :] != 0)
+    # counts      = vel_inc_bincounts[d, args] / np.sum(vel_inc_bincounts[d, :] * bin_width)
+    # bin_pts     = bin_centers[args]
+    # var         = np.sqrt(np.sum(counts * bin_pts**2 * bin_width))
+    # counts      *= var
+    # bin_pts     /= var
+    # bin_width   /= var
+    # plt.plot(bin_pts, counts) #/ float(pars['dur_norm'])
 
     # d = 1
     # bin_centers = (vel_inc_binedges[d, 1:] + vel_inc_binedges[d, :-1]) * 0.5
     # bin_width   = vel_inc_binedges[d, 1] - vel_inc_binedges[d, 0]
-    # args = np.argwhere(vel_inc_bincounts[d, :] != 0)
-    bin_centers = (grad_binedges[1:] + grad_binedges[:-1]) * 0.5
-    bin_width   = grad_binedges[1] - grad_binedges[0]
-    bin_centers = bin_centers[args]
-    # counts = vel_inc_bincounts[d, args]
-    counts = grad_bincounts[args]
-    # plt.plot(bin_centers, counts / np.sum(vel_inc_bincounts[d, :] * bin_width)/ float(pars['dur_norm']))
-    plt.plot(bin_centers, counts / np.sum(grad_bincounts[:] * bin_width)/ float(pars['dur_norm']))
-    plt.plot(bins, H)
-    plt.legend([r"A", r"Mine"])
-    plt.yscale('log')
-    plt.grid(True)
+    # args        = np.argwhere(vel_inc_bincounts[d, :] != 0)
+    # counts      = vel_inc_bincounts[d, args] / np.sum(vel_inc_bincounts[d, :] * bin_width)
+    # bin_pts     = bin_centers[args]
+    # var         = np.sqrt(np.sum(counts * bin_pts**2 * bin_width))
+    # counts      *= var
+    # bin_pts     /= var
+    # bin_width   /= var
+    # plt.plot(bin_pts, counts)
 
-
-    plt.savefig(output_dir + "/PDF_Vel_Incrments_COMPARE_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]_ITERS[{}]_TRANS[{}].png".format(N, k0, alpha, beta, u0, iters, trans), format='png', dpi = 400)  
-    plt.close()
-
-
-    ######################
-    ##  Vel Inc
-    ######################   
-    plt.figure()
-    for i in range(2):
-        bin_centers = (vel_inc_binedges[-i, 1:] + vel_inc_binedges[-i, :-1]) * 0.5
-        bin_width   = vel_inc_binedges[-i, 1] - vel_inc_binedges[-i, 0]
-        plt.plot(bin_centers, vel_inc_bincounts[-i] / (num_obs * bin_width) / float(pars['dur_norm']))
-        # plt.plot(bin_centers, vel_inc_bincounts[i] / np.sum(vel_inc_bincounts[i] * bin_width))
-        # plt.plot(vel_inc_bincounts[i] / (num_obs * bin_width))
-        # print(vel_inc_bincounts[i])
-    bin_centers = (grad_binedges[1:] + grad_binedges[:-1]) * 0.5
-    bin_width   = grad_binedges[1] - grad_binedges[0]
-    plt.plot(bin_centers, grad_bincounts / (num_obs * bin_width) / float(pars['dur_norm']))
-    # plt.plot(bin_centers, grad_bincounts / np.sum(grad_bincounts * bin_width))
-    # plt.plot(grad_bincounts / (num_obs * bin_width))
-    plt.legend([r"Largest", r"Smallest", r"Gradient"])
-    plt.yscale('log')
-    # plt.xlim(-5, 5)
-    plt.grid(True)
-
-
-    plt.savefig(output_dir + "/PDF_Vel_Incrments_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]_ITERS[{}]_TRANS[{}].png".format(N, k0, alpha, beta, u0, iters, trans), format='png', dpi = 400)  
-    plt.close()
+    # bin_centers = (grad_binedges[1:] + grad_binedges[:-1]) * 0.5
+    # bin_width   = grad_binedges[1] - grad_binedges[0]
+    # args        = np.argwhere(grad_bincounts[:] != 0)
+    # bin_centers = bin_centers[args]
+    # counts = grad_bincounts[args] / np.sum(grad_bincounts[:] * bin_width)
+    # var         = np.sqrt(np.sum(counts * bin_pts**2 * bin_width))
+    # counts      *= var
+    # bin_pts     /= var
+    # bin_width   /= var
+    # plt.plot(bin_pts, counts)
 
     
-    ######################
-    ##  Triad Centroid
-    #####################   
-    # Triad_Centroid = HDFfileData["TriadCentroid"]
-    # Triad_Cent_R   = HDFfileData["TriadCentroid_R"]
+    # plt.legend([r"A / Small", r"Mine / Large", r"Gradient"])
+    # plt.yscale('log')
+    # plt.grid(True)
 
-    # # Reshape triads
-    # tdims    = Triad_Centroid.attrs['Triad_Dims']
-    # k_range  = tdims[0, 0] # kmax - kmin + 1
-    # k1_range = tdims[0, 1] # int(k_range / 2)
 
-    # triad_cent   = np.reshape(Triad_Centroid[:], (k_range, k1_range))
-    # Triad_Cent_R = np.reshape(Triad_Cent_R[:], (k_range, k1_range))
-
-    # fig = plt.figure(figsize = (16, 9), tight_layout = True)
-    # gs  = GridSpec(1, 1)
-
-    # myjet   = cm.jet(np.arange(255))
-    # norm    = mpl.colors.Normalize(vmin = 0.0, vmax = 1.0)
-    # my_mjet = mpl.colors.LinearSegmentedColormap.from_list('my_map', myjet, N = kmax) # set N to inertial range
-    # my_mjet.set_under('1.0')
-    # m       = cm.ScalarMappable(norm = norm, cmap = my_mjet)     
-
-    # fig = plt.figure(figsize = (16, 9), tight_layout = True)
-    # gs  = GridSpec(1, 1)
-
-    # ax4  = fig.add_subplot(gs[0, 0])
-    # im   = ax4.imshow(np.flipud(np.transpose(Triad_Cent_R)), cmap = my_mjet, norm = norm)
-    # kMax = kmax - kmin # Adjusted indices in triads matrix
-    # kMin = kmin - kmin # Adjusted indices in triads matrix
-    # ax4.set_xticks([kmin, int((kMax - kMin)/5), int(2 * (kMax - kMin)/5), int(3* (kMax - kMin)/5), int(4 * (kMax - kMin)/5), kMax])
-    # ax4.set_xticklabels([kmin, int((kmax - kmin)/5), int(2 * (kmax - kmin)/5), int(3* (kmax - kmin)/5), int(4 * (kmax - kmin)/5), kmax])
-    # ax4.set_yticks([kMin, int((kMax / 2 - kMin)/4), int(2 * (kMax / 2 - kMin)/4), int(3* (kMax / 2 - kMin)/4),  int((kmax)/ 2 - kmin)])
-    # ax4.set_yticklabels(np.flip([kmin + kmin, int((kmax / 2 - kmin)/4) + kmin, int(2 * (kmax / 2 - kmin)/4) + kmin, int(3* (kmax / 2 - kmin)/4) + kmin,  int(kmax / 2)]))
-    # ax4.set_xlabel(r'$k$', labelpad = 0)
-    # ax4.set_ylabel(r'$p$',  rotation = 0, labelpad = 10)
-    # ax4.set_xlim(left = kmin - 0.5)
-    # ax4.set_ylim(bottom = int((kmax)/ 2 - kmin) + 0.5)
-    # div4  = make_axes_locatable(ax4)
-    # cax4  = div4.append_axes('right', size = '5%', pad = 0.1)
-    # cbar4 = plt.colorbar(im, cax = cax4, orientation='vertical')
-    # cbar4.set_ticks([ 0.0, 0.5, 1])
-    # cbar4.set_ticklabels([r"$0$", r"$0.5$", r"$1$"])
-    # cbar4.set_label(r"$\mathcal{R}_{k, p}$")
-
-    # plt.savefig(output_dir + "/Triad_Centroid_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]_ITERS[{}]_TRANS[{}].png".format(N, k0, alpha, beta, u0, iters, trans), format='png', dpi = 400)  
+    # plt.savefig(output_dir + "/PDF_Vel_Incrments_COMPARE_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]_ITERS[{}]_TRANS[{}].png".format(N, k0, alpha, beta, u0, iters, trans), format='png', dpi = 400)  
     # plt.close()
-
-
-
-   
-
-
-    ######################
-    ##  Str Funcs Plots
-    ######################   
-    # str_func     = HDFfileData["StructureFuncs"][:, :]
-
-    # print(str_func.shape)
-    # r = np.arange(0, N/2)
- 
-    # second_moment = compute_second_moment(amps, k0, int(N/2))
-
-    # L = (N / 2)
 
 
     # urms = np.load("urms.npy")
@@ -379,174 +585,120 @@ if __name__ == '__main__':
     # plt.close()
 
 
+
+
+
+    # u_grad, u_grad_rms = compute_grad(u_z, kmin, kmax)
+
+    # u_grad         = (u_grad * (np.pi / N/2)) / np.std((u_grad * (np.pi / N/2)).flatten())
+    # u_grad_rms     = u_grad_rms / np.std(u_grad_rms.flatten())
+
     # plt.figure()
-    # for i in range(str_func.shape[0]):
-    #     plt.plot(r/L, np.absolute(str_func[i, :]) / (u_rms**(i + 2)))
-    # plt.plot(r/L, second_moment[:] / u_rms**2, 'k--')
-   
-    # plt.legend(np.append([r"$p = {}$".format(p) for p in range(2, 6)], r"Second Moment"))
-    # plt.yscale('Log')
-    # plt.xscale('Log')
-    # plt.xlabel(r"$r / L$")
-    # plt.ylabel(r"$|S^p(r)|/u_{rms}^p$")
+    # hist, bins         = np.histogram(u_grad.flatten(), bins = 8000, density = False)
+    # bin_centers        = (bins[1:] + bins[:-1]) * 0.5
+    # bin_width          = bins[1] - bins[0]
+    # plt.plot(bin_centers, hist / (num_obs * bin_width))
 
+    # bin_centers = (grad_binedges[1:] + grad_binedges[:-1]) * 0.5
+    # bin_width   = grad_binedges[1] - grad_binedges[0]
+    # plt.plot(bin_centers, grad_bincounts / (num_obs * bin_width))
+    # plt.legend([r"Computed Grad", r"Solver Grad"])
     
-    # plt.savefig(output_dir + "/Structure_Funcs_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]_ITERS[{}]_TRANS[{}].png".format(N, k0, alpha, beta, u0, iters, trans), format='png', dpi = 400)  
+    # plt.yscale('log')
+    # # plt.xlim(-5, 5)
+    # plt.savefig(output_dir + "/Gradient_Test.png".format(N, alpha, beta, k0, iters), format='png', dpi = 400)  
     # plt.close()
 
+
+    # plt.figure()
+    # small_scale = du_r[:, :, 0] / np.std(du_r[:, :, 0].flatten())
+    # hist, bins         = np.histogram(small_scale.flatten(), bins = 8000, density = False)
+    # bin_centers        = (bins[1:] + bins[:-1]) * 0.5
+    # bin_width          = bins[1] - bins[0]
+    # plt.plot(bin_centers, hist / (num_obs * bin_width))
+
+    # large_scale = du_r[:, :, 1] / np.std(du_r[:, :, 1].flatten())
+    # hist, bins         = np.histogram(large_scale.flatten(), bins = 8000, density = False)
+    # bin_centers        = (bins[1:] + bins[:-1]) * 0.5
+    # bin_width          = bins[1] - bins[0]
+    # plt.plot(bin_centers, hist / (num_obs * bin_width))
     
-    ######################
-    ##  Space Time Plots
-    ######################   
-    # fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 9))
-    # fig.suptitle(r'$N = {} \quad \alpha = {} \quad \beta = {} \quad k_0 = {}$'.format(N, alpha, beta, k0))
-
-    # ## REAL SPACE
-    # im1 = ax1.imshow(np.flipud(u_urms), cmap = "bwr", extent = [0, N, 0, u_urms.shape[0]])
-    # ax1.set_aspect('auto')
-    # ax1.set_title(r"Real Space")
-    # ax1.set_xlabel(r"$x$")
-    # ax1.set_ylabel(r"$t$")
-    # ax1.set_xticks([0.0, np.ceil(N / 4), np.ceil(2 * N / 4), np.ceil(3 * N / 4), N])
-    # ax1.set_xticklabels([r"$0$", r"$\frac{\pi}{2}$", r"$\pi$", r"$\frac{3\pi}{2}$", r"$2 \pi$"])
-    # div1  = make_axes_locatable(ax1)
-    # cbax1 = div1.append_axes("right", size = "10%", pad = 0.05)
-    # cb1   = plt.colorbar(im1, cax = cbax1)
-    # cb1.set_label(r"$u(x, t) / u^{rms}(x, t)$")
-
-    # ## PHASES
-    # im2  = ax2.imshow(np.flipud(np.mod(phases[:, kmin:], 2.0*np.pi)), cmap = "Blues", vmin = 0.0, vmax = 2.0 * np.pi, extent = [kmin, kmax, 0, u_urms.shape[0]])
-    # ax2.set_aspect('auto')
-    # ax2.set_title(r"Phases")
-    # ax2.set_xlabel(r"$k$")
-    # ax2.set_ylabel(r"$t$")
-    # div2  = make_axes_locatable(ax2)
-    # cbax2 = div2.append_axes("right", size = "10%", pad = 0.05)
-    # cb2   = plt.colorbar(im2, cax = cbax2)
-    # cb2.set_ticks([ 0.0, np.pi/2.0, np.pi, 3.0*np.pi/2.0, 2.0*np.pi])
-    # cb2.set_ticklabels([r"$0$", r"$\frac{\pi}{2}$", r"$\pi$", r"$\frac{3\pi}{2}$", r"$2\pi$"])
-    # cb2.set_label(r"$\phi_k(t)$")
-
-    # plt.tight_layout(rect = (0, 0, 1, 0.96))
-    # plt.savefig(output_dir + "/SPACETIME_N[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(N, alpha, beta, k0, iters), format='png', dpi = 400)  
+    # plt.legend([r"$r = \pi / N$", r"$r = \pi$"])
+    # plt.xlabel(r"$\delta u_r / \sigma$")
+    # plt.ylabel(r"PDF")
+    
+    # plt.yscale('log')
+    # # plt.xlim(-5, 5)
+    # plt.savefig(output_dir + "/Vel_Inc_Test.png".format(N, alpha, beta, k0, iters), format='png', dpi = 400)  
     # plt.close()
 
 
 
+    # hist, bins         = np.histogram(small_scale.flatten(), bins = 8000, density = False)
+    # bin_centers        = (bins[1:] + bins[:-1]) * 0.5
+    # bin_width          = bins[1] - bins[0]
+    # plt.plot(bin_centers, hist / (num_obs * bin_width))
 
+    # hist, bins         = np.histogram(large_scale.flatten(), bins = 8000, density = False)
+    # bin_centers        = (bins[1:] + bins[:-1]) * 0.5
+    # bin_width          = bins[1] - bins[0]
+    # plt.plot(bin_centers, hist / (num_obs * bin_width))
 
+    # hist, bins         = np.histogram(u_grad.flatten(), bins = 8000, density = False)
+    # bin_centers        = (bins[1:] + bins[:-1]) * 0.5
+    # bin_width          = bins[1] - bins[0]
+    # plt.plot(bin_centers, hist / (num_obs * bin_width))
 
-    u_grad, u_grad_rms = compute_grad(u_z, kmin, kmax)
+    # hist, bins         = np.histogram(u_grad_rms.flatten(), bins = 8000, density = False)
+    # bin_centers        = (bins[1:] + bins[:-1]) * 0.5
+    # bin_width          = bins[1] - bins[0]
+    # plt.plot(bin_centers, hist / (num_obs * bin_width))
 
-    u_grad         = (u_grad * (np.pi / N/2)) / np.std((u_grad * (np.pi / N/2)).flatten())
-    u_grad_rms     = u_grad_rms / np.std(u_grad_rms.flatten())
+    # plt.legend([r"Small", r"Large", r"Gradient", r"Gradient RMS"])
+    # plt.yscale('log')
 
-    plt.figure()
-    hist, bins         = np.histogram(u_grad.flatten(), bins = 1000, density = False)
-    bin_centers        = (bins[1:] + bins[:-1]) * 0.5
-    bin_width          = bins[1] - bins[0]
-    plt.plot(bin_centers, hist / (num_obs * bin_width))
-
-    bin_centers = (grad_binedges[1:] + grad_binedges[:-1]) * 0.5
-    bin_width   = grad_binedges[1] - grad_binedges[0]
-    plt.plot(bin_centers, grad_bincounts / (num_obs * bin_width))
-    plt.legend([r"Computed Grad", r"Solver Grad"])
-    
-    plt.yscale('log')
-    # plt.xlim(-5, 5)
-    plt.savefig(output_dir + "/Gradient_Test.png".format(N, alpha, beta, k0, iters), format='png', dpi = 400)  
-    plt.close()
-
-
-    plt.figure()
-    small_scale = du_r[:, :, 0] / np.std(du_r[:, :, 0].flatten())
-    hist, bins         = np.histogram(small_scale.flatten(), bins = 1000, density = False)
-    bin_centers        = (bins[1:] + bins[:-1]) * 0.5
-    bin_width          = bins[1] - bins[0]
-    plt.plot(bin_centers, hist / (num_obs * bin_width))
-
-    large_scale = du_r[:, :, 1] / np.std(du_r[:, :, 1].flatten())
-    hist, bins         = np.histogram(large_scale.flatten(), bins = 1000, density = False)
-    bin_centers        = (bins[1:] + bins[:-1]) * 0.5
-    bin_width          = bins[1] - bins[0]
-    plt.plot(bin_centers, hist / (num_obs * bin_width))
-    
-    plt.legend([r"$r = \pi / N$", r"$r = \pi$"])
-    plt.xlabel(r"$\delta u_r / \sigma$")
-    plt.ylabel(r"PDF")
-    
-    plt.yscale('log')
-    # plt.xlim(-5, 5)
-    plt.savefig(output_dir + "/Vel_Inc_Test.png".format(N, alpha, beta, k0, iters), format='png', dpi = 400)  
-    plt.close()
-
-
-
-    hist, bins         = np.histogram(small_scale.flatten(), bins = 1000, density = False)
-    bin_centers        = (bins[1:] + bins[:-1]) * 0.5
-    bin_width          = bins[1] - bins[0]
-    plt.plot(bin_centers, hist / (num_obs * bin_width))
-
-    hist, bins         = np.histogram(large_scale.flatten(), bins = 1000, density = False)
-    bin_centers        = (bins[1:] + bins[:-1]) * 0.5
-    bin_width          = bins[1] - bins[0]
-    plt.plot(bin_centers, hist / (num_obs * bin_width))
-
-    hist, bins         = np.histogram(u_grad.flatten(), bins = 1000, density = False)
-    bin_centers        = (bins[1:] + bins[:-1]) * 0.5
-    bin_width          = bins[1] - bins[0]
-    plt.plot(bin_centers, hist / (num_obs * bin_width))
-
-    hist, bins         = np.histogram(u_grad_rms.flatten(), bins = 1000, density = False)
-    bin_centers        = (bins[1:] + bins[:-1]) * 0.5
-    bin_width          = bins[1] - bins[0]
-    plt.plot(bin_centers, hist / (num_obs * bin_width))
-
-    plt.legend([r"Small", r"Large", r"Gradient", r"Gradient RMS"])
-    plt.yscale('log')
-
-    plt.savefig(output_dir + "/Vel_Inc+Grad_Test.png".format(N, alpha, beta, k0, iters), format='png', dpi = 400)  
-    plt.close()
+    # plt.savefig(output_dir + "/Vel_Inc+Grad_Test.png".format(N, alpha, beta, k0, iters), format='png', dpi = 400)  
+    # plt.close()
 
 
     # # normal_dist = np.random.normal(loc = 0, scale = 1, size = 100 * num_obs)
-    # # hist, bins  = np.histogram(normal_dist, range = (-5, 5), bins = 1000, density = True)
+    # # hist, bins  = np.histogram(normal_dist, range = (-5, 5), bins = 8000, density = True)
     # # bin_centers = (bins[1:] + bins[:-1]) * 0.5
     # # plt.plot(bin_centers, hist, 'k--')
     
-    hist, bins         = np.histogram(large_scale.flatten(), bins = 1000, density = True)
-    bin_centers        = (bins[1:] + bins[:-1]) * 0.5
-    bin_width          = bins[1] - bins[0]
-    # plt.plot(bin_centers, hist / (num_obs * bin_width))
-    plt.plot(bin_centers, hist)
+    # hist, bins         = np.histogram(large_scale.flatten(), bins = 8000, density = True)
+    # bin_centers        = (bins[1:] + bins[:-1]) * 0.5
+    # bin_width          = bins[1] - bins[0]
+    # # plt.plot(bin_centers, hist / (num_obs * bin_width))
+    # plt.plot(bin_centers, hist)
 
     # large_scale_bins = bin_centers
     # large_scale_pdf  = hist / (num_obs * bin_width)
     # np.save("large_scale_bins.npy", large_scale_bins)
     # np.save("large_scale_pdf.npy", large_scale_pdf)
 
-    hist, bins         = np.histogram(small_scale.flatten(), bins = 1000, density = True)
-    bin_centers        = (bins[1:] + bins[:-1]) * 0.5
-    bin_width          = bins[1] - bins[0]
-    # plt.plot(bin_centers, hist / (num_obs * bin_width))
-    plt.plot(bin_centers, hist)
+    # hist, bins         = np.histogram(small_scale.flatten(), bins = 8000, density = True)
+    # bin_centers        = (bins[1:] + bins[:-1]) * 0.5
+    # bin_width          = bins[1] - bins[0]
+    # # plt.plot(bin_centers, hist / (num_obs * bin_width))
+    # plt.plot(bin_centers, hist)
    
     # small_scale_bins = bin_centers
     # small_scale_pdf  = hist / (num_obs * bin_width)
     # np.save("small_scale_bins.npy", small_scale_bins)
     # np.save("small_scale_pdf.npy", small_scale_pdf)
 
-    hist, bins         = np.histogram(u_grad_rms.flatten(), bins = 1000, density = True)
-    bin_centers        = (bins[1:] + bins[:-1]) * 0.5
-    bin_width          = bins[1] - bins[0]
-    # plt.plot(bin_centers, hist / (num_obs * bin_width))
-    plt.plot(bin_centers, hist)
+    # hist, bins         = np.histogram(u_grad_rms.flatten(), bins = 8000, density = True)
+    # bin_centers        = (bins[1:] + bins[:-1]) * 0.5
+    # bin_width          = bins[1] - bins[0]
+    # # plt.plot(bin_centers, hist / (num_obs * bin_width))
+    # plt.plot(bin_centers, hist)
 
 
 
 
-    plt.legend([r"Large-Scale", r"Small-Scale", r"Gradient"])
-    plt.yscale('log')
+    # plt.legend([r"Large-Scale", r"Small-Scale", r"Gradient"])
+    # plt.yscale('log')
 
-    plt.savefig(output_dir + "/Vel_Inc+Grad.png".format(N, alpha, beta, k0, iters), format='png', dpi = 400)  
-    plt.close()
+    # plt.savefig(output_dir + "/Vel_Inc+Grad.png".format(N, alpha, beta, k0, iters), format='png', dpi = 400)  
+    # plt.close()
