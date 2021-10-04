@@ -273,7 +273,7 @@ if __name__ == '__main__':
 	######################
 	##	Read in Datasets
 	######################
-	phi    = HDFfileData['Phases'][:, :]
+	# phi    = HDFfileData['Phases'][:, :]
 	time   = HDFfileData['Time'][:]
 	amps   = HDFfileData['Amps'][:]
 
@@ -284,7 +284,7 @@ if __name__ == '__main__':
 	##	Preliminary Calcs
 	######################
 	ntsteps = len(time)
-	num_osc = phi.shape[1]
+	num_osc = amps.shape[0]
 	N       = 2 * (num_osc - 1)
 	kmin    = k0 + 1
 	kmax    = num_osc - 1
@@ -316,7 +316,7 @@ if __name__ == '__main__':
 	# u, u_z = compute_modes_real_space(amps, phases, N)
 	# u_z = amps * np.exp(np.complex(0.0, 1.0) * phi[:, :])
 
-	# num_osc = 33
+	num_osc = 33
 	# u_z = amps[:num_osc] * np.exp(np.complex(0.0, 1.0) * np.pi/4)
 
 	# for i in range(num_osc):
@@ -326,7 +326,7 @@ if __name__ == '__main__':
 	# conv = convolution(u_z, num_osc, k0)
 	# conv_fft = convolution_fft(u_z, 32, num_osc, k0)
 
-	# norm = amp_normalization(amps[:num_osc], num_osc, k0)
+	norm = amp_normalization(amps[:num_osc], num_osc, k0)
 
 	# for i in range(num_osc):
 	# 	print("conv[{}]: {:.16f} {:.16f} I".format(i, np.real(conv[i]), np.imag(conv[i])))
@@ -346,9 +346,9 @@ if __name__ == '__main__':
 	# 	print("amp_fft[{}]: {:.16f}".format(i, np.absolute(conv_fft[i])))
 	# print()
 
-	# for i in range(num_osc):
-	# 	print("amp_n[{}]: {:.16f}".format(i, norm[i]))
-	# print()
+	for i in range(num_osc):
+		print("amp_n[{}]: {:.16f}".format(i, norm[i]))
+	print()
 	
 
 	##########################
@@ -363,31 +363,31 @@ if __name__ == '__main__':
 	# 	plot_phase_order(np.absolute(scale_order[t, :]), np.angle(scale_order[t, :]), kmin, kmax, t)
 
 
-	##########################
-	##	Video Creation
-	##########################
-	framesPerSec = 20
-	inputFile    = output_dir + "/ORDER_SNAPS/Order_SNAPS_%05d.png"
-	videoName    = output_dir + "/ORDER_SNAPS/ScaleDependent_OrderParameter_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]_ITERS[{}]_TRANS[{}].mp4".format(N, k0, alpha, beta, u0, iters, trans)
-	cmd = "ffmpeg -r {} -f image2 -s 1920x1080 -i {} -vcodec libx264 -crf 25 -pix_fmt yuv420p {}".format(framesPerSec, inputFile, videoName)
-	# cmd = "ffmpeg -r {} -f image2 -s 1280×720 -i {} -vcodec libx264 -preset ultrafast -crf 35 -pix_fmt yuv420p {}".format(framesPerSec, inputFile, videoName)
+	# ##########################
+	# ##	Video Creation
+	# ##########################
+	# framesPerSec = 20
+	# inputFile    = output_dir + "/ORDER_SNAPS/Order_SNAPS_%05d.png"
+	# videoName    = output_dir + "/ORDER_SNAPS/ScaleDependent_OrderParameter_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]_ITERS[{}]_TRANS[{}].mp4".format(N, k0, alpha, beta, u0, iters, trans)
+	# cmd = "ffmpeg -r {} -f image2 -s 1920x1080 -i {} -vcodec libx264 -crf 25 -pix_fmt yuv420p {}".format(framesPerSec, inputFile, videoName)
+	# # cmd = "ffmpeg -r {} -f image2 -s 1280×720 -i {} -vcodec libx264 -preset ultrafast -crf 35 -pix_fmt yuv420p {}".format(framesPerSec, inputFile, videoName)
 
 
-	## Start timer
-	start = TIME.perf_counter()
+	# ## Start timer
+	# start = TIME.perf_counter()
 
-	process = Popen(cmd, shell = True, stdout = PIPE, stdin = PIPE, universal_newlines = True)
-	[runCodeOutput, runCodeErr] = process.communicate()
-	print(runCodeOutput)
-	print(runCodeErr)
-	process.wait()
+	# process = Popen(cmd, shell = True, stdout = PIPE, stdin = PIPE, universal_newlines = True)
+	# [runCodeOutput, runCodeErr] = process.communicate()
+	# print(runCodeOutput)
+	# print(runCodeErr)
+	# process.wait()
 
 	
-	print("Finished making video...")
-	print("Video Location...")
-	print("\n" + videoName + "\n")
+	# print("Finished making video...")
+	# print("Video Location...")
+	# print("\n" + videoName + "\n")
 
-	# Start timer
-	end = TIME.perf_counter()
+	# # Start timer
+	# end = TIME.perf_counter()
 
-	print("\n\nMovie Time: {:5.8f}s\n\n".format(end - start))
+	# print("\n\nMovie Time: {:5.8f}s\n\n".format(end - start))

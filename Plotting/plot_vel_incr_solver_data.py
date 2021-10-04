@@ -14,11 +14,11 @@ import matplotlib.pyplot as plt
 mpl.rcParams['figure.figsize'] = [16, 9]
 mpl.rcParams['figure.autolayout'] = True
 mpl.rcParams['text.usetex'] = True
-mpl.rcParams['font.size']   = 24
+# mpl.rcParams['font.size']   = 24
 mpl.rcParams['font.family'] = 'serif'
 mpl.rcParams['font.serif'] = 'Computer Modern Roman'
-mpl.rcParams['lines.linewidth'] = 1.25
-mpl.rcParams['lines.markersize'] = 6
+# mpl.rcParams['lines.linewidth'] = 1.25
+# mpl.rcParams['lines.markersize'] = 6
 from scipy.io import FortranFile
 kr='float64'
 ki='int64'
@@ -37,6 +37,8 @@ import numpy as np
 np.set_printoptions(threshold=sys.maxsize)
 from numba import jit, njit
 
+
+from stats_functions import compute_normalized_pdf
 
 
 
@@ -253,105 +255,116 @@ if __name__ == '__main__':
         np.save(output_dir + "/endas_grad_pdf.npy", counts)
 
 
-    plt.savefig(output_dir + "/PDF_Vel_Incrments_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]_ITERS[{}]_TRANS[{}].png".format(N, k0, alpha, beta, u0, iters, trans), format='png', dpi = 400)  
+    plt.savefig(output_dir + "/PDF_Vel_Incrments_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]_ITERS[{}]_TRANS[{}].png".format(N, k0, alpha, beta, u0, iters, trans), format='png', dpi = 400, bbox_inches='tight')  
     plt.close()
 
 
 
-   
-    
-    ######################
-    ##  Triad Centroid
-    #####################   
-    ## Read in data
-    Triad_Centroid = HDFfileData["TriadCentroid"]
-    Triad_Cent_R   = HDFfileData["TriadCentroid_R"]
-
-    # Reshape triads
-    tdims    = Triad_Centroid.attrs['Triad_Dims']
-    k_range  = tdims[0, 0] # kmax - kmin + 1
-    k1_range = tdims[0, 1] # int(k_range / 2)
-
-    triad_cent   = np.reshape(Triad_Centroid[:], (k_range, k1_range))
-    Triad_Cent_R = np.reshape(Triad_Cent_R[:], (k_range, k1_range))
-
-    ## Generate colour map
-    myjet   = cm.jet(np.arange(255))
-    norm    = mpl.colors.Normalize(vmin = 0.0, vmax = 1.0)
-    my_mjet = mpl.colors.LinearSegmentedColormap.from_list('my_map', myjet, N = kmax) # set N to inertial range
-    my_mjet.set_under('1.0')
-    m       = cm.ScalarMappable(norm = norm, cmap = my_mjet)     
-
-    ## Plot data
-    fig = plt.figure(figsize = (16, 9), tight_layout = True)
-    gs  = GridSpec(1, 1)
-    ax4  = fig.add_subplot(gs[0, 0])
-    im   = ax4.imshow(np.flipud(np.transpose(Triad_Cent_R)), cmap = my_mjet, norm = norm)
-    kMax = kmax - kmin # Adjusted indices in triads matrix
-    kMin = kmin - kmin # Adjusted indices in triads matrix
-    ax4.set_xticks([kmin, int((kMax - kMin)/5), int(2 * (kMax - kMin)/5), int(3* (kMax - kMin)/5), int(4 * (kMax - kMin)/5), kMax])
-    ax4.set_xticklabels([kmin, int((kmax - kmin)/5), int(2 * (kmax - kmin)/5), int(3* (kmax - kmin)/5), int(4 * (kmax - kmin)/5), kmax])
-    ax4.set_yticks([kMin, int((kMax / 2 - kMin)/4), int(2 * (kMax / 2 - kMin)/4), int(3* (kMax / 2 - kMin)/4),  int((kmax)/ 2 - kmin)])
-    ax4.set_yticklabels(np.flip([kmin + kmin, int((kmax / 2 - kmin)/4) + kmin, int(2 * (kmax / 2 - kmin)/4) + kmin, int(3* (kmax / 2 - kmin)/4) + kmin,  int(kmax / 2)]))
-    ax4.set_xlabel(r'$k$', labelpad = 0)
-    ax4.set_ylabel(r'$p$',  rotation = 0, labelpad = 10)
-    ax4.set_xlim(left = kmin - 0.5)
-    ax4.set_ylim(bottom = int((kmax)/ 2 - kmin) + 0.5)
-    div4  = make_axes_locatable(ax4)
-    cax4  = div4.append_axes('right', size = '5%', pad = 0.1)
-    cbar4 = plt.colorbar(im, cax = cax4, orientation='vertical')
-    cbar4.set_ticks([ 0.0, 0.5, 1])
-    cbar4.set_ticklabels([r"$0$", r"$0.5$", r"$1$"])
-    cbar4.set_label(r"$\mathcal{R}_{k, p}$")
-
-    plt.savefig(output_dir + "/Triad_Centroid_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]_ITERS[{}]_TRANS[{}].png".format(N, k0, alpha, beta, u0, iters, trans), format='png', dpi = 400)  
-    plt.close()
-
-
-    if save_data == True:
-        np.save(output_dir + "/endas_triad_centroid.npy", np.flipud(np.transpose(Triad_Cent_R)))
-
-
-
-
-   
-
-
-
-
-    ######################
-    ##  Str Funcs Plots
-    ######################   
-    ## Read in Data
-    str_func = HDFfileData["StructureFuncs"][:, :]
-    amps     = HDFfileData["Amps"][:]
-    rms      = np.sqrt(np.mean(amps ** 2)) #* 1/N)
-
-    ## Compute control second memont
-    second_moment = compute_second_moment(amps, k0, int(N/2))
-
-    ## Scale variables
-    r = np.arange(1, N/2 + 1)
-    L = (N / 2)
-
-    ## Plot figure
     plt.figure()
-    for i in range(str_func.shape[0]):
-        plt.plot(r/L, np.absolute(str_func[i, :]) / (rms**(i + 2)))
-    plt.plot(r/L, second_moment[:] * N  / rms**2, 'k--')
-   
-    plt.legend(np.append([r"$p = {}$".format(p) for p in range(2, 6 + 1)], r"Second Moment"))
-    plt.yscale('Log')
-    plt.xscale('Log')
-    plt.xlabel(r"$r / L$")
-    plt.ylabel(r"$|S^p(r)|/u_{rms}^p$")
-    plt.xlim(left = 1 / L, right = 1)
-    plt.ylim(bottom = 1/(10**4))    
-    plt.savefig(output_dir + "/Structure_Funcs_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]_ITERS[{}]_TRANS[{}].png".format(N, k0, alpha, beta, u0, iters, trans), format='png', dpi = 400)  
-    plt.close()
+    for i in reversed(range(2)):
+        pdf, bin_pts, dx = compute_normalized_pdf(vel_inc_bincounts[i, :], vel_inc_binedges[i, :])
+        plt.plot(bin_pts, pdf)
 
-    if save_data == True:
-        np.save(output_dir + "/endas_str_funcs.npy", str_func)
+    pdf, bin_pts, dx = compute_normalized_pdf(grad_bincounts[:], grad_binedges[:])
+    plt.plot(bin_pts, pdf)
+    plt.legend([r"Largest", r"Smallest", r"Gradient"])
+    plt.yscale('log')
+    plt.grid(True)
+    plt.savefig(output_dir + "/SAVE_PDF_Vel_Incrments_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]_ITERS[{}]_TRANS[{}].png".format(N, k0, alpha, beta, u0, iters, trans), format='png', dpi = 400)  
+    plt.close()
+    
+    # ######################
+    # ##  Triad Centroid
+    # #####################   
+    # ## Read in data
+    # Triad_Centroid = HDFfileData["TriadCentroid"]
+    # Triad_Cent_R   = HDFfileData["TriadCentroid_R"]
+
+    # # Reshape triads
+    # tdims    = Triad_Centroid.attrs['Triad_Dims']
+    # k_range  = tdims[0, 0] # kmax - kmin + 1
+    # k1_range = tdims[0, 1] # int(k_range / 2)
+
+    # triad_cent   = np.reshape(Triad_Centroid[:], (k_range, k1_range))
+    # Triad_Cent_R = np.reshape(Triad_Cent_R[:], (k_range, k1_range))
+
+    # ## Generate colour map
+    # myjet   = cm.jet(np.arange(255))
+    # norm    = mpl.colors.Normalize(vmin = 0.0, vmax = 1.0)
+    # my_mjet = mpl.colors.LinearSegmentedColormap.from_list('my_map', myjet, N = kmax) # set N to inertial range
+    # my_mjet.set_under('1.0')
+    # m       = cm.ScalarMappable(norm = norm, cmap = my_mjet)     
+
+    # ## Plot data
+    # fig = plt.figure(figsize = (16, 9), tight_layout = True)
+    # gs  = GridSpec(1, 1)
+    # ax4  = fig.add_subplot(gs[0, 0])
+    # im   = ax4.imshow(np.flipud(np.transpose(Triad_Cent_R)), cmap = my_mjet, norm = norm)
+    # kMax = kmax - kmin # Adjusted indices in triads matrix
+    # kMin = kmin - kmin # Adjusted indices in triads matrix
+    # ax4.set_xticks([kmin, int((kMax - kMin)/5), int(2 * (kMax - kMin)/5), int(3* (kMax - kMin)/5), int(4 * (kMax - kMin)/5), kMax])
+    # ax4.set_xticklabels([kmin, int((kmax - kmin)/5), int(2 * (kmax - kmin)/5), int(3* (kmax - kmin)/5), int(4 * (kmax - kmin)/5), kmax])
+    # ax4.set_yticks([kMin, int((kMax / 2 - kMin)/4), int(2 * (kMax / 2 - kMin)/4), int(3* (kMax / 2 - kMin)/4),  int((kmax)/ 2 - kmin)])
+    # ax4.set_yticklabels(np.flip([kmin + kmin, int((kmax / 2 - kmin)/4) + kmin, int(2 * (kmax / 2 - kmin)/4) + kmin, int(3* (kmax / 2 - kmin)/4) + kmin,  int(kmax / 2)]))
+    # ax4.set_xlabel(r'$k$', labelpad = 0)
+    # ax4.set_ylabel(r'$p$',  rotation = 0, labelpad = 10)
+    # ax4.set_xlim(left = kmin - 0.5)
+    # ax4.set_ylim(bottom = int((kmax)/ 2 - kmin) + 0.5)
+    # div4  = make_axes_locatable(ax4)
+    # cax4  = div4.append_axes('right', size = '5%', pad = 0.1)
+    # cbar4 = plt.colorbar(im, cax = cax4, orientation='vertical')
+    # cbar4.set_ticks([ 0.0, 0.5, 1])
+    # cbar4.set_ticklabels([r"$0$", r"$0.5$", r"$1$"])
+    # cbar4.set_label(r"$\mathcal{R}_{k, p}$")
+
+    # plt.savefig(output_dir + "/Triad_Centroid_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]_ITERS[{}]_TRANS[{}].png".format(N, k0, alpha, beta, u0, iters, trans), format='png', dpi = 400)  
+    # plt.close()
+
+
+    # if save_data == True:
+    #     np.save(output_dir + "/endas_triad_centroid.npy", np.flipud(np.transpose(Triad_Cent_R)))
+
+
+
+
+   
+
+
+
+
+    # ######################
+    # ##  Str Funcs Plots
+    # ######################   
+    # ## Read in Data
+    # str_func = HDFfileData["StructureFuncs"][:, :]
+    # amps     = HDFfileData["Amps"][:]
+    # rms      = np.sqrt(np.mean(amps ** 2)) #* 1/N)
+
+    # ## Compute control second memont
+    # second_moment = compute_second_moment(amps, k0, int(N/2))
+
+    # ## Scale variables
+    # r = np.arange(1, N/2 + 1)
+    # L = (N / 2)
+
+    # ## Plot figure
+    # plt.figure()
+    # for i in range(str_func.shape[0]):
+    #     plt.plot(r/L, np.absolute(str_func[i, :]) / (rms**(i + 2)))
+    # plt.plot(r/L, second_moment[:] * N  / rms**2, 'k--')
+   
+    # plt.legend(np.append([r"$p = {}$".format(p) for p in range(2, 6 + 1)], r"Second Moment"))
+    # plt.yscale('Log')
+    # plt.xscale('Log')
+    # plt.xlabel(r"$r / L$")
+    # plt.ylabel(r"$|S^p(r)|/u_{rms}^p$")
+    # plt.xlim(left = 1 / L, right = 1)
+    # plt.ylim(bottom = 1/(10**4))    
+    # plt.savefig(output_dir + "/Structure_Funcs_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]_ITERS[{}]_TRANS[{}].png".format(N, k0, alpha, beta, u0, iters, trans), format='png', dpi = 400)  
+    # plt.close()
+
+    # if save_data == True:
+    #     np.save(output_dir + "/endas_str_funcs.npy", str_func)
     
     
 
@@ -364,47 +377,51 @@ if __name__ == '__main__':
     ##  Space Time Plots
     ######################   
     ## Read in data
-    phases = HDFfileData["Phases"][:, :]
-    amps   = HDFfileData["Amps"][:]
+    # phases = HDFfileData["Phases"][:, :]
+    # amps   = HDFfileData["Amps"][:]
     
-    ## Compute real space 
-    u, u_z        = compute_modes_real_space(amps, phases, N)
-    u_rms, u_urms = compute_rms(u)
+    # ## Compute real space 
+    # u, u_z        = compute_modes_real_space(amps, phases, N)
+    # u_rms, u_urms = compute_rms(u)
     
-    # du_r, rlist   = compute_velinc(u_urms, 2)
+    
+    # start = 1000
+    # end   = start * 2
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 9))
-    fig.suptitle(r'$N = {} \quad \alpha = {} \quad \beta = {} \quad k_0 = {}$'.format(N, alpha, beta, k0))
+    # fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 9))
+    # # fig.suptitle(r'$N = {} \quad \alpha = {} \quad \beta = {} \quad k_0 = {}$'.format(N, alpha, beta, k0))
 
-    ## REAL SPACE
-    im1 = ax1.imshow(np.flipud(u_urms), cmap = "bwr", extent = [0, N, 0, u_urms.shape[0]])
-    ax1.set_aspect('auto')
-    ax1.set_title(r"Real Space")
-    ax1.set_xlabel(r"$x$")
-    ax1.set_ylabel(r"$t$")
-    ax1.set_xticks([0.0, np.ceil(N / 4), np.ceil(2 * N / 4), np.ceil(3 * N / 4), N])
-    ax1.set_xticklabels([r"$0$", r"$\frac{\pi}{2}$", r"$\pi$", r"$\frac{3\pi}{2}$", r"$2 \pi$"])
-    div1  = make_axes_locatable(ax1)
-    cbax1 = div1.append_axes("right", size = "10%", pad = 0.05)
-    cb1   = plt.colorbar(im1, cax = cbax1)
-    cb1.set_label(r"$u(x, t) / u^{rms}(x, t)$")
+    # ## REAL SPACE
+    # im1 = ax1.imshow(np.flipud(u_urms[start:end, :]), cmap = "bwr", extent = [0, N, 0, u_urms.shape[0]])
+    # ax1.set_aspect('auto')
+    # ax1.set_title(r"Real Space")
+    # ax1.set_xlabel(r"$x$")
+    # ax1.set_ylabel(r"$t$")
+    # # ax1.set_xticks([0.0, np.ceil(N / 4), np.ceil(2 * N / 4), np.ceil(3 * N / 4), N])
+    # # ax1.set_xticklabels([r"$0$", r"$\frac{\pi}{2}$", r"$\pi$", r"$\frac{3\pi}{2}$", r"$2 \pi$"])
+    # ax1.set_xticks([0.0, np.ceil(2 * N / 4), N])
+    # ax1.set_xticklabels([r"$0$", r"$\frac{L}{2}$", r"$L$"])
+    # div1  = make_axes_locatable(ax1)
+    # cbax1 = div1.append_axes("right", size = "10%", pad = 0.05)
+    # cb1   = plt.colorbar(im1, cax = cbax1)
+    # cb1.set_label(r"$u(x, t) / u^{rms}(x, t)$")
 
-    ## PHASES
-    im2  = ax2.imshow(np.flipud(np.mod(phases[:, kmin:], 2.0*np.pi)), cmap = "Blues", vmin = 0.0, vmax = 2.0 * np.pi, extent = [kmin, kmax, 0, u_urms.shape[0]])
-    ax2.set_aspect('auto')
-    ax2.set_title(r"Phases")
-    ax2.set_xlabel(r"$k$")
-    ax2.set_ylabel(r"$t$")
-    div2  = make_axes_locatable(ax2)
-    cbax2 = div2.append_axes("right", size = "10%", pad = 0.05)
-    cb2   = plt.colorbar(im2, cax = cbax2)
-    cb2.set_ticks([ 0.0, np.pi/2.0, np.pi, 3.0*np.pi/2.0, 2.0*np.pi])
-    cb2.set_ticklabels([r"$0$", r"$\frac{\pi}{2}$", r"$\pi$", r"$\frac{3\pi}{2}$", r"$2\pi$"])
-    cb2.set_label(r"$\phi_k(t)$")
+    # ## PHASES
+    # im2  = ax2.imshow(np.flipud(np.mod(phases[start:end, kmin:], 2.0*np.pi)), cmap = "Blues", vmin = 0.0, vmax = 2.0 * np.pi, extent = [kmin, kmax, 0, u_urms.shape[0]])
+    # ax2.set_aspect('auto')
+    # ax2.set_title(r"Phases")
+    # ax2.set_xlabel(r"$k$")
+    # ax2.set_ylabel(r"$t$")
+    # div2  = make_axes_locatable(ax2)
+    # cbax2 = div2.append_axes("right", size = "10%", pad = 0.05)
+    # cb2   = plt.colorbar(im2, cax = cbax2)
+    # cb2.set_ticks([ 0.0, np.pi/2.0, np.pi, 3.0*np.pi/2.0, 2.0*np.pi])
+    # cb2.set_ticklabels([r"$0$", r"$\frac{\pi}{2}$", r"$\pi$", r"$\frac{3\pi}{2}$", r"$2\pi$"])
+    # cb2.set_label(r"$\phi_k(t)$")
 
-    plt.tight_layout(rect = (0, 0, 1, 0.96))
-    plt.savefig(output_dir + "/SPACETIME_N[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(N, alpha, beta, k0, iters), format='png', dpi = 400)  
-    plt.close()
+    # # plt.tight_layout(rect = (0, 0, 1, 0.96))
+    # plt.savefig(output_dir + "/SPACETIME_N[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_k0[{}]_ITERS[{}].png".format(N, alpha, beta, k0, iters), format='png', dpi = 400)  
+    # plt.close()
 
 
 

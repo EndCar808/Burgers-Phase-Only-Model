@@ -1,4 +1,4 @@
-// Enda Carroll
+ // Enda Carroll
 // May 2020
 // File including functions to perform the Benettin et al., algorithm
 // for computing the Lyapunov spectrum and the Ginelli et al. algorithm
@@ -166,7 +166,7 @@ void max(double* a, int n, int k0, double* max_val) {
 
 void mem_chk (void *arr_ptr, char *name) {
   if (arr_ptr == NULL ) {
-    fprintf(stderr, "ERROR!! |in file \"%s\"-line:%d | Unable to malloc required memory for %s, now exiting!\n", __FILE__, __LINE__, name);
+    fprintf(stderr, "ERROR!! |in file \"%s\"-line:%d | Unable to malloc required memory for [%s], now exiting!\n", __FILE__, __LINE__, name);
     exit(1);
   }
 }
@@ -209,23 +209,22 @@ void conv_2N_pad(fftw_complex* convo, fftw_complex* uz, fftw_plan *fftw_plan_r2c
 	double norm_fact = 1.0 / (double) m;
 
 	// Allocate temporary arrays
-	double* u_tmp = (double* ) malloc(m*sizeof(double));
+	double* u_tmp = (double* )malloc(m*sizeof(double));
 	mem_chk(u_tmp, "u_tmp");
+	fftw_complex* u_z_tmp = (fftw_complex* )fftw_malloc((2*num_osc - 1)*sizeof(fftw_complex));
+	mem_chk(u_z_tmp, "u_z_tmp");
 
-	fftw_complex* uz_pad = (fftw_complex* ) fftw_malloc((2 * num_osc - 1) * sizeof(fftw_complex));
-	mem_chk(uz_pad, "uz_pad");
-	
 	// write input data to padded array
-	for (int i = 0; i < 2*num_osc - 1; ++i)	{
+	for (int i = 0; i < (2*num_osc - 1); ++i)	{
 		if(i < num_osc){
-			uz_pad[i] = uz[i];
+			u_z_tmp[i] = uz[i];
 		} else {
-			uz_pad[i] = 0.0 + 0.0*I;
+			u_z_tmp[i] = 0.0 + 0.0*I;
 		}
 	}
 
 	// // transform back to Real Space
-	fftw_execute_dft_c2r((*fftw_plan_c2r_ptr), uz_pad, u_tmp);
+	fftw_execute_dft_c2r((*fftw_plan_c2r_ptr), u_z_tmp, u_tmp);
 
 	// // square
 	for (int i = 0; i < m; ++i)	{
@@ -233,14 +232,14 @@ void conv_2N_pad(fftw_complex* convo, fftw_complex* uz, fftw_plan *fftw_plan_r2c
 	}
 
 	// here we move the derivative from real to spectral space so that the derivatives can be returned in spectral space
-	fftw_execute_dft_r2c((*fftw_plan_r2c_ptr), u_tmp, uz_pad);
+	fftw_execute_dft_r2c((*fftw_plan_r2c_ptr), u_tmp, u_z_tmp);
 
 	// // normalize
 	for (int i = 0; i < num_osc; ++i)	{
 		if (i <= k0) {
 			convo[i] = 0.0 + 0.0*I;
 		} else {
-			convo[i] = uz_pad[i]*(norm_fact);
+			convo[i] = u_z_tmp[i]*(norm_fact);
 		}		
 	}
 
@@ -248,7 +247,7 @@ void conv_2N_pad(fftw_complex* convo, fftw_complex* uz, fftw_plan *fftw_plan_r2c
 	/// Free temp memory
 	///---------------
 	free(u_tmp);
-	fftw_free(uz_pad);
+	fftw_free(u_z_tmp);
 }
 
 
@@ -297,8 +296,10 @@ void po_rhs(double* rhs, fftw_complex* u_z, fftw_plan *plan_c2r_pad, fftw_plan *
 		if (k <= k0) {
 			rhs[k] = 0.0;
 		} else {
-			pre_fac = (-I * kx[k]) / (2.0 * u_z[k]);
-			rhs[k]  = cimag( pre_fac* (u_z_tmp[k] * norm_fac) );
+			// pre_fac = (-I * kx[k]) / (u_z[k]);
+			// rhs[k]  = cimag( pre_fac* (u_z_tmp[k] * norm_fac) );
+			pre_fac = -kx[k] / cabs(u_z[k]);
+			rhs[k] = pre_fac * creal(cexp(-I * carg(u_z[k]))) * (u_z_tmp[k] * norm_fac);
 		}		
 	}
 
@@ -340,7 +341,7 @@ void triad_phases(double* triads, fftw_complex* phase_order, double* phi, int km
 			num_triads++;			
 		}
 	}
-
+	
 	// normalize phase order parameter
 	*phase_order =  phase_order_tmp / (double) num_triads;
 }
@@ -426,18 +427,45 @@ int get_transient_iters(double* amps, fftw_plan plan_c2r, fftw_plan plan_r2c, in
 	// get the no. of iterations
 	trans_iters = pow(10, trans_mag);
 
-
+	// Frre memory
 	free(tmp_rhs);
 	fftw_free(u_z_tmp);
 
 	return trans_iters;
 }
 
+hid_t create_complex_datatype() {
+
+	// Declare HDF5 datatype variable
+	hid_t dtype;
+
+	// error handling var
+	herr_t status;
+	
+	// Create compound datatype for complex numbers
+	typedef struct complex_type {
+		double re;   // real part 
+		double im;   // imaginary part 
+	} complex_type;
+
+	struct complex_type cmplex;
+	cmplex.re = 0.0;
+	cmplex.im = 0.0;
+
+	// create complex compound datatype
+	dtype = H5Tcreate(H5T_COMPOUND, sizeof(cmplex));
+  	status = H5Tinsert(dtype, "r", offsetof(complex_type,re), H5T_NATIVE_DOUBLE);
+  	status = H5Tinsert(dtype, "i", offsetof(complex_type,im), H5T_NATIVE_DOUBLE);
+
+  	return dtype;
+}
+
 
 void get_output_file_name(char* output_file_name, int N, int k0, double a, double b, char* u0, int ntsteps, int m_end, int m_iter, int trans_iters, int numLEs) {
 
 	// Create Output File Locatoin
-	char output_dir[512] = "../../Data/RESULTS/RESULTS";
+	char output_dir[512] = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Test/RESULTS";
+	// char output_dir[512] = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/RESULTS/RESULTS";
 	char output_dir_tmp[512];
 	sprintf(output_dir_tmp,  "_N[%d]_k0[%d]_ALPHA[%1.3lf]_BETA[%1.3lf]_u0[%s]", N, k0, a, b, u0);
 	strcat(output_dir, output_dir_tmp);
@@ -469,7 +497,36 @@ void get_output_file_name(char* output_file_name, int N, int k0, double a, doubl
 }
 
 
-void open_output_create_slabbed_datasets_lce(hid_t* file_handle, char* output_file_name, hid_t* file_space, hid_t* data_set, hid_t* mem_space, int num_t_steps, int num_m_steps, int num_clv_steps, int num_osc, int k_range, int k1_range, int kmin, int numLEs) {
+
+void create_hdf5_slabbed_dset(hid_t* file_handle, char* dset_name, hid_t* file_space, hid_t* data_set, hid_t* mem_space, hid_t dtype, hid_t* dset_dims, hid_t* dset_max_dims, hid_t* dset_chunk_dims, const int num_dims) {
+
+	// Error handling variable
+	herr_t status;
+
+	// Create the 2D dataspace - setting the no. of dimensions, expected and max size of the dimensions
+	*file_space = H5Screate_simple(num_dims, dset_dims, dset_max_dims);
+
+	// Must create a propertly list to enable data chunking due to max dimension being unlimited
+	// Create property list 
+	hid_t plist;
+	plist = H5Pcreate(H5P_DATASET_CREATE);
+
+	// Using this property list set the chuncking - stores the chunking info in plist
+	status = H5Pset_chunk(plist, num_dims, dset_chunk_dims);
+
+	// Create the dataset in the previouosly created datafile - using the chunk enabled property list and new compound datatype
+	*data_set = H5Dcreate(*file_handle, dset_name, dtype, *file_space, H5P_DEFAULT, plist, H5P_DEFAULT);
+	
+	// Create the memory space for the slab
+	// setting the max dims to NULL defaults to same size as dims
+	*mem_space = H5Screate_simple(num_dims, dset_chunk_dims, NULL);
+
+	// Close the property list object
+	status = H5Pclose(plist);
+}
+
+
+void open_output_create_slabbed_datasets_lce(hid_t* file_handle, char* output_file_name, hid_t* file_space, hid_t* data_set, hid_t* mem_space, hid_t dtype, int num_t_steps, int num_m_steps, int num_clv_steps, int num_osc, int k_range, int k1_range, int kmin, int numLEs) {
 
 	// ------------------------------
 	//  Create file
@@ -477,6 +534,8 @@ void open_output_create_slabbed_datasets_lce(hid_t* file_handle, char* output_fi
 	// create datafile - H5F_ACC_TRUNC overwrites file if it exists already
 	*file_handle = H5Fcreate(output_file_name, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
 
+	// Initialize error handling variable
+	herr_t status;
 
 	// create hdf5 dimension arrays for creating the hyperslabs
 	static const int dimensions = 2;
@@ -485,13 +544,13 @@ void open_output_create_slabbed_datasets_lce(hid_t* file_handle, char* output_fi
 	hsize_t chunkdims[dimensions]; // array to hold dims of the hyperslab chunks
 
 
-	// ------------------------------
+	// ---------------------------------------
 	//  Create datasets with hyperslabing
-	// ------------------------------
-	#ifdef __PHASES
-	//
+	// ---------------------------------------
+	//-----------------------------//
 	//---------- PHASES -----------//
-	//
+	//-----------------------------//
+	#ifdef __PHASES
 	// initialize the hyperslab arrays
 	dims[0]      = num_t_steps;             // number of timesteps
 	dims[1]      = num_osc;                 // number of oscillators
@@ -503,66 +562,25 @@ void open_output_create_slabbed_datasets_lce(hid_t* file_handle, char* output_fi
 	// create the 2D dataspace - setting the no. of dimensions, expected and max size of the dimensions
 	file_space[0] = H5Screate_simple(dimensions, dims, maxdims);
 
-	// must create a propertly list to enable data chunking due to max time dimension being unlimited
-	// create property list 
-	hid_t plist;
-	plist = H5Pcreate(H5P_DATASET_CREATE);
-
-	// using this property list set the chuncking - stores the chunking info in plist
-	H5Pset_chunk(plist, dimensions, chunkdims);
-
-	// Create the dataset in the previouosly created datafile - using the chunk enabled property list and new compound datatype
-	data_set[0] = H5Dcreate(*file_handle, "Phases", H5T_NATIVE_DOUBLE, file_space[0], H5P_DEFAULT, plist, H5P_DEFAULT);
-	
-	// create the memory space for the slab
-	dims[0] = 1;
-	dims[1] = num_osc;
-
-	// setting the max dims to NULL defaults to same size as dims
-	mem_space[0] = H5Screate_simple(dimensions, dims, NULL);
-
-	H5Pclose(plist);
+	// Create the phases dataset
+	create_hdf5_slabbed_dset(file_handle, "Phases", &file_space[0], &data_set[0], &mem_space[0], H5T_NATIVE_DOUBLE, dims, maxdims, chunkdims, dimensions);
 	#endif
 
-	#ifdef __TRIADS
-	//
+	//-----------------------------//
 	//---------- TRIADS -----------//
-	//
-	// create hdf5 dimension arrays for creating the hyperslabs
-	static const int dim2 = 2;
-	hsize_t dims2[dim2];      // array to hold dims of full evolution data
-	hsize_t maxdims2[dim2];   // array to hold max dims of full evolution data
-	hsize_t chunkdims2[dim2]; // array to hold dims of the hyperslab chunks
-
+	//-----------------------------//
+	#ifdef __TRIADS
 	// initialize the hyperslab arrays
-	dims2[0]      = num_t_steps;             // number of timesteps + initial condition
-	dims2[1]      = k_range * k1_range;      // size of triads array
-	maxdims2[0]   = H5S_UNLIMITED;           // setting max time index to unlimited means we must chunk our data
-	maxdims2[1]   = k_range * k1_range;      // size of triads array
-	chunkdims2[0] = 1;                       // 1D chunk to be saved 
-	chunkdims2[1] = k_range*k1_range;         // size of triad array
-
-	// create the 2D dataspace - setting the no. of dimensions, expected and max size of the dimensions
-	file_space[1] = H5Screate_simple(dim2, dims2, maxdims2);
-
-	// must create a propertly list to enable data chunking due to max time dimension being unlimited
-	// create property list 
-	hid_t plist2;
-	plist2 = H5Pcreate(H5P_DATASET_CREATE);
-
-	// using this property list set the chuncking - stores the chunking info in plist
-	H5Pset_chunk(plist2, dim2, chunkdims2);
-
-	// Create the dataset in the previouosly created datafile - using the chunk enabled property list and new compound datatype
-	data_set[1] = H5Dcreate(*file_handle, "Triads", H5T_NATIVE_DOUBLE, file_space[1], H5P_DEFAULT, plist2, H5P_DEFAULT);
+	dims[0]      = num_t_steps;             // number of timesteps + initial condition
+	dims[1]      = k_range * k1_range;      // size of triads array
+	maxdims[0]   = H5S_UNLIMITED;           // setting max time index to unlimited means we must chunk our data
+	maxdims[1]   = k_range * k1_range;      // size of triads array
+	chunkdims[0] = 1;                       // 1D chunk to be saved 
+	chunkdims[1] = k_range*k1_range;        // size of triad array
 	
-	// create the memory space for the slab
-	dims2[0] = 1;
-	dims2[1] = k_range*k1_range;
-
-	// setting the max dims to NULL defaults to same size as dims
-	mem_space[1] = H5Screate_simple(dim2, dims2, NULL);
-
+	// Create the dataset for the Triads
+	create_hdf5_slabbed_dset(file_handle, "Triads", &file_space[1], &data_set[1], &mem_space[1], H5T_NATIVE_DOUBLE, dims, maxdims, chunkdims, dimensions);
+	
 	// Create attribute data for the triad dimensions
 	hid_t triads_attr, triads_attr_space;
 
@@ -570,7 +588,7 @@ void open_output_create_slabbed_datasets_lce(hid_t* file_handle, char* output_fi
 	adims[0] = 1;
 	adims[1] = 2;
 
-	triads_attr_space = H5Screate_simple (2, adims, NULL);
+	triads_attr_space = H5Screate_simple(2, adims, NULL);
 
 	triads_attr = H5Acreate(data_set[1], "Triad_Dims", H5T_NATIVE_INT, triads_attr_space, H5P_DEFAULT, H5P_DEFAULT);
 
@@ -578,17 +596,17 @@ void open_output_create_slabbed_datasets_lce(hid_t* file_handle, char* output_fi
 	triads_dims[0] = k_range;
 	triads_dims[1] = k1_range;
 
-    herr_t status = H5Awrite(triads_attr, H5T_NATIVE_INT, triads_dims);
+    status = H5Awrite(triads_attr, H5T_NATIVE_INT, triads_dims);
 
-	// close the created property list
+	// close the created attributes obkects
 	status = H5Aclose(triads_attr);
-    status = H5Sclose(triads_attr_space);
-	status = H5Pclose(plist2);
+    status = H5Sclose(triads_attr_space);	
 	#endif
 
+  //-----------------------------------//
+	//---------- LCE SPECTRUM -----------//
+	//-----------------------------------//
 	#ifdef __LCE_ALL
-	//---------- LCE -----------//
-	//
 	// initialize the hyperslab arrays
 	dims[0]      = num_m_steps;     // number of timesteps
 	dims[1]      = numLEs;          // number of oscillators
@@ -597,33 +615,14 @@ void open_output_create_slabbed_datasets_lce(hid_t* file_handle, char* output_fi
 	chunkdims[0] = 1;               // 1D chunk to be saved 
 	chunkdims[1] = numLEs;          // 1D chunk of size number of modes
 
-	// create the 2D dataspace - setting the no. of dimensions, expected and max size of the dimensions
-	file_space[2] = H5Screate_simple(dimensions, dims, maxdims);
-
-	// must create a propertly list to enable data chunking due to max time dimension being unlimited
-	// create property list 
-	hid_t plist3;
-	plist3 = H5Pcreate(H5P_DATASET_CREATE);
-
-	// using this property list set the chuncking - stores the chunking info in plist
-	H5Pset_chunk(plist3, dimensions, chunkdims);
-
-	// Create the dataset in the previouosly created datafile - using the chunk enabled property list and new compound datatype
-	data_set[2] = H5Dcreate(*file_handle, "LCE", H5T_NATIVE_DOUBLE, file_space[2], H5P_DEFAULT, plist3, H5P_DEFAULT);
-	
-	// create the memory space for the slab
-	dims[0] = 1;
-	dims[1] = numLEs;
-
-	// setting the max dims to NULL defaults to same size as dims
-	mem_space[2] = H5Screate_simple(dimensions, dims, NULL);
-
-	H5Pclose(plist3);
+	// Create the dataset for the LCE spectrum
+	create_hdf5_slabbed_dset(file_handle, "LCE", &file_space[2], &data_set[2], &mem_space[2], H5T_NATIVE_DOUBLE, dims, maxdims, chunkdims, dimensions);
 	#endif
 
+  //-----------------------------------//
+	//----------- R DIAGONAL ------------//
+	//-----------------------------------//
 	#ifdef __RNORM
-	//---------- R Diagonal -----------//
-	//
 	// initialize the hyperslab arrays
 	dims[0]      = num_m_steps;     // number of timesteps
 	dims[1]      = numLEs;          // number of oscillators
@@ -632,68 +631,24 @@ void open_output_create_slabbed_datasets_lce(hid_t* file_handle, char* output_fi
 	chunkdims[0] = 1;               // 1D chunk to be saved 
 	chunkdims[1] = numLEs;          // 1D chunk of size number of modes
 
-	// create the 2D dataspace - setting the no. of dimensions, expected and max size of the dimensions
-	file_space[3] = H5Screate_simple(dimensions, dims, maxdims);
-
-	// must create a propertly list to enable data chunking due to max time dimension being unlimited
-	// create property list 
-	hid_t plist4;
-	plist4 = H5Pcreate(H5P_DATASET_CREATE);
-
-	// using this property list set the chuncking - stores the chunking info in plist
-	H5Pset_chunk(plist4, dimensions, chunkdims);
-
-	// Create the dataset in the previouosly created datafile - using the chunk enabled property list and new compound datatype
-	data_set[3] = H5Dcreate(*file_handle, "RNorm", H5T_NATIVE_DOUBLE, file_space[3], H5P_DEFAULT, plist4, H5P_DEFAULT);
-	
-	// create the memory space for the slab
-	dims[0] = 1;
-	dims[1] = numLEs;
-
-	// setting the max dims to NULL defaults to same size as dims
-	mem_space[3] = H5Screate_simple(dimensions, dims, NULL);
-
-	H5Pclose(plist4);
+	// Create the dataset for the diagonal of the R matrix
+	create_hdf5_slabbed_dset(file_handle, "RNorm", &file_space[3], &data_set[3], &mem_space[3], H5T_NATIVE_DOUBLE, dims, maxdims, chunkdims, dimensions);
 	#endif	
 
+	//-----------------------------//
+	//----------- CLVs ------------//
+	//-----------------------------//
 	#ifdef __CLVs
-	//
-	//---------- CLVs -----------//
-	//
-	// create hdf5 dimension arrays for creating the hyperslabs
-	static const int dim2D = 2;
-	hsize_t dims2D[dim2D];      // array to hold dims of full evolution data
-	hsize_t maxdims2D[dim2D];   // array to hold max dims of full evolution data
-	hsize_t chunkdims2D[dim2D]; // array to hold dims of the hyperslab chunks
-
 	// initialize the hyperslab arrays
-	dims2D[0]      = num_clv_steps;                         // number of timesteps + initial condition
-	dims2D[1]      = (num_osc - kmin) * numLEs;   // size of CLV array
-	maxdims2D[0]   = H5S_UNLIMITED;                         // setting max time index to unlimited means we must chunk our data
-	maxdims2D[1]   = (num_osc - kmin) * numLEs;   // size of CLV array
-	chunkdims2D[0] = 1;                                     // 1D chunk to be saved 
-	chunkdims2D[1] = (num_osc - kmin) * numLEs;   // size of CLV array
+	dims[0]      = num_clv_steps;               // number of timesteps + initial condition
+	dims[1]      = (num_osc - kmin) * numLEs;   // size of CLV array
+	maxdims[0]   = H5S_UNLIMITED;               // setting max time index to unlimited means we must chunk our data
+	maxdims[1]   = (num_osc - kmin) * numLEs;   // size of CLV array
+	chunkdims[0] = 1;                           // 1D chunk to be saved 
+	chunkdims[1] = (num_osc - kmin) * numLEs;   // size of CLV array
 
-	// create the 2D dataspace - setting the no. of dimensions, expected and max size of the dimensions
-	file_space[4] = H5Screate_simple(dim2D, dims2D, maxdims2D);
-
-	// must create a propertly list to enable data chunking due to max time dimension being unlimited
-	// create property list 
-	hid_t plist5;
-	plist5 = H5Pcreate(H5P_DATASET_CREATE);
-
-	// using this property list set the chuncking - stores the chunking info in plist
-	H5Pset_chunk(plist5, dim2D, chunkdims2D);
-
-	// Create the dataset in the previouosly created datafile - using the chunk enabled property list and new compound datatype
-	data_set[4] = H5Dcreate(*file_handle, "CLVs", H5T_NATIVE_DOUBLE, file_space[4], H5P_DEFAULT, plist5, H5P_DEFAULT);
-	
-	// create the memory space for the slab
-	dims2D[0] = 1;
-	dims2D[1] = (num_osc - kmin) * numLEs;
-
-	// setting the max dims to NULL defaults to same size as dims
-	mem_space[4] = H5Screate_simple(dim2D, dims2D, NULL);
+	// Create the dataset for the CLVs
+	create_hdf5_slabbed_dset(file_handle, "CLVs", &file_space[4], &data_set[4], &mem_space[4], H5T_NATIVE_DOUBLE, dims, maxdims, chunkdims, dimensions);
 
 	// Create attribute data for the CLV dimensions
 	hid_t CLV_attr, CLV_attr_space;
@@ -710,45 +665,26 @@ void open_output_create_slabbed_datasets_lce(hid_t* file_handle, char* output_fi
 	CLV_dims[0] = (num_osc - kmin);
 	CLV_dims[1] = numLEs;
 
-    herr_t status = H5Awrite(CLV_attr, H5T_NATIVE_INT, CLV_dims);
+    status = H5Awrite(CLV_attr, H5T_NATIVE_INT, CLV_dims);
 
 	// close the created property list
 	status = H5Aclose(CLV_attr);
     status = H5Sclose(CLV_attr_space);
-	status = H5Pclose(plist5);
-
-	#ifdef __ANGLES
-	//
-	//---------- Angles -----------//
-	//	
-	// initialize the hyperslab arrays
-	dims2D[0]      = num_clv_steps;               // number of timesteps + initial condition
-	dims2D[1]      = (num_osc - kmin) * numLEs;   // size of angles array
-	maxdims2D[0]   = H5S_UNLIMITED;               // setting max time index to unlimited means we must chunk our data
-	maxdims2D[1]   = (num_osc - kmin) * numLEs;   // size of angles array
-	chunkdims2D[0] = 1;                           // 1D chunk to be saved 
-	chunkdims2D[1] = (num_osc - kmin) * numLEs;   // size of angles array
-
-	// create the 2D dataspace - setting the no. of dimensions, expected and max size of the dimensions
-	file_space[5] = H5Screate_simple(dim2D, dims2D, maxdims2D);
-
-	// must create a propertly list to enable data chunking due to max time dimension being unlimited
-	// create property list 
-	hid_t plist6;
-	plist6 = H5Pcreate(H5P_DATASET_CREATE);
-
-	// using this property list set the chuncking - stores the chunking info in plist
-	H5Pset_chunk(plist6, dim2D, chunkdims2D);
-
-	// Create the dataset in the previouosly created datafile - using the chunk enabled property list and new compound datatype
-	data_set[5] = H5Dcreate(*file_handle, "Angles", H5T_NATIVE_DOUBLE, file_space[5], H5P_DEFAULT, plist6, H5P_DEFAULT);
 	
-	// create the memory space for the slab
-	dims2D[0] = 1;
-	dims2D[1] = (num_osc - kmin) * numLEs;
+  //-------------------------------//
+  //----------- ANGLES ------------//
+  //-------------------------------//
+	#ifdef __ANGLES
+	// initialize the hyperslab arrays
+	dims[0]      = num_clv_steps;               // number of timesteps + initial condition
+	dims[1]      = (num_osc - kmin) * numLEs;   // size of angles array
+	maxdims[0]   = H5S_UNLIMITED;               // setting max time index to unlimited means we must chunk our data
+	maxdims[1]   = (num_osc - kmin) * numLEs;   // size of angles array
+	chunkdims[0] = 1;                           // 1D chunk to be saved 
+	chunkdims[1] = (num_osc - kmin) * numLEs;   // size of angles array
 
-	// setting the max dims to NULL defaults to same size as dims
-	mem_space[5] = H5Screate_simple(dim2D, dims2D, NULL);
+	// Create the dataset for the angles between CLVs
+	create_hdf5_slabbed_dset(file_handle, "Angles", &file_space[5], &data_set[5], &mem_space[5], H5T_NATIVE_DOUBLE, dims, maxdims, chunkdims, dimensions);
 
 	// Create attribute data for the Angles dimensions
 	CLV_adims[0] = 1;
@@ -769,48 +705,76 @@ void open_output_create_slabbed_datasets_lce(hid_t* file_handle, char* output_fi
 	// close the created property list
 	status = H5Aclose(Angles_attr);
     status = H5Sclose(Angles_attr_space);
-	status = H5Pclose(plist6);
 	#endif
 	#endif
 
-	if (numLEs == 1) {
-		//---------- Largest CLV -----------//
-		//
-		// initialize the hyperslab arrays
-		dims[0]      = num_t_steps;      // number of timesteps
-		dims[1]      = (num_osc - kmin); // number of oscillators
-		maxdims[0]   = H5S_UNLIMITED;    // setting max time index to unlimited means we must chunk our data
-		maxdims[1]   = (num_osc - kmin); // same as before = number of modes
-		chunkdims[0] = 1;                // 1D chunk to be saved 
-		chunkdims[1] = (num_osc - kmin); // 1D chunk of size number of modes
+  //------------------------------------//
+  //----------- MAXIMAL LCE ------------//
+  //------------------------------------//
+	#ifdef __CLV_MAX
+	// initialize the hyperslab arrays
+	dims[0]      = num_m_steps;      // number of timesteps
+	dims[1]      = (num_osc - kmin); // number of oscillators
+	maxdims[0]   = H5S_UNLIMITED;    // setting max time index to unlimited means we must chunk our data
+	maxdims[1]   = (num_osc - kmin); // same as before = number of modes
+	chunkdims[0] = 1;                // 1D chunk to be saved 
+	chunkdims[1] = (num_osc - kmin); // 1D chunk of size number of modes
 
-		// create the 2D dataspace - setting the no. of dimensions, expected and max size of the dimensions
-		file_space[6] = H5Screate_simple(dimensions, dims, maxdims);
+	// Create the dataset for the CLVs
+	create_hdf5_slabbed_dset(file_handle, "MaxCLV", &file_space[6], &data_set[6], &mem_space[6], H5T_NATIVE_DOUBLE, dims, maxdims, chunkdims, dimensions);
+	#endif
 
-		// must create a propertly list to enable data chunking due to max time dimension being unlimited
-		// create property list 
-		hid_t plist7;
-		plist7 = H5Pcreate(H5P_DATASET_CREATE);
+	//----------------------------//
+	//---------- MODES -----------//
+	//----------------------------//
+	#ifdef __MODES
+	// initialize the hyperslab arrays
+	dims[0]      = num_t_steps;     // number of timesteps
+	dims[1]      = num_osc;         // number of oscillators
+	maxdims[0]   = H5S_UNLIMITED;   // setting max time index to unlimited means we must chunk our data
+	maxdims[1]   = num_osc;         // same as before = number of modes
+	chunkdims[0] = 1;               // 1D chunk to be saved 
+	chunkdims[1] = num_osc;         // 1D chunk of size number of modes
 
-		// using this property list set the chuncking - stores the chunking info in plist
-		H5Pset_chunk(plist7, dimensions, chunkdims);
+	// Create the dataset for the Fourier space modes
+	create_hdf5_slabbed_dset(file_handle, "Modes", &file_space[7], &data_set[7], &mem_space[7], dtype, dims, maxdims, chunkdims, dimensions);
+	#endif
 
-		// Create the dataset in the previouosly created datafile - using the chunk enabled property list and new compound datatype
-		data_set[6] = H5Dcreate(*file_handle, "LargestCLV", H5T_NATIVE_DOUBLE, file_space[6], H5P_DEFAULT, plist7, H5P_DEFAULT);
-		
-		// create the memory space for the slab
-		dims[0] = 1;
-		dims[1] = (num_osc - kmin);
+	//---------------------------------//
+	//---------- REAL SPACE -----------//
+	//---------------------------------//
+	#ifdef __REALSPACE
+	// initialize the hyperslab arrays
+	dims[0]      = num_t_steps;     		     // number of timesteps
+	dims[1]      = (int) 2 * (num_osc - 1);  // number of oscillators
+	maxdims[0]   = H5S_UNLIMITED;   	       // setting max time index to unlimited means we must chunk our data
+	maxdims[1]   = (int) 2 * (num_osc - 1);  // same as before = number of modes
+	chunkdims[0] = 1;                        // 1D chunk to be saved 
+	chunkdims[1] = (int) 2 * (num_osc - 1);  // 1D chunk of size number of modes
 
-		// setting the max dims to NULL defaults to same size as dims
-		mem_space[6] = H5Screate_simple(dimensions, dims, NULL);
+	// Create the dataset for the real space solution
+	create_hdf5_slabbed_dset(file_handle, "RealSpace", &file_space[8], &data_set[8], &mem_space[8], H5T_NATIVE_DOUBLE, dims, maxdims, chunkdims, dimensions);
+	#endif
 
-		H5Pclose(plist7);
-	}
+	//-------------------------------//
+	//---------- GRADIENT -----------//
+	//-------------------------------//
+	#ifdef __GRAD
+	// initialize the hyperslab arrays
+	dims[0]      = num_t_steps;             // number of timesteps
+	dims[1]      = (int) 2 * (num_osc - 1); // number of oscillators
+	maxdims[0]   = H5S_UNLIMITED;  			    // setting max time index to unlimited means we must chunk our data
+	maxdims[1]   = (int) 2 * (num_osc - 1); // same as before = number of modes
+	chunkdims[0] = 1;               		    // 1D chunk to be saved 
+	chunkdims[1] = (int) 2 * (num_osc - 1); // 1D chunk of size number of modes
+
+	// Create the dataset for the gradient of the real space solution
+	create_hdf5_slabbed_dset(file_handle, "Gradient", &file_space[9], &data_set[9], &mem_space[9], H5T_NATIVE_DOUBLE, dims, maxdims, chunkdims, dimensions);
+	#endif
 }
 
 
-void write_hyperslab_data_d(hid_t file_space, hid_t data_set, hid_t mem_space, double* data, char* data_name, int n, int index) {
+void write_hyperslab_data(hid_t file_space, hid_t data_set, hid_t mem_space, hid_t dtype, double* data, char* data_name, int n, int index) {
 
 	// Create dimension arrays for hyperslab
 	hsize_t start_index[2]; // stores the index in the hyperslabbed dataset to start writing to
@@ -823,12 +787,12 @@ void write_hyperslab_data_d(hid_t file_space, hid_t data_set, hid_t mem_space, d
 
 	// select appropriate hyperslab 
 	if ((H5Sselect_hyperslab(file_space, H5S_SELECT_SET, start_index, NULL, count, NULL)) < 0) {
-		fprintf(stderr,"\n!!Error Selecting Hyperslab!! - For %s at Index: %d \n", data_name, index);
+		fprintf(stderr,"\n!!Error Selecting Hyperslab!! - For [%s] at Index: %d \n", data_name, index);
 	}
 
 	// then write the current modes to this hyperslab
-	if ((H5Dwrite(data_set, H5T_NATIVE_DOUBLE, mem_space, file_space, H5P_DEFAULT, data)) < 0) {
-		fprintf(stderr,"\n!!Error Writing Slabbed Data!! - For %s at Index: %d \n", data_name, index);
+	if ((H5Dwrite(data_set, dtype, mem_space, file_space, H5P_DEFAULT, data)) < 0) {
+		fprintf(stderr,"\n!!Error Writing Slabbed Data!! - For [%s] at Index: %d \n", data_name, index);
 	}
 }
 // ---------------------------------------------------------------------

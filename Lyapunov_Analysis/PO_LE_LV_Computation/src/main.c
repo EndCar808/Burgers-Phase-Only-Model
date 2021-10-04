@@ -44,12 +44,12 @@ int main(int argc, char** argv) {
 	// Collocation points
 	int N = atoi(argv[1]);
 
+	// Kill first k0 modes
+	int k0 = atoi(argv[2]);
+
 	// Alpha value
 	double alpha = atof(argv[3]);
 	double beta  = atof(argv[4]);
-	
-	// Kill first k0 modes
-	int k0 = atoi(argv[2]);;
 
 	// Specify initial condition
 	char* u0[128];

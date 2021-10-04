@@ -111,11 +111,11 @@ if __name__ == '__main__':
     angles = HDFfileData['Angles']
 
     ## System Parameters
-    num_tsteps    = len(time);
+    num_tsteps    = len(time)
     num_clv_steps = CLVs.shape[0]
-    num_osc       = phases.shape[1];
-    kmin          = k0 + 1;
-    kmax          = num_osc - 1;
+    num_osc       = phases.shape[1]
+    kmin          = k0 + 1
+    kmax          = num_osc - 1
     dof           = num_osc - kmin
 
     ## Reshape the CLV and Angles data
@@ -209,16 +209,16 @@ if __name__ == '__main__':
     
     ## Distrubution between stable and unstable manifolds
     ax3 = fig.add_subplot(gs[1, 0:])
-    hist, bins  = np.histogram(theta1, range = (0.0, np.pi / 2.0), bins = 900, density = True);
+    hist, bins  = np.histogram(theta1, range = (0.0, np.pi / 2.0), bins = 900, density = True)
     bin_centers = (bins[1:] + bins[:-1]) * 0.5
     plt.plot(bin_centers, hist)
     if zeroindx > 0:
-        hist, bins  = np.histogram(theta2, range = (0.0, np.pi / 2.0), bins = 900, density = True);
+        hist, bins  = np.histogram(theta2, range = (0.0, np.pi / 2.0), bins = 900, density = True)
         bin_centers = (bins[1:] + bins[:-1]) * 0.5
         ax3.plot(bin_centers, hist)
     ax3.set_xlim(0.0, np.pi/2.0)
     ax3.set_xlabel(r"$\theta$")
-    ax3.set_xticks([0.0, np.pi/4.0, np.pi/2.0],[r"$0$", r"$\frac{\pi}{4}$", r"$\frac{\pi}{2}$"]);
+    ax3.set_xticks([0.0, np.pi/4.0, np.pi/2.0],[r"$0$", r"$\frac{\pi}{4}$", r"$\frac{\pi}{2}$"])
     ax3.set_ylabel(r"PDF")
     ax3.set_yscale("log")
     ax3.legend([r"$\theta_{\mathbf{E}^+ \oplus \mathbf{E}^0, \mathbf{E}^-}$", r"$\theta_{\mathbf{E}^+, \mathbf{E}^0 \oplus \mathbf{E}^-}$"], fancybox = True, framealpha = 1, shadow = True)

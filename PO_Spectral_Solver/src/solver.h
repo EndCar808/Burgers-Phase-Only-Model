@@ -22,7 +22,7 @@ void max(double* a, int n, int k0, double* max_val);
 void min(double* a, int n, int k0, double* min_val);
 
 void get_output_file_name(char* output_file_name, int N, int k0, double a, double b, char* u0, int ntsteps, int trans_iters);
-hid_t create_complex_datatype(hid_t dtype);
+hid_t create_complex_datatype();
 
 void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_name, hid_t* file_space, hid_t* data_set, hid_t* mem_space, hid_t dtype, int num_t_steps, int num_osc, int k_range, int k1_range);
 void create_hdf5_slabbed_dset(hid_t* file_handle, char* dset_name, hid_t* file_space, hid_t* data_set, hid_t* mem_space, hid_t dtype, hid_t* dset_dims, hid_t* dset_max_dims, hid_t* dset_chunk_dims, const int num_dims);
@@ -43,6 +43,7 @@ void po_rhs(double* rhs, fftw_complex* u_z, fftw_plan *plan_c2r_pad, fftw_plan *
 
 void triad_phases(double* triads, fftw_complex* phase_order, double* phi, int kmin, int kmax);
 void amp_normalize(double* norm, double* amp, int num_osc, int k0);
+void sync_phase(fftw_complex* ordered, fftw_complex* heaviside, fftw_complex* heavi_ordered, double* phi, double* amps, int kmin, int kmax);
 
 double gradient_energy(double* a_k, int* k, int num_osc);
 double theoretical_energy(double* a_k, int num_osc);

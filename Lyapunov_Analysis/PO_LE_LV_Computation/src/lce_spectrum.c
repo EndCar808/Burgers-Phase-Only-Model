@@ -98,6 +98,7 @@ void po_rhs_extended(double* rhs, double* rhs_ext, fftw_complex* u_z, double* pe
 		u_tmp[i] = pow(u_tmp[i], 2);
 	}
 
+
 	// transform forward to Fourier space
 	fftw_execute_dft_r2c((*plan_r2c_pad), u_tmp, u_z_tmp);
 	
@@ -107,9 +108,11 @@ void po_rhs_extended(double* rhs, double* rhs_ext, fftw_complex* u_z, double* pe
 			rhs[k]  = 0.0;
 			conv[k] = 0.0 + 0.0*I; 
 		} else {
-			pre_fac = (-I * kx[k]) / (2.0 * u_z[k]);
 			conv[k] = u_z_tmp[k] * norm_fac;
-			rhs[k]  = cimag(pre_fac * (conv[k]));
+			// pre_fac = (-I * kx[k]) / (2.0 * u_z[k]);
+			// rhs[k]  = cimag(pre_fac * (conv[k]));
+			pre_fac = - kx[k] / cabs(u_z[k]);
+			rhs[k]  = pre_fac * creal(cexp(- I * carg(u_z[k])) * (u_z_tmp[k] * norm_fac));
 		}		
 	}
 
@@ -185,6 +188,45 @@ void po_rhs_extended(double* rhs, double* rhs_ext, fftw_complex* u_z, double* pe
 	fftw_free(u_z_tmp);
 }
 
+/**
+ * Function to compute the amplitude normalization factor (convolution of amplitudes) for computing the scale-dependent order parameters
+ *
+ * @param norm    Output array of size num_osc to hold the value amplitude convolution for each wavenumber k
+ * @param amp     Input array of size num_osc that holds the value of the individual amplitudes
+ * @param num_osc Variable defining the size of the input and output arrays
+ * @param k0      Variable defining the number of modes set to 0
+ */
+
+void amp_normalize(double* norm, double* amp, int num_osc, int k0) {
+
+	// Initialize variables
+	int k1;
+	int N = num_osc - 1;
+
+	// Compute the sum for each k
+	for (int kk = 0; kk <= N; ++kk) {
+		if (kk <= k0) {
+			norm[kk] = 0.0;
+		}
+		else {
+			for (int k_1 = 0; k_1 <= 2 * N; ++k_1) {
+				// Adjust for the correct k1 value
+				if (k_1 <= N) {     
+					k1 = -N + k_1;
+				}
+				else  {
+					k1 = k_1 - N;
+				}
+				
+				// Compute the convolution
+				if (k1 >= - N + kk) {
+					norm[kk] +=  amp[abs(k1)] * amp[abs(kk - k1)];
+				}
+			}
+		}
+		
+	}
+}
 
 
 /**
@@ -252,6 +294,7 @@ void jacobian(double* jac, fftw_complex* u_z, int num_osc, int k0) {
 
 /**
  * Function to compute the trace of the Jacobian by just computing the diagonal elements  
+ * 
  * @param  u_z     Input array of size num_osc holding the modes
  * @param  num_osc Number of the oscillators (includes phi_0)
  * @param  k0      Number of killed modes
@@ -499,15 +542,14 @@ void compute_CLVs(hid_t* file_space, hid_t* data_set, hid_t* mem_space, double* 
 	// iterator for saving CLVs to file - start in reverse
 	int save_clv_indx = (m_rev_iters - m_rev_trans) / SAVE_CLV_STEP - 1;
 
-
 	///---------------------------------------
 	/// Initialize the Coefficients matrix
 	///---------------------------------------
 	for (int i = 0; i < DOF; ++i) {
 		for (int j = 0; j < numLEs; ++j) {
 			if(j >= i) {
-				C[i * numLEs + j] = (double) rand() / (double) RAND_MAX;
-				// C[i * numLEs + j] =  (1.0) / ((double)j + 1.0);
+				// C[i * numLEs + j] = (double) rand() / (double) RAND_MAX;
+				C[i * numLEs + j] =  (1.0) / ((double)j + 1.0);
 			} 
 			else {
 				C[i * numLEs + j] = 0.0;
@@ -577,15 +619,20 @@ void compute_CLVs(hid_t* file_space, hid_t* data_set, hid_t* mem_space, double* 
 			// Write CLVs to file
 			if (p % SAVE_CLV_STEP == 0) {
 				// Write CLVs
-				write_hyperslab_data_d(file_space[4], data_set[4], mem_space[4], CLV, "CLV", DOF * numLEs, save_clv_indx);
+				write_hyperslab_data(file_space[4], data_set[4], mem_space[4], H5T_NATIVE_DOUBLE, CLV, "CLV", DOF * numLEs, save_clv_indx);
 
 				#ifdef __ANGLES
 				// compute the angles between the CLVs
 				compute_angles(angles, CLV, DOF, numLEs);
 
 				// Write angles
-				write_hyperslab_data_d(file_space[5], data_set[5], mem_space[5], angles, "Angles", DOF * numLEs, save_clv_indx);
+				write_hyperslab_data(file_space[5], data_set[5], mem_space[5], H5T_NATIVE_DOUBLE, angles, "Angles", DOF * numLEs, save_clv_indx);
 				#endif
+
+				// #ifdef __CLV_STATS
+				// // Compute CLVs stats running average
+				// compute_clv_stats(CLV, tmp_clv_avg, amp, dof, numLEs, kmin);
+				// #endif
 
 				// decrement for next iter
 				save_clv_indx--;
@@ -595,6 +642,14 @@ void compute_CLVs(hid_t* file_space, hid_t* data_set, hid_t* mem_space, double* 
 	///---------------------------------------
 	/// End of Ginelli Algo
 	///---------------------------------------
+
+	// for (int i = 0; i < DOF; ++i) {
+	// 	printf("Row: %d\n", i);
+	// 	for (int j = 0; j < numLEs; ++j) {
+	// 		printf("CLVs[%d]: %5.16lf \n", i * numLEs + j, CLV[i * numLEs + j]);
+	// 	}
+	// }
+	// printf("\n\n");
 
 
 	// Cleanup and free memory
@@ -608,6 +663,65 @@ void compute_CLVs(hid_t* file_space, hid_t* data_set, hid_t* mem_space, double* 
 	free(angles);
 	#endif
 	
+}
+
+/**
+ * Function to compute the statistics of the CLVs: the CLVs are projected to remove the nuetral direction and then sqaured and averaged over the time direction.
+ * Dot products and norms use the energy norm def i.e., v.d = \sum_k a_k v_k d_k
+ * @param clv         Input array containing the CLVs, size is dof by numLEs
+ * @param tmp_clv_avg Temporary array of size dof to read in the current CLV
+ * @param amp         Input array holding the amplitudes
+ * @param dof         Variable indicating the avaible degrees of freedom
+ * @param numLEs      Variable indicating the number of LEs / CLVs are being considered
+ * @param kmin        Variable indicating the first non-zero wavenumber
+ */
+void compute_clv_stats(double* clv, double* tmp_clv_avg, double* amp, int dof, int numLEs, int kmin) {
+
+	// Allocate local memory
+	double* p_k     = (double* )malloc(sizeof(double) * dof);	
+	mem_chk(p_k, "p_k");
+	double* tmp_clv = (double* )malloc(sizeof(double) * dof);
+	mem_chk(tmp_clv, "tmp_clv");
+
+	// norm variable
+	double norm;
+
+	// dot prod variables
+	double alpha;
+	double beta;
+
+	for (int j = 0; j < numLEs; ++j) {
+		// Get the current clv
+		for (int i = 0; i < dof; ++i) {
+			tmp_clv[i] = clv[i * numLEs + j];
+		}
+
+		// Get the dot products of v and the neutral direction
+		alpha = 0.0;
+		beta  = 0.0; 
+		for (int i = 0; i < dof; ++i) {
+			alpha += pow(amp[i + kmin], 2) * tmp_clv[i] * (i + kmin);
+			beta  += pow(amp[i + kmin], 2) * pow(i + kmin, 2);
+		}
+
+		// Remove neutral direction
+		for (int i = 0; i < dof; ++i) {
+			p_k[i] = tmp_clv[i] - (alpha / beta) * (i + kmin);
+		}
+		
+		// Normalize the projected vector
+		norm = 1 / cblas_dnrm2(dof, tmp_clv, 1);
+		cblas_dscal(dof, norm, p_k, 1);
+
+		// Update running sum used to find the time average
+		for (int i = 0; i < dof; ++i) {
+			tmp_clv_avg[i * numLEs + j] += pow(p_k[i], 2);
+		}
+	}	
+	
+	// Free memory
+	free(p_k);
+	free(tmp_clv);
 }
 
 
@@ -645,7 +759,7 @@ void compute_lce_spectrum_clvs(int N, double a, double b, char* u0, int k0, int 
 	int k1_range = (int)((kmax - kmin + 1)/ 2.0);
 
 	// print update every x iterations
-	int print_every = (m_end >= 10 ) ? (int)((double)m_end * 0.1) : 10;
+	int print_every = (m_end >= 10 ) ? (int)((double)m_end * 0.1) : 1;
 	
 
 	// Looping variables
@@ -676,6 +790,23 @@ void compute_lce_spectrum_clvs(int N, double a, double b, char* u0, int k0, int 
 	mem_chk(u_z, "u_z");
 	fftw_complex* u_z_pad = (fftw_complex* )fftw_malloc(sizeof(fftw_complex) * (2 * num_osc - 1));
 	mem_chk(u_z_pad, "u_z_pad");
+	#ifdef __REALSPACE
+	double* u = (double* ) malloc(N * sizeof(double));
+	mem_chk(u, "u");
+	for (int i = 0; i < N; ++i) u[i] = 0.0;
+	#endif
+	#ifdef __GRAD
+	fftw_complex* u_z_grad = (fftw_complex* ) fftw_malloc(sizeof(fftw_complex) * num_osc);
+	mem_chk(u_z_grad, "u_z_grad");
+	double* u_grad = (double* ) malloc(sizeof(double) * N);
+	mem_chk(u_grad, "u_grad");
+	for (int i = 0; i < N; ++i) {
+		u_grad[i] = 0.0;
+		if (i < num_osc){
+			u_z_grad[i] = 0.0 + 0.0 * I;
+		}
+	}
+	#endif
 
 	// LCE Spectrum Arrays
 	double* znorm   = (double* )malloc(sizeof(double) * numLEs);	
@@ -700,6 +831,42 @@ void compute_lce_spectrum_clvs(int N, double a, double b, char* u0, int k0, int 
 	// Initilaize Phase Order peramter
 	fftw_complex triad_phase_order;
 	triad_phase_order = 0.0 + I * 0.0;
+	#endif
+
+	#ifdef __TRIAD_ORDER
+	// Allocate scale dependent order paramter arrays
+	fftw_complex* adler_order_k = (fftw_complex* )fftw_malloc(sizeof(fftw_complex) * num_osc);
+	mem_chk(adler_order_k, "adler_order_k");
+	fftw_complex* phase_shift_order_k = (fftw_complex* )fftw_malloc(sizeof(fftw_complex) * num_osc);
+	mem_chk(phase_shift_order_k, "phase_shift_order_k");
+	fftw_complex* theta_time_order_k = (fftw_complex* )fftw_malloc(sizeof(fftw_complex) * num_osc);
+	mem_chk(theta_time_order_k, "theta_time_order_k");
+	fftw_complex* tmp_time_order_k = (fftw_complex* )fftw_malloc(sizeof(fftw_complex) * num_osc);
+	mem_chk(tmp_time_order_k, "tmp_time_order_k");
+
+	// Allocate arrays needed to compute the phase order parameters
+	fftw_complex* conv = (fftw_complex* )fftw_malloc(sizeof(fftw_complex) * num_osc);
+	mem_chk(conv, "conv");
+	double* amp_norm = (double* )malloc(sizeof(double) * num_osc);
+	mem_chk(amp_norm, "amp_norm");
+
+	// Allocate memory for the order parameter
+	double* R_k = (double * )malloc(sizeof(double) * num_osc);	
+
+	// Initialize normalization counter
+	int t_count = 1;
+
+	// Initialize the arrays
+	for (int i = 0; i < num_osc; ++i) {
+		// Order params
+		adler_order_k[i] = 0.0 + 0.0 * I;
+		phase_shift_order_k[i] = 0.0 + 0.0 * I;
+
+		// Auxillary arrays
+		conv[i]     = 0.0 + 0.0 * I;
+		amp_norm[i] = 0.0;
+		R_k[i]      = 0.0;
+	}
 	#endif
 	
 	
@@ -748,12 +915,16 @@ void compute_lce_spectrum_clvs(int N, double a, double b, char* u0, int k0, int 
 	//  Create FFTW plans
 	// ------------------------------
 	// create fftw3 plans objects
-	fftw_plan fftw_plan_r2c, fftw_plan_c2r;
+	fftw_plan fftw_plan_r2c_pad, fftw_plan_c2r_pad;
 
 	// create plans - ensure no overwriting - fill arrays after
-	fftw_plan_r2c = fftw_plan_dft_r2c_1d(M, u_pad, u_z_pad, FFTW_PRESERVE_INPUT); 
-	fftw_plan_c2r = fftw_plan_dft_c2r_1d(M, u_z_pad, u_pad, FFTW_PRESERVE_INPUT);
-
+	fftw_plan_r2c_pad = fftw_plan_dft_r2c_1d(M, u_pad, u_z_pad, FFTW_PRESERVE_INPUT); 
+	fftw_plan_c2r_pad = fftw_plan_dft_c2r_1d(M, u_z_pad, u_pad, FFTW_PRESERVE_INPUT);
+	#if defined(__REALSPACE) || defined(__GRAD)
+	fftw_plan fftw_plan_r2c, fftw_plan_c2r;
+	fftw_plan_r2c = fftw_plan_dft_r2c_1d(N, u, u_z, FFTW_PRESERVE_INPUT); 
+	fftw_plan_c2r = fftw_plan_dft_c2r_1d(N, u_z, u, FFTW_PRESERVE_INPUT);
+	#endif
 
 
 
@@ -763,6 +934,7 @@ void compute_lce_spectrum_clvs(int N, double a, double b, char* u0, int k0, int 
 	// Set the initial condition of the perturbed system to the identity matrix
 	initial_conditions_lce(pert, phi, amp, u_z, kx, num_osc, k0, kmin, a, b, u0, numLEs);
 
+	// Print IC if small system size
 	if (num_osc <= 32) {
 		for (int i = 0; i < num_osc; ++i) {
 			printf("k[%d]: %d | a: %5.15lf   p: %5.16lf   | u_z[%d]: %+5.16lf\t%+ 5.16lfI \n", i, kx[i], amp[i], phi[i], i, creal(amp[i] * cexp(I * phi[i])), cimag(amp[i] * cexp(I * phi[i])));
@@ -775,7 +947,10 @@ void compute_lce_spectrum_clvs(int N, double a, double b, char* u0, int k0, int 
 	//  Get Timestep & Integration Vars
 	// ------------------------------
 	// Get timestep
-	double dt = get_timestep(amp, fftw_plan_c2r, fftw_plan_r2c, kx, N, num_osc, k0);
+	double dt = get_timestep(amp, fftw_plan_c2r_pad, fftw_plan_r2c_pad, kx, N, num_osc, k0);
+
+	printf("\n\nTimestep:%6.16lf\n", dt);
+
 
 	// Get number of transient iterations
 	#ifdef __TRANSIENTS
@@ -785,7 +960,7 @@ void compute_lce_spectrum_clvs(int N, double a, double b, char* u0, int k0, int 
 	int trans_m     = (int ) (TRANS_STEPS * (m_end));
 	#else
 	// Get no. of transient steps as a ratio of fastest oscillator to slowest
-	int trans_iters = get_transient_iters(amp, fftw_plan_c2r, fftw_plan_r2c, kx, N, num_osc, k0);
+	int trans_iters = get_transient_iters(amp, fftw_plan_c2r_pad, fftw_plan_r2c_pad, kx, N, num_osc, k0);
 	int trans_m     = (int ) (trans_iters / m_iter);
 	#endif
 	#else
@@ -795,8 +970,8 @@ void compute_lce_spectrum_clvs(int N, double a, double b, char* u0, int k0, int 
 	#endif	
 
 	// Get saving variables
-	int tot_m_save_steps = (int) (m_end - trans_m) / SAVE_LCE_STEP;
-	int tot_t_save_steps = (int) (((m_iter * m_end) - trans_iters) / SAVE_DATA_STEP);
+	int tot_m_save_steps = (int) m_end / SAVE_LCE_STEP;
+	int tot_t_save_steps = (int) (m_iter * m_end)  / SAVE_DATA_STEP;
 
 	// Solver time varibales 
 	#ifdef __TRANSIENTS	
@@ -807,6 +982,9 @@ void compute_lce_spectrum_clvs(int N, double a, double b, char* u0, int k0, int 
 	#endif
 	double T  = t0 + m_iter * dt;	
 
+	// printf("Trans_iters: %d", trans_iters);
+	// printf("Trans_m: %d\n", trans_m);
+	// printf("Trans Iters: %d\nTrans m: %d\nTotal Save steps t: %d\nTotal Save steps m: %d\n\n", trans_iters, trans_m, tot_t_save_steps, tot_m_save_steps);
 
 	// ------------------------------
 	//  CLVs Setup
@@ -815,13 +993,28 @@ void compute_lce_spectrum_clvs(int N, double a, double b, char* u0, int k0, int 
 	mem_chk(R_tmp, "R_tmp");
 	#ifdef __CLVs
 	// CLV arrays	
-	double* R     = (double* )malloc(sizeof(double) * dof * numLEs * (m_end - trans_m));	
+	double* R  = (double* )malloc(sizeof(double) * dof * numLEs * (m_end));	
 	mem_chk(R, "R");
-	double* GS    = (double* )malloc(sizeof(double) * dof * numLEs * (m_end - 2 * trans_m));	
+	double* GS = (double* )malloc(sizeof(double) * dof * numLEs * (m_end - trans_m));	
 	mem_chk(GS, "GS");
 	#endif
+	#ifdef __CLV_MAX
+	// Allocate array to capturing the maxial CLV
+	double* max_clv = (double* )malloc(sizeof(double) * dof);
+	#endif	
+	#ifdef __CLV_STATS
+	// Allocate memory for computing CLV stats
+	double* tmp_clv_avg = (double* )malloc(sizeof(double) * dof * numLEs);
+	mem_chk(tmp_clv_avg, "tmp_clv_avg");
+	#ifdef __CLV_MAX
+	int max_clv_stats_counter = 0;
+	#endif
+	#ifdef __CLVs
+	int clvs_stats_counter = 0;
+	#endif
+	#endif
 	// saving steps for CLVs
-	int tot_clv_save_steps = (int) (m_end - 2 * trans_m) / SAVE_CLV_STEP;
+	int tot_clv_save_steps = (int) (m_end - trans_m) / SAVE_CLV_STEP;
 
 
 	// ------------------------------
@@ -830,18 +1023,27 @@ void compute_lce_spectrum_clvs(int N, double a, double b, char* u0, int k0, int 
 	// Create the HDF5 file handle
 	hid_t HDF_file_handle;
 
+	// Create variable to handle HDF5 errors
+	herr_t status;
+
 	// create hdf5 handle identifiers for hyperslabing the full evolution data
-	hid_t HDF_file_space[7];
-	hid_t HDF_data_set[7];
-	hid_t HDF_mem_space[7];
+	hid_t HDF_file_space[10];
+	hid_t HDF_data_set[10];
+	hid_t HDF_mem_space[10];
 
 	// get output file name
 	char output_file_name[512];
 	get_output_file_name(output_file_name, N, k0, a, b, u0, (m_iter * m_end), m_end, m_iter, trans_iters, numLEs);
+
+	// Create complex datatype for hdf5 file if modes are being recorded
+	#if defined(__MODES) || defined(__TRIAD_ORDER)
+	hid_t COMPLEX_DATATYPE = create_complex_datatype();
+	#else
+	hid_t COMPLEX_DATATYPE = -1;
+	#endif
 	
 	// open output file and create hyperslabbed datasets 
-	open_output_create_slabbed_datasets_lce(&HDF_file_handle, output_file_name, HDF_file_space, HDF_data_set, HDF_mem_space, tot_t_save_steps, tot_m_save_steps, tot_clv_save_steps, num_osc, k_range, k1_range, kmin, numLEs);
-
+	open_output_create_slabbed_datasets_lce(&HDF_file_handle, output_file_name, HDF_file_space, HDF_data_set, HDF_mem_space, COMPLEX_DATATYPE, tot_t_save_steps, tot_m_save_steps, tot_clv_save_steps, num_osc, k_range, k1_range, kmin, numLEs);
 
 	// Create arrays for time and phase order to save after algorithm is finished
 	double* time_array      = (double* )malloc(sizeof(double) * (tot_t_save_steps));
@@ -859,15 +1061,28 @@ void compute_lce_spectrum_clvs(int N, double a, double b, char* u0, int k0, int 
 	// ------------------------------
 	#ifndef __TRANSIENTS
 	#ifdef __PHASES
-	write_hyperslab_data_d(HDF_file_space[0], HDF_data_set[0], HDF_mem_space[0], phi, "phi", num_osc, 0);
+	write_hyperslab_data(HDF_file_space[0], HDF_data_set[0], HDF_mem_space[0], H5T_NATIVE_DOUBLE, phi, "phi", num_osc, 0);
 	#endif
 
 	#ifdef __TRIADS
 	// compute triads for initial conditions
 	triad_phases(triads, &triad_phase_order, phi, kmin, kmax);
 	
-	// then write the current modes to this hyperslab
-	write_hyperslab_data_d(HDF_file_space[1], HDF_data_set[1], HDF_mem_space[1], triads, "triads", k_range * k1_range, 0);
+	// then write the current triads to this hyperslab
+	write_hyperslab_data(HDF_file_space[1], HDF_data_set[1], HDF_mem_space[1], H5T_NATIVE_DOUBLE, triads, "triads", k_range * k1_range, 0);
+
+	#ifdef __MODES
+	// Write Initial condition for modes
+	write_hyperslab_data(HDF_file_space[7], HDF_data_set[7], HDF_mem_space[7], COMPLEX_DATATYPE, u_z, "u_z", num_osc, 0);
+	#endif
+
+	#ifdef __REALSPACE 
+	// transform back to Real Space
+	fftw_execute_dft_c2r(fftw_plan_c2r, u_z, u);
+
+	// Write Initial condition for real space
+	write_hyperslab_data(HDF_file_space[8], HDF_data_set[8], HDF_mem_space[8], H5T_NATIVE_DOUBLE, u, "u", N, 0);
+	#endif
 	
 	phase_order_R[0]   = cabs(triad_phase_order);
 	phase_order_Phi[0] = carg(triad_phase_order);
@@ -891,7 +1106,7 @@ void compute_lce_spectrum_clvs(int N, double a, double b, char* u0, int k0, int 
 	// ------------------------------
 	//  Begin Algorithm
 	// ------------------------------
-	while (m <= m_end) {
+	while (m <= (trans_m + m_end)) {
 
 		// ------------------------------
 		//  Integrate System Forward
@@ -908,7 +1123,7 @@ void compute_lce_spectrum_clvs(int N, double a, double b, char* u0, int k0, int 
 			//////////////
 			/*---------- STAGE 1 ----------*/
 			// find RHS first and then update stage
-			po_rhs_extended(RK1, RK1_pert, u_z_tmp, pert, &fftw_plan_c2r, &fftw_plan_r2c, kx, N, num_osc, k0, numLEs);
+			po_rhs_extended(RK1, RK1_pert, u_z_tmp, pert, &fftw_plan_c2r_pad, &fftw_plan_r2c_pad, kx, N, num_osc, k0, numLEs);
 			for (int i = 0; i < num_osc; ++i) {
 				u_z_tmp[i] = amp[i] * cexp(I * (phi[i] + A21 * dt * RK1[i]));
 				if (i < dof) {
@@ -918,12 +1133,20 @@ void compute_lce_spectrum_clvs(int N, double a, double b, char* u0, int k0, int 
 						pert_tmp[indx] = pert[indx] + A21 * dt * RK1_pert[indx];
 					}
 				}
+				// if (m == 1) {
+				// 	printf("RK1[%d]: %6.16lf\n", i, RK1[i]);
+				// }
 			}
+			// if (m == 1) {
+			// 	printf("\n\n");
+			// }
 
+
+			
 
 			/*---------- STAGE 2 ----------*/
 			// find RHS first and then update stage
-			po_rhs_extended(RK2, RK2_pert, u_z_tmp, pert_tmp, &fftw_plan_c2r, &fftw_plan_r2c, kx, N, num_osc, k0, numLEs) ;
+			po_rhs_extended(RK2, RK2_pert, u_z_tmp, pert_tmp, &fftw_plan_c2r_pad, &fftw_plan_r2c_pad, kx, N, num_osc, k0, numLEs) ;
 			for (int i = 0; i < num_osc; ++i) {
 				u_z_tmp[i] = amp[i] * cexp(I * (phi[i] + A32 * dt * RK2[i]));
 				if (i < dof) {
@@ -933,12 +1156,14 @@ void compute_lce_spectrum_clvs(int N, double a, double b, char* u0, int k0, int 
 						pert_tmp[indx] = pert[indx] + A21 * dt * RK2_pert[indx];
 					}
 				}
+			// printf("RK2[%d]: %6.16lf\n", i, RK2[i]);
 			}
+			// printf("\n\n");
 			
 
 			/*---------- STAGE 3 ----------*/
 			// find RHS first and then update stage
-			po_rhs_extended(RK3, RK3_pert, u_z_tmp, pert_tmp, &fftw_plan_c2r, &fftw_plan_r2c, kx, N, num_osc, k0, numLEs) ;
+			po_rhs_extended(RK3, RK3_pert, u_z_tmp, pert_tmp, &fftw_plan_c2r_pad, &fftw_plan_r2c_pad, kx, N, num_osc, k0, numLEs) ;
 			for (int i = 0; i < num_osc; ++i) {
 				u_z_tmp[i] = amp[i] * cexp(I * (phi[i] + A43 * dt * RK3[i]));
 				if (i < dof) {
@@ -948,12 +1173,14 @@ void compute_lce_spectrum_clvs(int N, double a, double b, char* u0, int k0, int 
 						pert_tmp[indx] = pert[indx] + A43 * dt * RK3_pert[indx];
 					}
 				}
+			// printf("RK3[%d]: %6.16lf\n", i, RK3[i]);
 			}
+			// printf("\n\n");
 
 			
 			/*---------- STAGE 4 ----------*/
 			// find RHS first and then update 
-			po_rhs_extended(RK4, RK4_pert, u_z_tmp, pert_tmp, &fftw_plan_c2r, &fftw_plan_r2c, kx, N, num_osc, k0, numLEs) ;
+			po_rhs_extended(RK4, RK4_pert, u_z_tmp, pert_tmp, &fftw_plan_c2r_pad, &fftw_plan_r2c_pad, kx, N, num_osc, k0, numLEs) ;
 
 			
 			//////////////
@@ -968,35 +1195,138 @@ void compute_lce_spectrum_clvs(int N, double a, double b, char* u0, int k0, int 
 							pert[indx] = pert[indx] + (dt * B1) * RK1_pert[indx] + (dt * B2) * RK2_pert[indx] + (dt * B3) * RK3_pert[indx] + (dt * B4) * RK4_pert[indx];  
 						}
 					}
-			}			
-
+			// printf("RK4[%d]: %6.16lf\n", i, RK4[i]);
+			}
+			// printf("\n\n");
 			
+			// for (int i = 0; i < num_osc; ++i)
+			// {
+			// 	printf("phi[%d]: %6.16lf\n", i, phi[i]);
+			// }
+			// printf("\n\n");
+
+			// for (int i = 0; i < dof; ++i)
+			// {
+			// 	for (int j = 0; j < numLEs; ++j)
+			// 	{
+			// 		printf("RK1_pert[%d]: %5.16lf \n", i * numLEs + j, RK1_pert[i * numLEs + j]);
+			// 	}
+			// 	printf("\n");
+			// }
+			// printf("\n\n");
+
+			// printf("Iter: %d\n", iter);
+
+			// printf("\n\n");
 
 			/////////////////
 			// Print to file
 			/////////////////
 			if ((iter > trans_iters) && (iter % SAVE_DATA_STEP == 0)) {
+
+
 				// Write phases
 				#ifdef __PHASES
-				write_hyperslab_data_d(HDF_file_space[0], HDF_data_set[0], HDF_mem_space[0], phi, "phi", num_osc, save_data_indx);
+				write_hyperslab_data(HDF_file_space[0], HDF_data_set[0], HDF_mem_space[0], H5T_NATIVE_DOUBLE, phi, "phi", num_osc, save_data_indx);
 				#endif
 
 				#ifdef __TRIADS
 				// compute triads for initial conditions
 				triad_phases(triads, &triad_phase_order, phi, kmin, kmax);
-				
+
 				// write triads
-				write_hyperslab_data_d(HDF_file_space[1], HDF_data_set[1], HDF_mem_space[1], triads, "triads", k_range * k1_range, save_data_indx);
+				write_hyperslab_data(HDF_file_space[1], HDF_data_set[1], HDF_mem_space[1], H5T_NATIVE_DOUBLE, triads, "triads", k_range * k1_range, save_data_indx);
 
 				// save phase order parameters
 				phase_order_R[save_data_indx]   = cabs(triad_phase_order);
 				phase_order_Phi[save_data_indx] = carg(triad_phase_order);
 				#endif
 
-				// Save Largest CLV
-				if (numLEs == 1) {
-					write_hyperslab_data_d(HDF_file_space[6], HDF_data_set[6], HDF_mem_space[6], pert, "LargestCLV", dof, save_lce_indx);
+				#if defined(__MODES) || defined(__GRAD) || defined(__REALSPACE) || defined(__TRIAD_ORDER)
+				// Construct the modes
+				for (int i = 0; i < num_osc; ++i) {
+					u_z[i] = amp[i] * cexp(I * phi[i]);
+
+					#ifdef __GRAD
+					u_z_grad[i] = I * kx[i] * u_z[i];
+					#endif
 				}
+				#endif
+				#ifdef __MODES
+				// Write current modes
+				write_hyperslab_data(HDF_file_space[7], HDF_data_set[7], HDF_mem_space[7], COMPLEX_DATATYPE, u_z, "u_z", num_osc, save_data_indx);
+				#endif
+				
+				#ifdef __REALSPACE
+				// transform back to Real Space
+				fftw_execute_dft_c2r(fftw_plan_c2r, u_z, u);			
+				for (int i = 0; i < N; ++i)	{
+					u[i] /= sqrt((double) N);  // Normalize inverse transfom	
+					// printf("u[%d]: %6.16lf\n", i, u[i]);	
+				}
+				// printf("\n\n");
+				// Write real space
+				write_hyperslab_data(HDF_file_space[8], HDF_data_set[8], HDF_mem_space[8], H5T_NATIVE_DOUBLE, u, "u", N, save_data_indx);
+				#endif
+				
+				#ifdef __GRAD
+				// transform back to Real Space
+				fftw_execute_dft_c2r(fftw_plan_c2r, u_z_grad, u_grad);
+				for (int i = 0; i < N; ++i)	{
+					u_grad[i] /= sqrt((double) N);  // Normalize inverse transfom
+				// printf("u_g[%d]: %6.16lf\n", i, u_grad[i]);	
+				}
+				// printf("\n\n");
+				
+				// Write real space
+				write_hyperslab_data(HDF_file_space[9], HDF_data_set[9], HDF_mem_space[9], H5T_NATIVE_DOUBLE, u_grad, "u_grad", N, save_data_indx);
+				#endif
+
+				#ifdef __TRIAD_ORDER
+				// Get the normalization constant
+				if (save_data_indx == 0) {
+					amp_normalize(amp_norm, amp, num_osc, k0);
+				}
+
+				// Get the convolution
+				conv_2N_pad(conv, u_z, &fftw_plan_r2c_pad, &fftw_plan_c2r_pad, N, num_osc, k0);
+
+				// compute scale dependent phase order parameter
+				for (int i = k0 + 1; i < num_osc; ++i) {
+					// Proposed scale dependent Kuramoto order parameters
+					adler_order_k[i]       = -I * (cexp(I * 2.0 *  phi[i]) * conj(conv[i])); // / amp_norm[i]);
+					
+					// Scale dependent Phase shift order parameter
+					phase_shift_order_k[i] = I * (conv[i] * cexp(-I * phi[i])); // / amp_norm[i]);
+
+					// Scale dependent Kuramoto order parameter in time of the phase shift
+					tmp_time_order_k[i]   += cexp(I * carg(phase_shift_order_k[i]));
+					theta_time_order_k[i] = tmp_time_order_k[i] / t_count;
+				}
+
+				// increment the counter			
+				t_count++;
+				#endif
+
+
+				////////////////////////////////////////////////// Should this be here??
+				#ifdef __CLV_MAX
+				// Get the first vector from the perturbation matrix
+				for (int i = 0; i < dof; ++i) {
+					max_clv[i] = pert[i * numLEs];
+				}
+
+				#ifdef __CLV_STATS
+				// Do running clv stats calculation
+				compute_clv_stats(max_clv, tmp_clv_avg, amp, dof, 1, kmin);
+				
+				// Update normalization counter
+				max_clv_stats_counter++;
+				#endif
+
+				// Write maximal CLV to file
+				write_hyperslab_data(HDF_file_space[6], HDF_data_set[6], HDF_mem_space[6], H5T_NATIVE_DOUBLE, max_clv, "MaxCLV", dof, save_lce_indx);				
+				#endif
 
 				// save time
 				time_array[save_data_indx] = iter * dt;
@@ -1052,7 +1382,6 @@ void compute_lce_spectrum_clvs(int N, double a, double b, char* u0, int k0, int 
 				}
 			}
 			
-			
 			////////////////
 			// Compute LCEs
 			////////////////
@@ -1062,14 +1391,13 @@ void compute_lce_spectrum_clvs(int N, double a, double b, char* u0, int k0, int 
 				lce[i]     = run_sum[i] / (t - t0);
 			}
 
-
 			// then write the current LCEs to this hyperslab
 			if (m % SAVE_LCE_STEP == 0) {		
 				#ifdef __LCE_ALL	
-				write_hyperslab_data_d(HDF_file_space[2], HDF_data_set[2], HDF_mem_space[2], lce, "lce", numLEs, save_lce_indx);
+				write_hyperslab_data(HDF_file_space[2], HDF_data_set[2], HDF_mem_space[2], H5T_NATIVE_DOUBLE, lce, "lce", numLEs, save_lce_indx);
 				#endif
 				#ifdef __RNORM
-				write_hyperslab_data_d(HDF_file_space[3], HDF_data_set[3], HDF_mem_space[3], znorm, "rNorm", numLEs, save_lce_indx);
+				write_hyperslab_data(HDF_file_space[3], HDF_data_set[3], HDF_mem_space[3], H5T_NATIVE_DOUBLE, znorm, "rNorm", numLEs, save_lce_indx);
 				#endif
 				
 				save_lce_indx += 1;
@@ -1094,16 +1422,21 @@ void compute_lce_spectrum_clvs(int N, double a, double b, char* u0, int k0, int 
 						continue;
 					}
 				}
-				printf("Iter: %d / %d | t: %5.6lf tsteps: %d | k0:%d alpha: %5.6lf beta: %5.6lf | Sum: %5.9lf | Dim: %5.9lf\n", m, m_end, t, m_end * m_iter, k0, a, b, lce_sum, (dim_indx + (dim_sum / fabs(lce[dim_indx]))));
+				printf("Iter: %d / %d | t: %6.3lf tsteps: %d | k0:%d alpha: %2.3lf beta: %2.3lf | Sum: %5.9lf | Dim: %5.9lf\n", m, m_end + trans_m, t, m_end * m_iter, k0, a, b, lce_sum, (dim_indx + (dim_sum / fabs(lce[dim_indx]))));
+				#ifdef PRINT_LCEs
 				printf("k: \n");
 				for (int j = 0; j < numLEs; ++j) {
 					printf("%5.6lf ", lce[j]);
 				}
 				printf("\n\n");
+				#endif
 			}
 			#endif
+			#if defined(__CLV_STATS) && defined(__CLVs)
+			// update counter for computing CLVs stats
+			clvs_stats_counter++;
+			#endif
 		}
-		// printf("Here: %d\n", m);
 
 		// ------------------------------
 		//  Update For Next Iteration
@@ -1120,7 +1453,7 @@ void compute_lce_spectrum_clvs(int N, double a, double b, char* u0, int k0, int 
 	//  Compute the CLVs
 	// ------------------------------
 	#ifdef __CLVs
-	compute_CLVs(HDF_file_space, HDF_data_set, HDF_mem_space, R, GS, dof, numLEs, m_end - trans_m, trans_m);
+	compute_CLVs(HDF_file_space, HDF_data_set, HDF_mem_space, R, GS, dof, numLEs, m_end, trans_m);
 	#endif
 	// ------------------------------
 	// End Algorithm
@@ -1166,6 +1499,69 @@ void compute_lce_spectrum_clvs(int N, double a, double b, char* u0, int k0, int 
 		fprintf(stderr, "\n\n!!Failed to make - PhaseOrderPhi - Dataset!!\n\n");
 	}
 	#endif
+	#ifdef __TRIAD_ORDER
+	// Write the final state of the scale dependent triad order parameter
+	for (int i = 0; i < num_osc; ++i) {
+		R_k[i] = cabs(theta_time_order_k[i]);
+	}
+	D1dims[0] = num_osc;
+	if ( (H5LTmake_dataset(HDF_file_handle, "R_k", D1, D1dims, H5T_NATIVE_DOUBLE, R_k)) < 0) {
+		fprintf(stderr, "\n\n!!Failed to make - R_k - Dataset!!\n\n");
+	}
+	#endif
+	#ifdef __CLV_STATS
+	// Normalize the CLV stats
+	for (int i = 0; i < dof; ++i) {
+		for (int j = 0; j < numLEs; ++j) {
+			#ifdef __CLV_MAX
+			tmp_clv_avg[i * numLEs + j] /= max_clv_stats_counter;
+			#endif
+			#ifdef __CLVs
+			tmp_clv_avg[i * numLEs + j] /= clvs_stats_counter;
+			#endif
+		}
+	}
+
+	// Write clv stats to file
+	#ifdef __CLV_MAX
+	D1dims[0] = dof;
+	if ( (H5LTmake_dataset(HDF_file_handle, "MaxCLVStats", D1, D1dims, H5T_NATIVE_DOUBLE, tmp_clv_avg)) < 0) {
+		fprintf(stderr, "\n\n!!Failed to make - MaxCLVStats - Dataset!!\n\n");
+	}
+	#endif
+	#ifdef __CLVs
+	hid_t D2 = 2;
+	hid_t D2dims[D2];
+	D2dims[0] = dof;
+	D2dims[1] = numLEs;
+	if ( (H5LTmake_dataset(HDF_file_handle, "CLVsStats", D2, D2dims, H5T_NATIVE_DOUBLE, tmp_clv_avg)) < 0) {
+	fprintf(stderr, "\n\n!!Failed to make - CLVStats - Dataset!!\n\n");
+	}
+	#endif
+	#endif
+	
+
+
+	// printf("Total Iters: %d\nTotal m Iters: %d \n\n", iter, m_iter);
+	// for (int i = 0; i < num_osc; ++i) {
+	// 	printf("phi[%d]: %5.16lf\n", i, phi[i]);
+	// }
+	// printf("\n");
+
+	// for (int i = 0; i < dof; ++i) {
+	// 	for (int j = 0; j < numLEs; ++j) {
+	// 		printf("pert[%d]: %5.16lf ", i * dof + j, pert[i * dof + j]);
+	// 	}
+	// 	printf("\n");
+	// }
+	// printf("\n\n");
+
+	// for (int i = 0; i < numLEs; ++i) {
+	// 	printf("LCE[%d]: %5.16lf\n", i, lce[i]);
+	// }
+	// printf("\n");
+	
+
 
 
 
@@ -1173,8 +1569,12 @@ void compute_lce_spectrum_clvs(int N, double a, double b, char* u0, int k0, int 
 	//  Clean Up & Exit
 	// ------------------------------
 	// Destroy DFT plans
+	#if defined(__REALSPACE) || defined(__GRAD)
 	fftw_destroy_plan(fftw_plan_r2c);
 	fftw_destroy_plan(fftw_plan_c2r);
+	#endif
+	fftw_destroy_plan(fftw_plan_r2c_pad);
+	fftw_destroy_plan(fftw_plan_c2r_pad);
 	
 	// Free memory
 	#ifdef __TRIADS
@@ -1185,6 +1585,27 @@ void compute_lce_spectrum_clvs(int N, double a, double b, char* u0, int k0, int 
 	#ifdef __CLVs
 	free(R);
 	free(GS);
+	#endif
+	#ifdef __TRIAD_ORDER
+	fftw_free(adler_order_k);
+	fftw_free(phase_shift_order_k);	
+	fftw_free(theta_time_order_k);	
+	fftw_free(conv);
+	free(amp_norm);
+	free(R_k);
+	#endif
+	#ifdef __CLV_MAX
+	free(max_clv);
+	#endif
+	#ifdef __CLV_STATS
+	free(tmp_clv_avg);
+	#endif
+	#ifdef __REALSPACE
+	free(u);
+	#endif
+	#ifdef _GRAD
+	fftw_free(u_z_grad);
+	free(u_grad);
 	#endif
 	free(R_tmp);
 	free(kx);
@@ -1209,48 +1630,66 @@ void compute_lce_spectrum_clvs(int N, double a, double b, char* u0, int k0, int 
 	fftw_free(u_z_tmp);
 	fftw_free(u_z_pad);
 
-	
+	// destroy the complex comound datatype
+	#if defined(__MODES) || defined(__TRIAD_ORDER)
+	status = H5Tclose(COMPLEX_DATATYPE);
+	#endif
 	
 
 	// Close HDF5 handles
 	#ifdef __TRIADS
-	H5Sclose( HDF_mem_space[1] );
-	H5Dclose( HDF_data_set[1] );
-	H5Sclose( HDF_file_space[1] );
+	status = H5Sclose( HDF_mem_space[1] );
+	status = H5Dclose( HDF_data_set[1] );
+	status = H5Sclose( HDF_file_space[1] );
 	#endif
 	#ifdef __CLVs
-	H5Sclose( HDF_mem_space[4] );
-	H5Dclose( HDF_data_set[4] );
-	H5Sclose( HDF_file_space[4] );
+	status = H5Sclose( HDF_mem_space[4] );
+	status = H5Dclose( HDF_data_set[4] );
+	status = H5Sclose( HDF_file_space[4] );
 	#ifdef __ANGLES
-	H5Sclose( HDF_mem_space[5] );
-	H5Dclose( HDF_data_set[5] );
-	H5Sclose( HDF_file_space[5] );
+	status = H5Sclose( HDF_mem_space[5] );
+	status = H5Dclose( HDF_data_set[5] );
+	status = H5Sclose( HDF_file_space[5] );
 	#endif
 	#endif
 	#ifdef __RNORM
-	H5Sclose( HDF_mem_space[3] );
-	H5Dclose( HDF_data_set[3] );
-	H5Sclose( HDF_file_space[3] );
+	status = H5Sclose( HDF_mem_space[3] );
+	status = H5Dclose( HDF_data_set[3] );
+	status = H5Sclose( HDF_file_space[3] );
 	#endif
 	#ifdef __PHASES
-	H5Sclose( HDF_mem_space[0] );
-	H5Dclose( HDF_data_set[0] );
-	H5Sclose( HDF_file_space[0] );
+	status = H5Sclose( HDF_mem_space[0] );
+	status = H5Dclose( HDF_data_set[0] );
+	status = H5Sclose( HDF_file_space[0] );
 	#endif
 	#ifdef __LCE_ALL
-	H5Sclose( HDF_mem_space[2] );
-	H5Dclose( HDF_data_set[2] );
-	H5Sclose( HDF_file_space[2] );
+	status = H5Sclose( HDF_mem_space[2] );
+	status = H5Dclose( HDF_data_set[2] );
+	status = H5Sclose( HDF_file_space[2] );
 	#endif 
-	if (numLEs == 1) {
-		H5Sclose( HDF_mem_space[6] );
-		H5Dclose( HDF_data_set[6] );
-		H5Sclose( HDF_file_space[6] );
-	}
+	#ifdef __CLV_MAX
+	status = H5Sclose( HDF_mem_space[6] );
+	status = H5Dclose( HDF_data_set[6] );
+	status = H5Sclose( HDF_file_space[6] );
+	#endif
+	#ifdef __MODES
+	status = H5Sclose( HDF_mem_space[7] );
+	status = H5Dclose( HDF_data_set[7] );
+	status = H5Sclose( HDF_file_space[7] );
+	#endif
+	#ifdef __REALSPACE
+	status = H5Sclose( HDF_mem_space[8] );
+	status = H5Dclose( HDF_data_set[8] );
+	status = H5Sclose( HDF_file_space[8] );
+	#endif
+	#ifdef __GRAD
+	status = H5Sclose( HDF_mem_space[9] );
+	status = H5Dclose( HDF_data_set[9] );
+	status = H5Sclose( HDF_file_space[9] );
+	#endif
 
 	// Close output file
-	H5Fclose(HDF_file_handle);
+	status = H5Fclose(HDF_file_handle);
 }
 // ---------------------------------------------------------------------
 //  End of File

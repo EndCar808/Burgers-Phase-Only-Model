@@ -194,7 +194,7 @@ def plot_largest_clv(N, k0, alpha, beta, u0, iters, m_end, m_iter, trans, numLEs
         ## --------- Get System Parameters
         amps    = HDFfileData['Amps'][:]
         kmin    = k0 + 1
-        num_osc = amps.shape[0];
+        num_osc = amps.shape[0]
         dof     = num_osc - kmin
 
         ## --------- Read in CLV Data
@@ -306,7 +306,7 @@ def find_min_max(N, k0, alpha, beta, u0, iters, m_end, m_iter, trans, min_v_z, m
         
         ## --------- System Parameters
         num_clv_steps = CLVs.shape[0]
-        num_osc       = amps.shape[0];
+        num_osc       = amps.shape[0]
         dof           = num_osc - (k0 + 1)
 
         ## --------- Reshape the CLV and Angles data
@@ -360,11 +360,11 @@ def loop_over_data(N, k0, a, beta, u0, iters, m_end, m_iter, trans, min_v_z, max
     angles = HDFfileData['Angles']
 
     ## --------- System Parameters
-    num_tsteps    = len(time);
+    num_tsteps    = len(time)
     num_clv_steps = CLVs.shape[0]
-    num_osc       = amps.shape[0];
-    kmin          = k0 + 1;
-    kmax          = num_osc - 1;
+    num_osc       = amps.shape[0]
+    kmin          = k0 + 1
+    kmax          = num_osc - 1
     dof           = num_osc - kmin
 
     ## --------- Reshape the CLV and Angles data
@@ -496,16 +496,16 @@ def plot_data(angles, zdata, theta1, theta2, zeroindx, kmin, num_osc, dof, min_v
     
     ## Distrubution between stable and unstable manifolds
     ax3 = fig.add_subplot(gs[1, 0:])
-    hist, bins  = np.histogram(theta1, range = (0.0, np.pi / 2.0), bins = 900, density = True);
+    hist, bins  = np.histogram(theta1, range = (0.0, np.pi / 2.0), bins = 900, density = True)
     bin_centers = (bins[1:] + bins[:-1]) * 0.5
     plt.plot(bin_centers, hist)
     if zeroindx > 0:
-        hist, bins  = np.histogram(theta2, range = (0.0, np.pi / 2.0), bins = 900, density = True);
+        hist, bins  = np.histogram(theta2, range = (0.0, np.pi / 2.0), bins = 900, density = True)
         bin_centers = (bins[1:] + bins[:-1]) * 0.5
         ax3.plot(bin_centers, hist)
     ax3.set_xlim(0.0, np.pi/2.0)
     ax3.set_xlabel(r"$\theta$")
-    ax3.set_xticks([0.0, np.pi/4.0, np.pi/2.0],[r"$0$", r"$\frac{\pi}{4}$", r"$\frac{\pi}{2}$"]);
+    ax3.set_xticks([0.0, np.pi/4.0, np.pi/2.0],[r"$0$", r"$\frac{\pi}{4}$", r"$\frac{\pi}{2}$"])
     ax3.set_ylabel(r"PDF")
     ax3.set_yscale("log")
     ax3.legend([r"$\theta_{\mathbf{E}^+ \oplus \mathbf{E}^0, \mathbf{E}^-}$", r"$\theta_{\mathbf{E}^+, \mathbf{E}^0 \oplus \mathbf{E}^-}$"], fancybox = True, framealpha = 1, shadow = True)

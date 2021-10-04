@@ -18,6 +18,8 @@
 void mem_chk (void *arr_ptr, char *name);
 int max_indx_d(double* array, int n);
 
+int sgn(int x);
+
 void write_array(double *A, int n, char *filename);
 void write_array_fftwreal(fftw_complex *A, int n, char *filename);
 void write_array_fftwimag(fftw_complex *A, int n, char *filename);

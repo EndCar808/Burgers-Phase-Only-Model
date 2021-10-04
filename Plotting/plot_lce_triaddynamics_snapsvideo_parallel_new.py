@@ -33,7 +33,7 @@ from matplotlib.pyplot import cm
 import numpy as np
 np.set_printoptions(threshold=sys.maxsize)
 from numba import jit
-
+from functions import compute_time, compute_triads, compute_current_triads
 
 ###########################
 ##	Function Definitions
@@ -41,6 +41,10 @@ from numba import jit
 # For plotting snapshots
 def plot_snaps(i, x, u_urms, du_x_rms, time, triads, kmin, kmax, phases, R, Phi, t0, T, fullTime):
     print("SNAP {}\n".format(i))
+    
+    ## Compute current iteration triads and order parameters
+    if not triads:
+        triads, R, Phi = compute_current_triads(phases, kmin, kmax)
 
     ## CREATE FIGURE
     fig = plt.figure(figsize = (16, 9), tight_layout=True)
@@ -64,7 +68,7 @@ def plot_snaps(i, x, u_urms, du_x_rms, time, triads, kmin, kmax, phases, R, Phi,
     ax1.legend([leg1], [r"$T=({:04.3f})$".format(time)], handlelength = -0.5, fancybox = True, prop = {'size': 10})
     ax1.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
 
-    ## PDF
+    ## PDF of TRIADS
     ax2 = fig.add_subplot(gs[0, 1])
     hist, bins  = np.histogram(np.extract(triads != -10, triads).flatten(), range = (0.0 - 0.5, 2.0 * np.pi + 0.5), bins = 100, density = True)
     bin_centers = (bins[1:] + bins[:-1]) * 0.5
@@ -109,8 +113,8 @@ def plot_snaps(i, x, u_urms, du_x_rms, time, triads, kmin, kmax, phases, R, Phi,
 
     ## PHASES - vs k
     ax6  = fig.add_subplot(gs[2, 1])
-    ax6.plot(fullTime, R, color = 'blue')
-    ax6.plot(fullTime, Phi, color = 'green')
+    ax6.plot(fullTime R, color = 'blue')
+    ax6.plot(fullTime Phi, color = 'green')
     ax6.set_xlim(t0, T)
     ax6.set_ylim([0.0, np.pi])
     ax6.set_xlabel(r'$t$', labelpad = 0)
@@ -144,40 +148,6 @@ def plot_snaps(i, x, u_urms, du_x_rms, time, triads, kmin, kmax, phases, R, Phi,
     plt.close()
 
 
-
-
-## Create the triads from the phases
-@jit(nopython = True)
-def compute_triads(phases, kmin, kmax):
-	print("\n...Computing Triads...\n")
-
-	## Variables
-	numTriads  = 0
-	k3_range   = int(kmax - kmin + 1)
-	k1_range   = int((kmax - kmin + 1) / 2)
-	time_steps = phases.shape[0]
-
-	## Create memory space
-	triadphase = -10 * np.ones((k3_range, k1_range, time_steps))
-	triads     = -10 * np.ones((k3_range, k1_range, time_steps))
-	phaseOrder = np.complex(0.0, 0.0) * np.ones((time_steps))
-	R          = np.zeros((time_steps))
-	Phi        = np.zeros((time_steps))
-	
-	## Compute the triads
-	for k in range(kmin, kmax + 1):
-	    for k1 in range(kmin, int(k/2) + 1):
-	        triadphase[k - kmin, k1 - kmin, :] = phases[:, k1] + phases[:, k - k1] - phases[:, k]
-	        triads[k - kmin, k1 - kmin, :]     = np.mod(triadphase[k - kmin, k1 - kmin, :], 2*np.pi)
-
-	        phaseOrder[:] += np.exp(np.complex(0.0, 1.0)*triads[k - kmin, k1 - kmin, :])
-	        numTriads += 1
-	
-	# Compute Phase-Order params
-	R[:]   = np.absolute(phaseOrder[:] / numTriads)
-	Phi[:] = np.angle(phaseOrder[:] / numTriads)
-
-	return triads, R, Phi
 
 
 ## Real Space Data
@@ -217,174 +187,181 @@ def compute_gradient(u_z, kmin, kmax):
 
 
 if __name__ == '__main__':
-	#########################
-	##	Get Input Parameters
-	#########################
-	if (len(sys.argv) != 8):
-	    print("No Input Provided, Error.\nProvide k0\nAlpah\nBeta\nIterations\nTransient Iterations\nN\nu0\n")
-	    sys.exit()
-	else: 
-	    k0    = int(sys.argv[1])
-	    alpha = float(sys.argv[2])
-	    beta  = float(sys.argv[3])
-	    iters = int(sys.argv[4])
-	    trans = int(sys.argv[5])
-	    N     = int(sys.argv[6])
-	    u0    = str(sys.argv[7])
-	results_dir = "/RESULTS_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]".format(N, k0, alpha, beta, u0)
-	filename    = "/LCEData_ITERS[{}]_TRANS[{}]".format(iters, trans)
+    #########################
+    ##	Get Input Parameters
+    #########################
+    if (len(sys.argv) != 8):
+        print("No Input Provided, Error.\nProvide k0\nAlpah\nBeta\nIterations\nTransient Iterations\nN\nu0\n")
+        sys.exit()
+    else: 
+        k0    = int(sys.argv[1])
+        alpha = float(sys.argv[2])
+        beta  = float(sys.argv[3])
+        iters = int(sys.argv[4])
+        trans = int(sys.argv[5])
+        N     = int(sys.argv[6])
+        u0    = str(sys.argv[7])
+    results_dir = "/RESULTS_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]".format(N, k0, alpha, beta, u0)
+    # filename    = "/LCEData_ITERS[{}]_TRANS[{}]".format(iters, trans)
+    filename    = "/SolverData_ITERS[{}]_TRANS[{}]".format(iters, trans)
 
-	######################
-	##	Input & Output Dir
-	######################
-	# input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Output/LCE"
-	# output_dir = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Snapshots/TriadDynamics" + filename
-	input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/RESULTS"
-	output_dir = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/RESULTS/" + results_dir
+    ######################
+    ##	Input & Output Dir
+    ######################
+    # input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Output/LCE"
+    # output_dir = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Snapshots/TriadDynamics" + filename
+    input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/RESULTS"
+    output_dir = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/RESULTS/" + results_dir
 
-	if os.path.isdir(output_dir) != True:
-		os.mkdir(output_dir)
-	if os.path.isdir(output_dir + '/SNAPS') != True:
-		os.mkdir(output_dir + '/SNAPS')
-
-
-
-	######################
-	##	Read in Input File
-	######################
-	# HDFfileData = h5py.File(input_dir + filename + '.h5', 'r')
-	HDFfileData = h5py.File(input_dir + results_dir + filename + '.h5', 'r')
-
-	# print input file name to screen
-	# print("\n\nData File: %s.h5\n" % filename)
-	print("\n\nData File: {}.h5\n".format(results_dir + filename))
-
-	######################
-	##	Read in Datasets
-	######################
-	phases = HDFfileData['Phases'][:, :]
-	time   = HDFfileData['Time'][:]
-	amps   = HDFfileData['Amps'][:]
+    if os.path.isdir(output_dir) != True:
+    	os.mkdir(output_dir)
+    if os.path.isdir(output_dir + '/SNAPS') != True:
+    	os.mkdir(output_dir + '/SNAPS')
 
 
 
+    ######################
+    ##	Read in Input File
+    ######################
+    # HDFfileData = h5py.File(input_dir + filename + '.h5', 'r')
+    HDFfileData = h5py.File(input_dir + results_dir + filename + '.h5', 'r')
 
-	######################
-	##	Preliminary Calcs
-	######################
-	ntsteps = len(time)
-	num_osc = phases.shape[1]
-	N       = 2 * (num_osc - 1)
-	kmin    = k0 + 1
-	kmax    = num_osc - 1
-
-
-
-	######################
-	##	Triad Data
-	######################
-	if 'Triads' in list(HDFfileData.keys()):
-		R      = HDFfileData['PhaseOrderR'][:, :]
-		Phi    = HDFfileData['PhaseOrderPhi'][:, :]
-		triad  = HDFfileData['Triads']
-		# Reshape triads
-		tdims     = triad.attrs['Triad_Dims']
-		triads    = np.array(np.reshape(triad, np.append(triad.shape[0], tdims[0, :])))
-
-		triads_exist = 1
-	else:
-		## Call triad function
-		triads, R, Phi = compute_triads(phases, kmin, kmax)
-		triads_exist = 0
-
-	triads, R, Phi = compute_triads(phases, kmin, kmax)
-	triads_exist   = 0
+    # print input file name to screen
+    # print("\n\nData File: %s.h5\n" % filename)
+    print("\n\nData File: {}.h5\n".format(results_dir + filename))
 
 
-	######################
-	##	ColourMaps
-	######################
-	# Triads Colourmap
-	colours = [[1, 1, 1], [1, 1, 0], [0, 0, 1], [0, 1, 1], [0, 1, 0], [1, 0, 1], [1, 0, 0], [1, 0.25, 0], [1, 1, 1]]   #located @ 0, pi/2, pi, 3pi/2 and 2pi
-	# my_m    = mpl.colors.LinearSegmentedColormap.from_list('my_map', colours, N = kmax)                            # set N to inertial range
-	my_m    = mpl.colors.LinearSegmentedColormap.from_list('my_map', cm.hsv(np.arange(255)), N = kmax)                            # set N to inertial range
-	my_m.set_under('1.0')
-	my_norm = mpl.colors.Normalize(vmin = 0, vmax = 2*np.pi)
-
-	# Phases Colourmap
-	myhsv   = cm.hsv(np.arange(255))
-	norm    = mpl.colors.Normalize(vmin = 0.0, vmax = 2.0*np.pi)
-	my_mhsv = mpl.colors.LinearSegmentedColormap.from_list('my_map', myhsv, N = kmax) # set N to inertial range
-	m       = cm.ScalarMappable( norm = norm, cmap = my_mhsv)                         # map the values to rgba tuple
+    # ######################
+    # ##	Read in Datasets
+    # ######################
+    phases = HDFfileData['Phases'][:, :]
+    amps   = HDFfileData['Amps'][:]
+    try:
+        time   = HDFfileData['Time'][:]
+    except:
+        print("No time dset...creating one now")
+        time, step = compute_time(N, alpha, beta, k0, iters, trans)
+        print("timestep = {}".format(step))
 
 
 
-	######################	
-	##	Plot Data
-	######################
-	## Call realspace function
-	u, u_urms, x, u_z = compute_realspace(amps, phases, N)
-
-	## Compute Real Space velocity Gradient
-	du_x, du_x_rms = compute_gradient(u_z, k0, kmax)
-
-
-	## Plot in parallel
-	## Create Process list	
-	procLim  = 10
-
-	## Create iterable group of processess
-	if triads_exist == 0:
-		groups_args = [(mprocs.Process(target = plot_snaps, args = (i, x, u_urms[i, :], du_x_rms[i, :], time[i], triads[:, :, i], kmin, kmax, phases[i, kmin:], R[0:i], Phi[0:i], time[0], time[-1], time[0:i])) for i in range(time.shape[0]))] * procLim
-	else:
-	 	groups_args = [(mprocs.Process(target = plot_snaps, args = (i, x, u_urms[i, :], du_x_rms[i, :], time[i], triads[i, :, :], kmin, kmax, phases[i, kmin:], R[0:i], Phi[0:i], time[0], time[-1], time[0:i])) for i in range(time.shape[0]))] * procLim
+    ######################
+    ##	Preliminary Calcs
+    ######################
+    ntsteps = len(time)
+    num_osc = phases.shape[1]
+    N       = 2 * (num_osc - 1)
+    kmin    = k0 + 1
+    kmax    = num_osc - 1
 
 
-	## Start timer
-	start = TIME.perf_counter()
 
-	## Loop of grouped iterable
-	for procs in zip_longest(*groups_args): 
-		processes = []
-		for p in filter(None, procs):
-			processes.append(p)
-			p.start()
+    ######################
+    ##	Triad Data
+    ######################
+    if 'Triads' in list(HDFfileData.keys()):
+    	R      = HDFfileData['PhaseOrderR'][:, :]
+    	Phi    = HDFfileData['PhaseOrderPhi'][:, :]
+    	triad  = HDFfileData['Triads']
+    	# Reshape triads
+    	tdims     = triad.attrs['Triad_Dims']
+    	triads    = np.array(np.reshape(triad, np.append(triad.shape[0], tdims[0, :])))
 
-		for process in processes:
-			process.join()
+    	triads_exist = 1
+    else:
+    	## Call triad function
+    	triads, R, Phi = compute_triads(phases, kmin, kmax)
+    	triads_exist = 0
 
-
-	# Start timer
-	end = TIME.perf_counter()
-
-	print("\n\nPlotting Time: {:5.8f}s\n\n".format(end - start))
-
-
-	######################
-	##	Make Video From Snaps
-	######################
-	framesPerSec = 20
-	inputFile    = output_dir + "/SNAPS/Triad_SNAPS_%05d.png"
-	videoName    = output_dir + "/SNAPS/Triad_Dynamics6.mp4"
-	cmd = "ffmpeg -r {} -f image2 -s 1920x1080 -i {} -vcodec libx264 -crf 25 -pix_fmt yuv420p {}".format(framesPerSec, inputFile, videoName)
-	# cmd = "ffmpeg -r {} -f image2 -s 1280×720 -i {} -vcodec libx264 -preset ultrafast -crf 35 -pix_fmt yuv420p {}".format(framesPerSec, inputFile, videoName)
+    triads, R, Phi = compute_triads(phases, kmin, kmax)
+    triads_exist   = 0
 
 
-	## Start timer
-	start = TIME.perf_counter()
+    ######################
+    ##	ColourMaps
+    ######################
+    # Triads Colourmap
+    colours = [[1, 1, 1], [1, 1, 0], [0, 0, 1], [0, 1, 1], [0, 1, 0], [1, 0, 1], [1, 0, 0], [1, 0.25, 0], [1, 1, 1]]   #located @ 0, pi/2, pi, 3pi/2 and 2pi
+    # my_m    = mpl.colors.LinearSegmentedColormap.from_list('my_map', colours, N = kmax)                            # set N to inertial range
+    my_m    = mpl.colors.LinearSegmentedColormap.from_list('my_map', cm.hsv(np.arange(255)), N = kmax)                            # set N to inertial range
+    my_m.set_under('1.0')
+    my_norm = mpl.colors.Normalize(vmin = 0, vmax = 2*np.pi)
 
-	process = Popen(cmd, shell = True, stdout = PIPE, stdin = PIPE, universal_newlines = True)
-	[runCodeOutput, runCodeErr] = process.communicate()
-	print(runCodeOutput)
-	print(runCodeErr)
-	process.wait()
+    # Phases Colourmap
+    myhsv   = cm.hsv(np.arange(255))
+    norm    = mpl.colors.Normalize(vmin = 0.0, vmax = 2.0*np.pi)
+    my_mhsv = mpl.colors.LinearSegmentedColormap.from_list('my_map', myhsv, N = kmax) # set N to inertial range
+    m       = cm.ScalarMappable( norm = norm, cmap = my_mhsv)                         # map the values to rgba tuple
 
-	
-	print("Finished making video...")
-	print("Video Location...")
-	print("\n" + videoName + "\n")
 
-	# Start timer
-	end = TIME.perf_counter()
 
-	print("\n\nMovie Time: {:5.8f}s\n\n".format(end - start))
+    ######################	
+    ##	Plot Data
+    ######################
+    ## Call realspace function
+    u, u_urms, x, u_z = compute_realspace(amps, phases, N)
+
+    ## Compute Real Space velocity Gradient
+    du_x, du_x_rms = compute_gradient(u_z, k0, kmax)
+
+
+    ## Plot in parallel
+    ## Create Process list	
+    procLim  = 10
+
+    ## Create iterable group of processess
+    if triads_exist == 0:
+    	groups_args = [(mprocs.Process(target = plot_snaps, args = (i, x, u_urms[i, :], du_x_rms[i, :], time[i], triads[:, :, i], kmin, kmax, phases[i, kmin:], R[0:i], Phi[0:i], time[0], time[-1], time[0:i])) for i in range(time.shape[0]))] * procLim
+    else:
+     	groups_args = [(mprocs.Process(target = plot_snaps, args = (i, x, u_urms[i, :], du_x_rms[i, :], time[i], triads[i, :, :], kmin, kmax, phases[i, kmin:], R[0:i], Phi[0:i], time[0], time[-1], time[0:i])) for i in range(time.shape[0]))] * procLim
+    # groups_args = [(mprocs.Process(target = plot_snaps, args = (i, x, u_urms[i, :], du_x_rms[i, :], time[i], [], kmin, kmax, phases[i, kmin:], [], [], time[0], time[-1], time[0:i])) for i in range(time.shape[0]))] * procLim
+
+
+    ## Start timer
+    start = TIME.perf_counter()
+
+    ## Loop of grouped iterable
+    for procs in zip_longest(*groups_args): 
+    	processes = []
+    	for p in filter(None, procs):
+    		processes.append(p)
+    		p.start()
+
+    	for process in processes:
+    		process.join()
+
+
+    # Start timer
+    end = TIME.perf_counter()
+
+    print("\n\nPlotting Time: {:5.8f}s\n\n".format(end - start))
+
+
+    ######################
+    ##	Make Video From Snaps
+    ######################
+    framesPerSec = 20
+    inputFile    = output_dir + "/SNAPS/Triad_SNAPS_%05d.png"
+    videoName    = output_dir + "/SNAPS/Triad_Dynamics6.mp4"
+    cmd = "ffmpeg -r {} -f image2 -s 1920x1080 -i {} -vcodec libx264 -crf 25 -pix_fmt yuv420p {}".format(framesPerSec, inputFile, videoName)
+    # cmd = "ffmpeg -r {} -f image2 -s 1280×720 -i {} -vcodec libx264 -preset ultrafast -crf 35 -pix_fmt yuv420p {}".format(framesPerSec, inputFile, videoName)
+
+
+    ## Start timer
+    start = TIME.perf_counter()
+
+    process = Popen(cmd, shell = True, stdout = PIPE, stdin = PIPE, universal_newlines = True)
+    [runCodeOutput, runCodeErr] = process.communicate()
+    print(runCodeOutput)
+    print(runCodeErr)
+    process.wait()
+
+
+    print("Finished making video...")
+    print("Video Location...")
+    print("\n" + videoName + "\n")
+
+    # Start timer
+    end = TIME.perf_counter()
+
+    print("\n\nMovie Time: {:5.8f}s\n\n".format(end - start))

@@ -32,7 +32,7 @@ from matplotlib.pyplot import cm
 import numpy as np
 np.set_printoptions(threshold=sys.maxsize)
 from numba import jit
-
+from functions import compute_current_triads, compute_time
 
 ###########################
 ##	Function Definitions
@@ -40,6 +40,11 @@ from numba import jit
 # For plotting snapshots
 def plot_snaps(i, x, u_urms, du_x_rms, time, triads, kmin, kmax, phases, R, Phi, t0, T, fullTime):
 	print("SNAP {}\n".format(i))
+
+	## Compute current iteration triads and order parameters
+	if not triads:
+	    triads, R, Phi = compute_current_triads(phases, kmin, kmax)
+
 
 	## CREATE FIGURE
 	fig = plt.figure(figsize = (16, 9), tight_layout=True)
@@ -57,26 +62,26 @@ def plot_snaps(i, x, u_urms, du_x_rms, time, triads, kmin, kmax, phases, R, Phi,
 	ax1.set_ylim(-3.2, 3.2)
 	ax1.set_xlabel(r'$x$')
 	ax1.set_ylabel(r'$u(x, t) / u_{rms}(x, t)$', color = 'blue')
-	ax1.set_xticks([0.0, np.pi/2.0, np.pi, 1.5*np.pi, 2*np.pi]);
-	ax1.set_xticklabels([r"$0$", r"$\frac{\pi}{2}$", r"$\pi$", r"$\frac{3\pi}{2}$", r"$2 \pi$"]);
+	ax1.set_xticks([0.0, np.pi/2.0, np.pi, 1.5*np.pi, 2*np.pi])
+	ax1.set_xticklabels([r"$0$", r"$\frac{\pi}{2}$", r"$\pi$", r"$\frac{3\pi}{2}$", r"$2 \pi$"])
 	leg1 = mpl.patches.Rectangle((0, 0), 0, 0, alpha = 0.0)
 	ax1.legend([leg1], [r"$T=({:04.3f})$".format(time)], handlelength = -0.5, fancybox = True, prop = {'size': 10})
 	ax1.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
 
 	## PDF
 	ax2 = fig.add_subplot(gs[0, 1])
-	hist, bins  = np.histogram(np.extract(triads != -10, triads).flatten(), range = (0.0 - 0.5, 2.0 * np.pi + 0.5), bins = 100, density = True);
+	hist, bins  = np.histogram(np.extract(triads != -10, triads).flatten(), range = (0.0 - 0.5, 2.0 * np.pi + 0.5), bins = 100, density = True)
 	bin_centers = (bins[1:] + bins[:-1]) * 0.5
 	ax2.plot(bin_centers, hist)
-	ax2.set_xlim(-0.05, 2 * np.pi+0.05);
+	ax2.set_xlim(-0.05, 2 * np.pi+0.05)
 	ax2.set_ylim(1e-4, 10)
-	ax2.axhline(y = 1 / (2 * np.pi), xmin = 0, xmax = 1., ls = '--', c = 'black');
-	ax2.set_xticks([0.0, np.pi/2.0, np.pi, 1.5*np.pi, 2*np.pi]);
-	ax2.set_xticklabels([r"$0$", r"$\frac{\pi}{2}$", r"$\pi$", r"$\frac{3\pi}{2}$", r"$2 \pi$"]);
-	ax2.set_xlabel(r'$\varphi_{k_1, k_3 - k_1}^{k_3}(t)$');
-	ax2.set_ylabel(r'PDF');
-	ax2.set_yscale('log');
-	ax2.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both');
+	ax2.axhline(y = 1 / (2 * np.pi), xmin = 0, xmax = 1., ls = '--', c = 'black')
+	ax2.set_xticks([0.0, np.pi/2.0, np.pi, 1.5*np.pi, 2*np.pi])
+	ax2.set_xticklabels([r"$0$", r"$\frac{\pi}{2}$", r"$\pi$", r"$\frac{3\pi}{2}$", r"$2 \pi$"])
+	ax2.set_xlabel(r'$\varphi_{k_1, k_3 - k_1}^{k_3}(t)$')
+	ax2.set_ylabel(r'PDF')
+	ax2.set_yscale('log')
+	ax2.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
 
 	## PHASES - BARPLOT
 	ax3  = fig.add_subplot(gs[1, 0])
@@ -103,20 +108,20 @@ def plot_snaps(i, x, u_urms, du_x_rms, time, triads, kmin, kmax, phases, R, Phi,
 	ax5.set_ylabel(r'$\phi_k$', rotation = 0, labelpad = 10)
 	ax5.set_yticks([0, np.pi / 2.0, np.pi, 3.0 * np.pi / 2.0, 2.0 * np.pi])
 	ax5.set_yticklabels([r"$0$", r"$\frac{\pi}{2}$", r"$\pi$", r"$\frac{3\pi}{2}$", r"$2\pi$"])
-	ax5.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both');
+	ax5.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
     
 
     ## PHASES - vs k
 	ax6  = fig.add_subplot(gs[2, 1])
-	ax6.plot(fullTime, R, color = 'blue')
-	ax6.plot(fullTime, Phi, color = 'green')
+	ax6.plot(fullTime, R, 'o', color = 'blue')
+	ax6.plot(fullTime, Phi, 'o', color = 'green')
 	ax6.set_xlim(t0, T)
 	ax6.set_ylim([0.0, np.pi])
 	ax6.set_xlabel(r'$t$', labelpad = 0)
 	ax6.set_yticks([0.5, 1.0, np.pi / 2.0, np.pi])
 	ax6.set_yticklabels([r"$0.5$", r"$1.0$", r"$\frac{\pi}{2}$", r"$\pi$"])
 	ax6.legend([r"$\mathcal{R}(t)$", r"$\Phi(t)$"])
-	ax6.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both');
+	ax6.grid(which = 'both', linestyle=':', linewidth='0.5', axis = 'both')
 
 
 	## TRIADS
@@ -150,7 +155,7 @@ def compute_triads(phases, kmin, kmax):
 	print("\n...Computing Triads...\n")
 
 	## Variables
-	numTriads  = 0;
+	numTriads  = 0
 	k3_range   = int(kmax - kmin + 1)
 	k1_range   = int((kmax - kmin + 1) / 2)
 	time_steps = phases.shape[0]
@@ -180,12 +185,13 @@ def compute_triads(phases, kmin, kmax):
 
 
 
+
 ## Real Space Data
 def compute_realspace(amps, phases, N):
 	print("\n...Creating Real Space Soln...\n")
 
 	# Create full set of amps and phases
-	amps_full   = np.append(amps[0, :], np.flipud(amps[0, 1:-1]))
+	amps_full   = np.append(amps[:], np.flipud(amps[1:-1]))
 	phases_full = np.concatenate((phases[:, :], -np.fliplr(phases[:, 1:-1])), axis = 1)
 
 	# Construct modes and realspace soln
@@ -217,27 +223,48 @@ def compute_gradient(u_z, kmin, kmax):
 
 
 
+
+
+
 if __name__ == '__main__':
 
 	#########################
 	##	Get Input Parameters
 	#########################
-	if (len(sys.argv) != 6):
+	if (len(sys.argv) != 8):
 	    print("No Input Provided, Error.\nProvide: \nk0\nAlpha\nBeta\nIterations\nN\n")
 	    sys.exit()
 	else: 
-	    k0    = int(sys.argv[1])
-	    alpha = float(sys.argv[2])
-	    beta  = float(sys.argv[3])
-	    iters = int(sys.argv[4])
-	    N     = int(sys.argv[5])
-	filename = "/LCE_Runtime_Data_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[ALIGNED]_ITERS[{}]".format(N, k0, alpha, beta, iters)
+		k0    = int(sys.argv[1])
+		alpha = float(sys.argv[2])
+		beta  = float(sys.argv[3])
+		iters = int(sys.argv[4])
+		trans = int(sys.argv[5])
+		N     = int(sys.argv[6])
+		u0    = str(sys.argv[7])
+	# filename = "/LCE_Runtime_Data_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[ALIGNED]_ITERS[{}]".format(N, k0, alpha, beta, iters)
+
+	# ######################
+	# ##	Input & Output Dir
+	# ######################
+	# input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Output/LCE"
+	# output_dir = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Snapshots/TriadDynamics" + filename
+
+	# if os.path.isdir(output_dir) != True:
+	# 	os.mkdir(output_dir)
+	# if os.path.isdir(output_dir + '/SNAPS') != True:
+	# 	os.mkdir(output_dir + '/SNAPS')
+	results_dir = "/RESULTS_N[{}]_k0[{}]_ALPHA[{:0.3f}]_BETA[{:0.3f}]_u0[{}]".format(N, k0, alpha, beta, u0)
+	# filename    = "/LCEData_ITERS[{}]_TRANS[{}]".format(iters, trans)
+	filename    = "/SolverData_ITERS[{}]_TRANS[{}]".format(iters, trans)
 
 	######################
 	##	Input & Output Dir
 	######################
-	input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Output/LCE"
-	output_dir = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Snapshots/TriadDynamics" + filename
+	# input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Output/LCE"
+	# output_dir = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/Snapshots/TriadDynamics" + filename
+	input_dir  = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/RESULTS"
+	output_dir = "/work/projects/TurbPhase/burgers_1d_code/Burgers_PO/Data/RESULTS/" + results_dir
 
 	if os.path.isdir(output_dir) != True:
 		os.mkdir(output_dir)
@@ -246,101 +273,114 @@ if __name__ == '__main__':
 
 
 
+
 	######################
 	##	Read in Input File
 	######################
-	HDFfileData = h5py.File(input_dir + filename + '.h5', 'r')
+	# HDFfileData = h5py.File(input_dir + filename + '.h5', 'r')
+
+	# # print input file name to screen
+	# print("\n\nData File: %s.h5\n" % filename)
+	# HDFfileData = h5py.File(input_dir + filename + '.h5', 'r')
+	HDFfileData = h5py.File(input_dir + results_dir + filename + '.h5', 'r')
 
 	# print input file name to screen
-	print("\n\nData File: %s.h5\n" % filename)
+	# print("\n\nData File: %s.h5\n" % filename)
+	print("\n\nData File: {}.h5\n".format(results_dir + filename))
+
 
 
 	######################
 	##	Read in Datasets
 	######################
 	phases = HDFfileData['Phases'][:, :]
-	time   = HDFfileData['Time'][:, :]
-	amps   = HDFfileData['Amps'][:, :]
-	lce    = HDFfileData['LCE'][:, :]
+	amps   = HDFfileData['Amps'][:]
+	try:
+	    time   = HDFfileData['Time'][:]
+	except:
+	    print("No time dset...creating one now")
+	    time, step = compute_time(N, alpha, beta, k0, iters, trans)
+	    print("timestep = {}".format(step))
 
 
 
 	######################
 	##	Preliminary Calcs
 	######################
-	ntsteps = phases.shape[0];
-	num_osc = phases.shape[1];
-	N       = 2 * num_osc - 1 - 1;
-	kmin    = k0 + 1;
-	kmax    = amps.shape[1] - 1
-	k0      = kmin - 1;
+	ntsteps = phases.shape[0]
+	num_osc = phases.shape[1]
+	N       = 2 * num_osc - 1 - 1
+	kmin    = k0 + 1
+	kmax    = amps.shape[0] - 1
+	k0      = kmin - 1
 
 
 
-	######################
-	##	Triad Data
-	######################
-	if 'Triads' in list(HDFfileData.keys()):
-		R      = HDFfileData['PhaseOrderR'][:, :]
-		Phi    = HDFfileData['PhaseOrderPhi'][:, :]
-		triad  = HDFfileData['Triads']
-		# Reshape triads
-		tdims     = triad.attrs['Triad_Dims']
-		triads    = np.array(np.reshape(triad, np.append(triad.shape[0], tdims[0, :])))
+	# ######################
+	# ##	Triad Data
+	# ######################
+	# # if 'Triads' in list(HDFfileData.keys()):
+	# # 	R      = HDFfileData['PhaseOrderR'][:, :]
+	# # 	Phi    = HDFfileData['PhaseOrderPhi'][:, :]
+	# # 	triad  = HDFfileData['Triads']
+	# # 	# Reshape triads
+	# # 	tdims     = triad.attrs['Triad_Dims']
+	# # 	triads    = np.array(np.reshape(triad, np.append(triad.shape[0], tdims[0, :])))
 
-		triads_exist = 1
-	else:
-		## Call triad function
-		triads, R, Phi = compute_triads(phases, kmin, kmax)
-		triads_exist = 0
-
-
-
-
-	######################
-	##	ColourMaps
-	######################
-	# Triads Colourmap
-	colours = [[1, 1, 1], [1, 1, 0], [0, 0, 1], [0, 1, 1], [0, 1, 0], [1, 0, 1], [1, 0, 0], [1, 0.25, 0], [1, 1, 1]]   # located @ 0, pi/2, pi, 3pi/2 and 2pi
-	# my_m    = mpl.colors.LinearSegmentedColormap.from_list('my_map', colours, N = kmax)                                # set N to inertial range
-	my_m  = mpl.colors.LinearSegmentedColormap.from_list('my_map', cm.hsv(np.arange(255)), N = kmax)                 # set N to inertial range
-	my_m.set_under('1.0')
-	my_norm = mpl.colors.Normalize(vmin = 0, vmax = 2*np.pi)
-
-	# Phases Colourmap
-	myhsv   = cm.hsv(np.arange(255))
-	norm    = mpl.colors.Normalize(vmin = 0.0, vmax = 2.0*np.pi)
-	my_mhsv = mpl.colors.LinearSegmentedColormap.from_list('my_map', myhsv, N = kmax) # set N to inertial range
-	m       = cm.ScalarMappable( norm = norm, cmap = my_mhsv)                         # map the values to rgba tuple
+	# # 	triads_exist = 1
+	# # else:
+	# # 	## Call triad function
+	# # 	triads, R, Phi = compute_triads(phases, kmin, kmax)
+	# # 	triads_exist = 0
 
 
 
 
-	######################
-	##	Plot Data
-	######################
-	## Call realspace function
-	u, u_urms, x, u_z = compute_realspace(amps, phases, N)
+	# ######################
+	# ##	ColourMaps
+	# ######################
+	# # Triads Colourmap
+	# colours = [[1, 1, 1], [1, 1, 0], [0, 0, 1], [0, 1, 1], [0, 1, 0], [1, 0, 1], [1, 0, 0], [1, 0.25, 0], [1, 1, 1]]   # located @ 0, pi/2, pi, 3pi/2 and 2pi
+	# # my_m    = mpl.colors.LinearSegmentedColormap.from_list('my_map', colours, N = kmax)                                # set N to inertial range
+	# my_m  = mpl.colors.LinearSegmentedColormap.from_list('my_map', cm.hsv(np.arange(255)), N = kmax)                 # set N to inertial range
+	# my_m.set_under('1.0')
+	# my_norm = mpl.colors.Normalize(vmin = 0, vmax = 2*np.pi)
 
-	## Compute Real Space velocity Gradient
-	du_x, du_x_rms = compute_gradient(u_z, k0, kmax)
+	# # Phases Colourmap
+	# myhsv   = cm.hsv(np.arange(255))
+	# norm    = mpl.colors.Normalize(vmin = 0.0, vmax = 2.0*np.pi)
+	# my_mhsv = mpl.colors.LinearSegmentedColormap.from_list('my_map', myhsv, N = kmax) # set N to inertial range
+	# m       = cm.ScalarMappable( norm = norm, cmap = my_mhsv)                         # map the values to rgba tuple
 
-	## Start timer
-	start = TIME.perf_counter()
-	
-	# print(triads[:, :, 175])
 
-	## Plot in serial
-	for i in range(time.shape[0]):
-		if triads_exist == 0:
-			plot_snaps(i, x, u_urms[i, :], du_x_rms[i, :], time[i, 0], triads[:, :, i], kmin, kmax, phases[i, kmin:], R[0:i, 0], Phi[0:i, 0], time[0, 0], time[-1, 0], time[0:i, 0])
-		else:
-			plot_snaps(i, x, u_urms[i, :], du_x_rms[i, :], time[i, 0], triads[i, :, :], kmin, kmax, phases[i, kmin:], R[0:i, 0], Phi[0:i, 0], time[0, 0], time[-1, 0], time[0:i, 0])
 
-	# Start timer
-	end = TIME.perf_counter()
 
-	print("\n\nTime: {:5.8f}s\n\n".format(end - start))
+	# ######################
+	# ##	Plot Data
+	# ######################
+	# ## Call realspace function
+	# u, u_urms, x, u_z = compute_realspace(amps, phases, N)
+
+	# ## Compute Real Space velocity Gradient
+	# du_x, du_x_rms = compute_gradient(u_z, k0, kmax)
+
+	# ## Start timer
+	# start = TIME.perf_counter()
+
+	# # print(triads[:, :, 175])
+
+	# ## Plot in serial
+	# for i in range(time.shape[0]):
+	# 	# if triads_exist == 0:
+	# 	# 	plot_snaps(i, x, u_urms[i, :], du_x_rms[i, :], time[i, 0], triads[:, :, i], kmin, kmax, phases[i, kmin:], R[0:i, 0], Phi[0:i, 0], time[0, 0], time[-1, 0], time[0:i, 0])
+	# 	# else:
+	# 	# 	plot_snaps(i, x, u_urms[i, :], du_x_rms[i, :], time[i, 0], triads[i, :, :], kmin, kmax, phases[i, kmin:], R[0:i, 0], Phi[0:i, 0], time[0, 0], time[-1, 0], time[0:i, 0])
+	# 	plot_snaps(i, x, u_urms[i, :], du_x_rms[i, :], time[i], [], kmin, kmax, phases[i, kmin:], [], [], time[0], time[-1], time[i])
+
+	# # Start timer
+	# end = TIME.perf_counter()
+
+	# print("\n\nTime: {:5.8f}s\n\n".format(end - start))
 
 
 

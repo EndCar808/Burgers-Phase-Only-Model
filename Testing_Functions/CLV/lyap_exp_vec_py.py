@@ -45,6 +45,10 @@ def initial_conditions(dim, sys):
 
 	x     = np.zeros((dim))
 	x_ext = np.identity(dim)
+	# print(x.shape)
+	# print(x)
+	# print(x_ext)
+	# print()
 	if sys == "Lorenz63":		
 		x[0] = -1.01
 		x[1] = 3.01
@@ -63,15 +67,19 @@ def initial_conditions(dim, sys):
 def RHS(x, x_ext, nexps, dim, sys):
 
 	f = np.zeros((dim))
+	# print(f.shape)
 
 	if sys == "Lorenz63":
 		f[0] = sigma * (x[1] - x[0])
 		f[1] = x[0] * (rho - x[2]) - x[1]
 		f[2] = x[0] * x[1] - beta * x[2]
+		# print(f)
 
 		Jac = np.array([[-sigma, sigma, 0], [rho - x[2], -1, -x[0]], [x[1], x[0], -beta]])
+		# print(Jac)
 
 		f_ext = np.matmul(Jac, x_ext)
+		# print(f_ext)
 	elif sys == "Henon2D":
 		f[0] = 1 - a * (x[0]**2) + x[1]
 		f[1] = b * x[0]
@@ -168,16 +176,16 @@ def test_lorenz_angles(x, x_ext, m_end, m_trans, dim, sys):
 
 	## Plot distrubution of angles
 	plt.figure()
-	hist, bins  = np.histogram(angles, range = (0.0, np.pi / 2.0), bins = 900, density = True);
+	hist, bins  = np.histogram(angles, range = (0.0, np.pi / 2.0), bins = 900, density = True)
 	bin_centers = (bins[1:] + bins[:-1]) * 0.5
 	plt.plot(bin_centers, hist)
-	hist, bins  = np.histogram(angles_a, range = (0.0, np.pi / 2.0), bins = 900, density = True);
+	hist, bins  = np.histogram(angles_a, range = (0.0, np.pi / 2.0), bins = 900, density = True)
 	bin_centers = (bins[1:] + bins[:-1]) * 0.5
 	plt.plot(bin_centers, hist)
 	plt.xlim(0.0, np.pi/2.0)
 	# plt.ylim(0.0, 5.0)
 	plt.xlabel(r"$\theta$")
-	plt.xticks([0.0, np.pi/4.0, np.pi/2.0],[r"$0$", r"$\frac{\pi}{4}$", r"$\frac{\pi}{2}$"]);
+	plt.xticks([0.0, np.pi/4.0, np.pi/2.0],[r"$0$", r"$\frac{\pi}{4}$", r"$\frac{\pi}{2}$"])
 	plt.legend([r"$\rho = 28$", r"$\rho = 60$"])
 	plt.ylabel(r"PDF")
 	plt.title(r"Distribution of Angles Between Intrinsic Stable and Unstable Directions")
@@ -204,16 +212,16 @@ def test_henonlozi_angles(x, x_ext, m_end, m_trans, dim, sys):
 
 	## Plot distrubution of angles
 	plt.figure()
-	hist, bins  = np.histogram(angles[:, 0], range = (0.0, np.pi / 2.0), bins = 900, density = True);
+	hist, bins  = np.histogram(angles[:, 0], range = (0.0, np.pi / 2.0), bins = 900, density = True)
 	bin_centers = (bins[1:] + bins[:-1]) * 0.5
 	plt.plot(bin_centers, hist)
-	hist, bins  = np.histogram(angles_a[:, 0], range = (0.0, np.pi / 2.0), bins = 900, density = True);
+	hist, bins  = np.histogram(angles_a[:, 0], range = (0.0, np.pi / 2.0), bins = 900, density = True)
 	bin_centers = (bins[1:] + bins[:-1]) * 0.5
 	plt.plot(bin_centers, hist / 10)   # Reduced by a factor of 10 for visual purposes
 	plt.xlim(0.0, np.pi/2.0)
 	plt.ylim(0.0, 5.0)
 	plt.xlabel(r"$\theta$")
-	plt.xticks([0.0, np.pi/4.0, np.pi/2.0],[r"$0$", r"$\frac{\pi}{4}$", r"$\frac{\pi}{2}$"]);
+	plt.xticks([0.0, np.pi/4.0, np.pi/2.0],[r"$0$", r"$\frac{\pi}{4}$", r"$\frac{\pi}{2}$"])
 	plt.legend([r"Henon Map", r"Lozi Map"])
 	plt.ylabel(r"PDF")
 	plt.title(r"Distribution of Angles Between Intrinsic Stable and Unstable Directions")
@@ -222,21 +230,24 @@ def test_henonlozi_angles(x, x_ext, m_end, m_trans, dim, sys):
 
 
 def compute_lces(x, x_ext, m_end, m_trans, m_rev_trans, dim, sys):	
+
+	## Memoer Allocation
 	lce     = np.zeros((nexps)) 
 	run_sum = np.zeros((nexps))
 
-	R_avg = np.zeros((dim, nexps, m_end - m_trans))
-	T_avg = np.zeros((dim, nexps, m_end - 2 * m_trans))
+	R_avg   = np.zeros((dim, nexps, m_end - m_trans))
+	T_avg   = np.zeros((dim, nexps, m_end - 2 * m_trans))
 	lce_out = np.zeros((m_avg, nexps))
 
 	x_out     = np.zeros((m_end, nexps))
 	x_ext_out = np.zeros((dim, nexps, m_end))
 
+	## Iteration counters
 	m     = 0
 	iters = 1
 	while m < m_end:
 
-
+		## Perform the time integration
 		for i in range(m_iters):
 
 			if sys == "Henon2D" or sys == "Henon2D_Alt" or sys == "Lozi2D" or sys == "Henon3D":
@@ -249,25 +260,28 @@ def compute_lces(x, x_ext, m_end, m_trans, m_rev_trans, dim, sys):
 				RK4, RK4_ext = RHS(x + dt * RK3, x_ext + dt * RK3_ext, nexps, dim, sys)
 
 				## Update
-				# x = x + (dt / 6.0) * (RK1 + 2.0 * RK2 + 2.0 * RK3 + RK4)
-				# x_ext = x_ext + (dt / 6.0) * (RK1_ext + 2.0 * RK2_ext + 2.0 * RK3_ext + RK4_ext)
-				x = x + (dt / 6.0) * RK1 + (dt / 3.0) * RK2 + (dt / 3.0) * RK3 + (dt / 6.0) * RK4
-				x_ext = x_ext + (dt / 6.0) * RK1_ext + (dt / 3.0) * RK2_ext + (dt / 3.0) * RK3_ext + (dt / 6.0) * RK4_ext
+				x = x + (dt / 6.0) * (RK1 + 2.0 * RK2 + 2.0 * RK3 + RK4)
+				x_ext = x_ext + (dt / 6.0) * (RK1_ext + 2.0 * RK2_ext + 2.0 * RK3_ext + RK4_ext)
+				# x = x + (dt / 6.0) * RK1 + (dt / 3.0) * RK2 + (dt / 3.0) * RK3 + (dt / 6.0) * RK4
+				# x_ext = x_ext + (dt / 6.0) * RK1_ext + (dt / 3.0) * RK2_ext + (dt / 3.0) * RK3_ext + (dt / 6.0) * RK4_ext
 
 			
 			t     = iters * dt
 			iters += 1
 
+		## Perform QR factorization on the tangent matrix
 		Q, R = np.linalg.qr(x_ext)
 
+		## Extract the diagonals and save for computing the LCEs
 		diags = np.diag(R)
-
 		rnorm = np.absolute(diags)
 		x_ext = Q
 		
+		## Save the system state
 		x_out[m, :] = x
 		x_ext_out[:, :, m] = x_ext
 
+		## If transient iterations have been reached record data for CLV computation
 		if m >= m_trans:
 
 			## Store the R and Tangent matrices
@@ -294,7 +308,8 @@ def compute_lces(x, x_ext, m_end, m_trans, m_rev_trans, dim, sys):
 
 		m += 1
 
-	return R_avg, T_avg, lce_out, x_out, x_ext_out, t
+	
+	return x, x_ext, R_avg, T_avg, lce_out, x_out, x_ext_out, t
 
 
 
@@ -311,17 +326,17 @@ if __name__ == '__main__':
 	# sys = "Henon3D"
 
 	## Select Iteration variables
-	m_trans = 1
-	m_avg   = 3000000
-	m_end   = m_avg + m_trans
-	m_iters = 1
-	m_rev_trans = 1
+	# m_trans = 1
+	# m_avg   = 3000000
+	# m_end   = m_avg + m_trans
+	# m_iters = 1
+	# m_rev_trans = 1
 
 	## System parameters
 	if sys == "Lorenz63":
-		m_trans = 0
-		m_avg   = 200000
-		m_end   = m_avg
+		m_trans = 1000
+		m_avg   = 1000
+		m_end   = m_avg + m_trans
 		m_iters = 1
 		m_rev_trans = m_trans
 
@@ -380,16 +395,40 @@ if __name__ == '__main__':
 
 
 	if sys == "Lorenz63":
+		
+		# x, x_ext = RHS(x, x_ext, nexps, dim, sys)
 
-		## Compute LCEs and forward propogation
-		R_avg, T_avg, lce, x_out, x_ext_out, t = compute_lces(x, x_ext, m_end, m_trans, m_rev_trans, dim, sys)
+		# Compute LCEs and forward propogation
+		x, x_ext, R_avg, T_avg, lce, x_out, x_ext_out, t = compute_lces(x, x_ext, m_end, m_trans, m_rev_trans, dim, sys)
+		
+		## Print system state - where is the system located at end 
 		print()
-		print("x")
+		print("x0")
+		print(x_out[m_trans, :])
+		print("xend")
 		print(x_out[-1, :])
 
-		print("x_pert")
-		for i in range(1, 6):
-			print(x_ext_out[:, 0, -i])
+
+		## Print the final computed LCEs
+		print()
+		print("LCE")
+		print(lce[-1, :])
+
+		# Print the tangent space vectors
+		print("x_pert_0")
+		print(x_ext_out[:, :, m_trans])
+		print("x_pert_end")
+		print(x_ext_out[:, :, -1])
+
+
+		print()
+		print()
+		print(x)
+		print()
+		print(x_ext)
+		
+		# for i in range(1, 6):
+		# 	print(x_ext_out[:, 0, -i])
 
 		
 
@@ -410,28 +449,30 @@ if __name__ == '__main__':
 		# print(T_avg.shape)
 		# print(m_end - 2 * m_trans)
 
-		w = 0
+		# w = 0
 
-		## Compute CLVs
-		angles, CLVs, vec_norms = compute_clvs(R_avg, T_avg, m_end - m_trans, m_rev_trans, dim, nexps)
+		# ## Compute CLVs
+		# angles, CLVs, vec_norms = compute_clvs(R_avg, T_avg, m_end, m_rev_trans, dim, nexps)
 
 
-		print("---------------------------")
+		# print("---------------------------")
 
-		print("CLVs0")
-		for i in range(5):
-			print(CLVs[:, 0, i])
+		# print("CLVs0")
+		# print(CLVs[:, :, 0])
+		# # for i in range(5):
+		# # 	print(CLVs[:, 0, i])
 
-		print("CLVs_end")
-		for i in range(1, 6):
-			print(CLVs[:, 0, -i])
+		# print("CLVs_end")
+		# print(CLVs[:, :, -1])
+		# for i in range(1, 6):
+		# 	print(CLVs[:, 0, -i])
 
-		print("---------------------------")
-		print("Angles0")
-		print(angles[0, :])
+		# print("---------------------------")
+		# print("Angles0")
+		# print(angles[0, :])
 
-		print("Angles")
-		print(angles[-1, :])
+		# print("Angles")
+		# print(angles[-1, :])
 
 
 
@@ -449,15 +490,15 @@ if __name__ == '__main__':
 		# angles_v, CLVs, vec_norms = compute_clvs(R_avg, T_avg, m_end - m_trans, dim, nexps)
 
 		# plt.figure()
-		# hist, bins  = np.histogram(angles[:, 1], range = (0.0, np.pi / 2.0), bins = 900, density = True);
+		# hist, bins  = np.histogram(angles[:, 1], range = (0.0, np.pi / 2.0), bins = 900, density = True)
 		# bin_centers = (bins[1:] + bins[:-1]) * 0.5
 		# plt.plot(bin_centers, hist)
-		# hist, bins  = np.histogram(angles_v[:, 1], range = (0.0, np.pi / 2.0), bins = 900, density = True);
+		# hist, bins  = np.histogram(angles_v[:, 1], range = (0.0, np.pi / 2.0), bins = 900, density = True)
 		# bin_centers = (bins[1:] + bins[:-1]) * 0.5
 		# plt.plot(bin_centers, hist)
 		# plt.xlim(0.0, np.pi/2.0)
 		# plt.xlabel(r"$\theta$")
-		# plt.xticks([0.0, np.pi/4.0, np.pi/2.0],[r"$0$", r"$\frac{\pi}{4}$", r"$\frac{\pi}{2}$"]);
+		# plt.xticks([0.0, np.pi/4.0, np.pi/2.0],[r"$0$", r"$\frac{\pi}{4}$", r"$\frac{\pi}{2}$"])
 		# plt.legend([r"$\rho = 28$", r"$\rho = 60$"])
 		# plt.ylabel(r"PDF")
 		# plt.title(r"Distribution of Angles Between Intrinsic Stable and Unstable Directions")
@@ -483,15 +524,15 @@ if __name__ == '__main__':
 		angles_v, CLVs, vec_norms = compute_clvs(R_avg, T_avg, m_end - m_trans, dim, nexps)
 
 		plt.figure()
-		hist, bins  = np.histogram(angles[:, 0], range = (0.0, np.pi / 2.0), bins = 900, density = True);
+		hist, bins  = np.histogram(angles[:, 0], range = (0.0, np.pi / 2.0), bins = 900, density = True)
 		bin_centers = (bins[1:] + bins[:-1]) * 0.5
 		plt.plot(bin_centers, hist)
-		hist, bins  = np.histogram(angles_v[:, 0], range = (0.0, np.pi / 2.0), bins = 900, density = True);
+		hist, bins  = np.histogram(angles_v[:, 0], range = (0.0, np.pi / 2.0), bins = 900, density = True)
 		bin_centers = (bins[1:] + bins[:-1]) * 0.5
 		plt.plot(bin_centers, hist)
 		plt.xlim(0.0, np.pi/2.0)
 		plt.xlabel(r"$\theta$")
-		plt.xticks([0.0, np.pi/4.0, np.pi/2.0],[r"$0$", r"$\frac{\pi}{4}$", r"$\frac{\pi}{2}$"]);
+		plt.xticks([0.0, np.pi/4.0, np.pi/2.0],[r"$0$", r"$\frac{\pi}{4}$", r"$\frac{\pi}{2}$"])
 		plt.legend([r"$a = 1.4, b = 0.3$", r"$a = 1.0, b = 0.52$"])
 		plt.ylabel(r"PDF")
 		plt.title(r"Distribution of Angles Between Intrinsic Stable and Unstable Directions")
@@ -531,18 +572,18 @@ if __name__ == '__main__':
 
 	## Plot distrubution of angles
 	# plt.figure()
-	# hist, bins  = np.histogram(angles[:-1000, 0], range = (0.0, np.pi / 2.0), bins = 900, density = True);
+	# hist, bins  = np.histogram(angles[:-1000, 0], range = (0.0, np.pi / 2.0), bins = 900, density = True)
 	# bin_centers = (bins[1:] + bins[:-1]) * 0.5
 	# plt.plot(bin_centers, hist)
-	# hist, bins  = np.histogram(angles[:-1000, 1], range = (0.0, np.pi / 2.0), bins = 900, density = True);
+	# hist, bins  = np.histogram(angles[:-1000, 1], range = (0.0, np.pi / 2.0), bins = 900, density = True)
 	# bin_centers = (bins[1:] + bins[:-1]) * 0.5
 	# plt.plot(bin_centers, hist)
-	# hist, bins  = np.histogram(angles[:-1000, 2], range = (0.0, np.pi / 2.0), bins = 900, density = True);
+	# hist, bins  = np.histogram(angles[:-1000, 2], range = (0.0, np.pi / 2.0), bins = 900, density = True)
 	# bin_centers = (bins[1:] + bins[:-1]) * 0.5
 	# plt.plot(bin_centers, hist)
 	# plt.xlim(0.0, np.pi/2.0)
 	# plt.xlabel(r"$\theta$")
-	# plt.xticks([0.0, np.pi/4.0, np.pi/2.0],[r"$0$", r"$\frac{\pi}{4}$", r"$\frac{\pi}{2}$"]);
+	# plt.xticks([0.0, np.pi/4.0, np.pi/2.0],[r"$0$", r"$\frac{\pi}{4}$", r"$\frac{\pi}{2}$"])
 	# plt.legend([r"$\theta_{1, 2}$", r"$\theta_{1,3}$", r"$\theta_{2,3}$"])
 	# plt.ylabel(r"PDF")
 	# plt.title(r"Distribution of Angles Between Intrinsic Stable and Unstable Directions")

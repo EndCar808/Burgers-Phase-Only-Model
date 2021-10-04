@@ -53,6 +53,23 @@ int max_indx_d(double* array, int n) {
 	return indx;
 }
 
+int sgn(int x) {
+
+	int val = 0;
+
+	if (x > 0) {
+		val = 1;
+	}
+	else if(x < 0) {
+		val = -1;
+	}
+	else if (x == 0) {
+		val = 0;
+	}
+
+	return val;
+}
+
 void write_array(double *A, int n, char *filename) {
 
 	int i;

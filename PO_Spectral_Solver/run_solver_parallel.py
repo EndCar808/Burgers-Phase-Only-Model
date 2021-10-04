@@ -8,14 +8,14 @@ if __name__ == '__main__':
 	######################
 	##	Dataspace
 	######################
-	N     = [2048]
+	N     = [256, 512, 1024, 2048, 4096, 8192, 16384]
 	k0    = 1
-	# a     = np.array([0.0, 0.5, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0, 3.45]) 
-	alpha = np.arange(0.0, 2.55, 0.05)
+	# alpha = np.array([0.0, 0.5, 1.0, 1.2, 1.5, 1.7, 2.0, 2.2, 2.5]) 
+	# alpha = np.array([0.00, 0.50, 1.00, 1.25, 1.5, 1.75, 2.00, 2.5]) 
+	alpha = np.arange(0.0, 2.51, 0.05)[~np.isin(np.arange(0.0, 2.51, 0.05), np.arange(0.0, 2.51, 0.1))] #np.arange(0.0, 2.51, 0.05)
 	beta  = [0.0]	
 	u0    = "RANDOM"
-	iters = 100000000
-
+	iters = int(4e5)
 
 	########################
 	##	Create command list
@@ -29,7 +29,8 @@ if __name__ == '__main__':
 	##	Run commands in parallel
 	#############################
 	## Set the limit of subprocesses / threads to spawn at any one time	
-	procLimit = 18
+	procLimit = len(alpha) * 2
+	print("Process Created = {}".format(procLimit))
 
 	# Create output objects to store process error and output
 	output = []
