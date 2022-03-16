@@ -32,6 +32,12 @@
 // #define __TRIADS
 // #define __TRIAD_STATS
 #define __TRIAD_ORDER
+#if defined(__TRIAD_ORDER)
+// #define __ADLER_PHASE_ORDER
+#define __SCALE_PHASE_ORDER
+// #define __THETA_TIME_PHASE_ORDER
+// #define __OMEGA_K
+#endif
 // #define __MODES
 // #define __RHS
 // #define __REALSPACE

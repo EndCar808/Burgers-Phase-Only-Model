@@ -352,6 +352,12 @@ if __name__ == '__main__':
     ax2.tick_params(axis='x', which = 'both', bottom = True, labelsize = ticksize)
     ax2.tick_params(axis='y', which = 'both', bottom = True, labelsize = ticksize)
     ax2.legend([r"$N = {}$".format(int(n / 2)) for n in N_sync], fontsize = ticksize, bbox_to_anchor = (0.05, 0.2, 0.3, 0.2), loc="lower left", mode = "expand", ncol = 1)
+
+    # for i in range(len(N_sync)):
+    #     print("Max R_k: {} -- max index {}".format(np.amax(R_avg[i, :]), np.where(R_avg[i, :] == np.amax(R_avg[i, :]))))
+    # print(alpha_sync[np.where(R_avg[i, :] == np.amax(R_avg[i, :]))[0][0]])
+    # print(R_avg.shape)
+
     
     ax3 = fig.add_subplot(gs[2, 0])
     for i in range(len(N)):

@@ -433,18 +433,27 @@ void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_n
 	// Create the dataset for the P_k variable - the absolute value of the Adler order parameter
 	// create_hdf5_slabbed_dset(file_handle, "P_k", &file_space[6], &data_set[6], &mem_space[6], H5T_NATIVE_DOUBLE, dims, maxdims, chunkdims, dimensions);
 
-	// // Create the dataset for the Adler scale order parameter  -> P_k(t) e^{i \Phi_k(t)} =  -i (sgnk) e^{i\phi_k}\sum_{k_1} a_{k_1}a_{k-k_1}e^{-i\varphi_{k_1, k - k_1}^{k}}  
-	// create_hdf5_slabbed_dset(file_handle, "AdlerScaleOrderParam", &file_space[8], &data_set[8], &mem_space[8], dtype, dims, maxdims, chunkdims, dimensions);
 
-	// // Create the dataset for the phase shift scale dependent scale order parameter -> P_k(t) e^{i \theta_k(t)} =  i (sgnk) \sum_{k_1} a_{k_1}a_{k-k_1}e^{i\varphi_{k_1, k - k_1}^{k}} 
-	// create_hdf5_slabbed_dset(file_handle, "PhaseShiftScaleOrderParam", &file_space[9], &data_set[9], &mem_space[9], dtype, dims, maxdims, chunkdims, dimensions);
-
-	// // Create the dataset for the kuramoto order parameter (in time) for the phase shift theta_k -> T_k(t)e^{i\Theta_k(t)} = 1 / iters \sum_{t}^{iters} e^{i \theta_k(t)}
-	// create_hdf5_slabbed_dset(file_handle, "ThetaTimeScaleOrderParam", &file_space[10], &data_set[10], &mem_space[10], dtype, dims, maxdims, chunkdims, dimensions);
-
-	// // Create the dataset for the phase locking parameter -> Omega_k = <\dot{Phi}_k> / <F_k>
-	// create_hdf5_slabbed_dset(file_handle, "PhiPhaseLocking", &file_space[11], &data_set[11], &mem_space[11], H5T_NATIVE_DOUBLE, dims, maxdims, chunkdims, dimensions);
+	// Create the dataset for the Adler scale order parameter  -> P_k(t) e^{i \Phi_k(t)} =  -i (sgnk) e^{i\phi_k}\sum_{k_1} a_{k_1}a_{k-k_1}e^{-i\varphi_{k_1, k - k_1}^{k}}  
+	#ifdef __ADLER_PHASE_ORDER
+	create_hdf5_slabbed_dset(file_handle, "AdlerScaleOrderParam", &file_space[8], &data_set[8], &mem_space[8], dtype, dims, maxdims, chunkdims, dimensions);
+	#endif
 	
+	// Create the dataset for the phase shift scale dependent scale order parameter -> P_k(t) e^{i \theta_k(t)} =  i (sgnk) \sum_{k_1} a_{k_1}a_{k-k_1}e^{i\varphi_{k_1, k - k_1}^{k}} 
+	#ifdef __SCALE_PHASE_ORDER
+	create_hdf5_slabbed_dset(file_handle, "PhaseShiftScaleOrderParam", &file_space[9], &data_set[9], &mem_space[9], dtype, dims, maxdims, chunkdims, dimensions);
+	#endif
+
+	// Create the dataset for the kuramoto order parameter (in time) for the phase shift theta_k -> T_k(t)e^{i\Theta_k(t)} = 1 / iters \sum_{t}^{iters} e^{i \theta_k(t)}
+	#ifdef __THETA_TIME_PHASE_ORDER	
+	create_hdf5_slabbed_dset(file_handle, "ThetaTimeScaleOrderParam", &file_space[10], &data_set[10], &mem_space[10], dtype, dims, maxdims, chunkdims, dimensions);
+	#endif
+
+	// Create the dataset for the phase locking parameter -> Omega_k = <\dot{Phi}_k> / <F_k>
+	#ifdef __OMEGA_K	
+	create_hdf5_slabbed_dset(file_handle, "PhiPhaseLocking", &file_space[11], &data_set[11], &mem_space[11], H5T_NATIVE_DOUBLE, dims, maxdims, chunkdims, dimensions);
+	#endif
+
 	// // Create the dataset for the phase locking parameter -> Omega_k = <\dot{Phi}_k> / <F_k>
 	// create_hdf5_slabbed_dset(file_handle, "Theta_k", &file_space[11], &data_set[11], &mem_space[11], H5T_NATIVE_DOUBLE, dims, maxdims, chunkdims, dimensions);
 
@@ -1599,10 +1608,18 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 
 			// Write the scale order parameters to file
 			// write_hyperslab_data(HDF_file_space[6], HDF_data_set[6], HDF_mem_space[6], COMPLEX_DATATYPE, order_k, "ScaleOrderParam", num_osc, save_data_indx);
-			// write_hyperslab_data(HDF_file_space[8], HDF_data_set[8], HDF_mem_space[8], COMPLEX_DATATYPE, adler_order_k, "AdlerScaleOrderParam", num_osc, save_data_indx);
-			// write_hyperslab_data(HDF_file_space[9], HDF_data_set[9], HDF_mem_space[9], COMPLEX_DATATYPE, phase_shift_order_k, "PhaseShiftScaleOrderParam", num_osc, save_data_indx);
-			// write_hyperslab_data(HDF_file_space[10], HDF_data_set[10], HDF_mem_space[10], COMPLEX_DATATYPE, theta_time_order_k, "ThetaTimeScaleOrderParam", num_osc, save_data_indx);
-			// write_hyperslab_data(HDF_file_space[11], HDF_data_set[11], HDF_mem_space[11], H5T_NATIVE_DOUBLE, Omega_k, "PhiPhaseLocking", num_osc, save_data_indx);
+			#ifdef __ADLER_PHASE_ORDER
+			write_hyperslab_data(HDF_file_space[8], HDF_data_set[8], HDF_mem_space[8], COMPLEX_DATATYPE, adler_order_k, "AdlerScaleOrderParam", num_osc, save_data_indx);
+			#endif
+			#ifdef __SCALE_PHASE_ORDER
+			write_hyperslab_data(HDF_file_space[9], HDF_data_set[9], HDF_mem_space[9], COMPLEX_DATATYPE, phase_shift_order_k, "PhaseShiftScaleOrderParam", num_osc, save_data_indx);
+			#endif
+			#ifdef __THETA_TIME_PHASE_ORDER
+			write_hyperslab_data(HDF_file_space[10], HDF_data_set[10], HDF_mem_space[10], COMPLEX_DATATYPE, theta_time_order_k, "ThetaTimeScaleOrderParam", num_osc, save_data_indx);
+			#endif
+			#ifdef __OMEGA_K
+			write_hyperslab_data(HDF_file_space[11], HDF_data_set[11], HDF_mem_space[11], H5T_NATIVE_DOUBLE, Omega_k, "PhiPhaseLocking", num_osc, save_data_indx);
+			#endif
 
 			// write_hyperslab_data(HDF_file_space[11], HDF_data_set[11], HDF_mem_space[11], H5T_NATIVE_DOUBLE, theta_k, "Theta_k", num_osc, save_data_indx);
 			// write_hyperslab_data(HDF_file_space[12], HDF_data_set[12], HDF_mem_space[12], H5T_NATIVE_DOUBLE, R_k, "R_k", num_osc, save_data_indx);
@@ -2018,18 +2035,26 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	// status = H5Sclose( HDF_mem_space[7] );
 	// status = H5Dclose( HDF_data_set[7] );
 	// status = H5Sclose( HDF_file_space[7] );
-	// status = H5Sclose( HDF_mem_space[8] );
-	// status = H5Dclose( HDF_data_set[8] );
-	// status = H5Sclose( HDF_file_space[8] );
-	// status = H5Sclose( HDF_mem_space[9] );
-	// status = H5Dclose( HDF_data_set[9] );
-	// status = H5Sclose( HDF_file_space[9] );
-	// status = H5Sclose( HDF_mem_space[10] );
-	// status = H5Dclose( HDF_data_set[10] );
-	// status = H5Sclose( HDF_file_space[10] );
-	// status = H5Sclose( HDF_mem_space[11] );
-	// status = H5Dclose( HDF_data_set[11] );
-	// status = H5Sclose( HDF_file_space[11] );
+	#ifdef __ADLER_PHASE_ORDER
+	status = H5Sclose( HDF_mem_space[8] );
+	status = H5Dclose( HDF_data_set[8] );
+	status = H5Sclose( HDF_file_space[8] );
+	#endif
+	#ifdef __SCALE_PHASE_ORDER
+	status = H5Sclose( HDF_mem_space[9] );
+	status = H5Dclose( HDF_data_set[9] );
+	status = H5Sclose( HDF_file_space[9] );
+	#endif
+	#ifdef __THETA_TIME_PHASE_ORDER
+	status = H5Sclose( HDF_mem_space[10] );
+	status = H5Dclose( HDF_data_set[10] );
+	status = H5Sclose( HDF_file_space[10] );
+	#endif
+	#ifdef __OMEGA_K
+	status = H5Sclose( HDF_mem_space[11] );
+	status = H5Dclose( HDF_data_set[11] );
+	status = H5Sclose( HDF_file_space[11] );
+	#endif
 	// status = H5Sclose( HDF_mem_space[12] );
 	// status = H5Dclose( HDF_data_set[12] );
 	// status = H5Sclose( HDF_file_space[12] );
