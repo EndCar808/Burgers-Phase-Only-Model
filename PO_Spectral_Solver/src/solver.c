@@ -431,8 +431,9 @@ void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_n
 	chunkdims[1] = num_osc;                 // 1D chunk of size number of modes
 
 	// Create the dataset for the P_k variable - the absolute value of the Adler order parameter
-	// create_hdf5_slabbed_dset(file_handle, "P_k", &file_space[6], &data_set[6], &mem_space[6], H5T_NATIVE_DOUBLE, dims, maxdims, chunkdims, dimensions);
-
+	#ifdef __PHI_K_DOT
+	create_hdf5_slabbed_dset(file_handle, "Phi_k_dot", &file_space[6], &data_set[6], &mem_space[6], H5T_NATIVE_DOUBLE, dims, maxdims, chunkdims, dimensions);
+	#endif
 
 	// Create the dataset for the Adler scale order parameter  -> P_k(t) e^{i \Phi_k(t)} =  -i (sgnk) e^{i\phi_k}\sum_{k_1} a_{k_1}a_{k-k_1}e^{-i\varphi_{k_1, k - k_1}^{k}}  
 	#ifdef __ADLER_PHASE_ORDER
@@ -454,20 +455,24 @@ void open_output_create_slabbed_datasets(hid_t* file_handle, char* output_file_n
 	create_hdf5_slabbed_dset(file_handle, "PhiPhaseLocking", &file_space[11], &data_set[11], &mem_space[11], H5T_NATIVE_DOUBLE, dims, maxdims, chunkdims, dimensions);
 	#endif
 
-	// // Create the dataset for the phase locking parameter -> Omega_k = <\dot{Phi}_k> / <F_k>
-	// create_hdf5_slabbed_dset(file_handle, "Theta_k", &file_space[11], &data_set[11], &mem_space[11], H5T_NATIVE_DOUBLE, dims, maxdims, chunkdims, dimensions);
+	// Create the dataset for the phase locking parameter -> Omega_k = <\dot{Phi}_k> / <F_k>
+	#ifdef __SIN_THETA_K
+	create_hdf5_slabbed_dset(file_handle, "SinTheta_k", &file_space[11], &data_set[11], &mem_space[11], H5T_NATIVE_DOUBLE, dims, maxdims, chunkdims, dimensions);
+	#endif
 
 	// Create the dataset for the R_k variable - the absolute value of the order parameter in time of the phase-shift theta_k
 	// create_hdf5_slabbed_dset(file_handle, "R_k", &file_space[12], &data_set[12], &mem_space[12], H5T_NATIVE_DOUBLE, dims, maxdims, chunkdims, dimensions);
 	
-	// // Create the dataset for the phase shift scale dependent scale order parameter -> P_k(t) e^{i \theta_k(t)} =  i (sgnk) \sum_{k_1} a_{k_1}a_{k-k_1}e^{i\varphi_{k_1, k - k_1}^{k}} 
-	// create_hdf5_slabbed_dset(file_handle, "OrderedSyncPhase", &file_space[13], &data_set[13], &mem_space[13], dtype, dims, maxdims, chunkdims, dimensions);
+	#ifdef __ALT_ORDER_PARAMS
+	// Create the dataset for the phase shift scale dependent scale order parameter -> P_k(t) e^{i \theta_k(t)} =  i (sgnk) \sum_{k_1} a_{k_1}a_{k-k_1}e^{i\varphi_{k_1, k - k_1}^{k}} 
+	create_hdf5_slabbed_dset(file_handle, "OrderedSyncPhase", &file_space[13], &data_set[13], &mem_space[13], dtype, dims, maxdims, chunkdims, dimensions);
 
-	// // Create the dataset for the phase shift scale dependent scale order parameter -> P_k(t) e^{i \theta_k(t)} =  i (sgnk) \sum_{k_1} a_{k_1}a_{k-k_1}e^{i\varphi_{k_1, k - k_1}^{k}} 
-	// create_hdf5_slabbed_dset(file_handle, "HeavisideSyncPhase", &file_space[14], &data_set[14], &mem_space[14], dtype, dims, maxdims, chunkdims, dimensions);
+	// Create the dataset for the phase shift scale dependent scale order parameter -> P_k(t) e^{i \theta_k(t)} =  i (sgnk) \sum_{k_1} a_{k_1}a_{k-k_1}e^{i\varphi_{k_1, k - k_1}^{k}} 
+	create_hdf5_slabbed_dset(file_handle, "HeavisideSyncPhase", &file_space[14], &data_set[14], &mem_space[14], dtype, dims, maxdims, chunkdims, dimensions);
 
-	// // Create the dataset for the phase shift scale dependent scale order parameter -> P_k(t) e^{i \theta_k(t)} =  i (sgnk) \sum_{k_1} a_{k_1}a_{k-k_1}e^{i\varphi_{k_1, k - k_1}^{k}} 
-	// create_hdf5_slabbed_dset(file_handle, "HeavisideOrderedSyncPhase", &file_space[15], &data_set[15], &mem_space[15], dtype, dims, maxdims, chunkdims, dimensions);
+	// Create the dataset for the phase shift scale dependent scale order parameter -> P_k(t) e^{i \theta_k(t)} =  i (sgnk) \sum_{k_1} a_{k_1}a_{k-k_1}e^{i\varphi_{k_1, k - k_1}^{k}} 
+	create_hdf5_slabbed_dset(file_handle, "HeavisideOrderedSyncPhase", &file_space[15], &data_set[15], &mem_space[15], dtype, dims, maxdims, chunkdims, dimensions);
+	#endif
 	#endif
 }
 
@@ -1170,6 +1175,7 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	fftw_complex* tmp_time_order_k = (fftw_complex* )fftw_malloc(sizeof(fftw_complex) * num_osc);
 	mem_chk(tmp_time_order_k, "tmp_time_order_k");
 
+	#ifdef __ALT_ORDER_PARAMS
 	fftw_complex* ordered_sync_phase = (fftw_complex* )fftw_malloc(sizeof(fftw_complex) * num_osc);
 	mem_chk(ordered_sync_phase, "ordered_sync_phase");
 	fftw_complex* heaviside_sync_phase = (fftw_complex* )fftw_malloc(sizeof(fftw_complex) * num_osc);
@@ -1188,6 +1194,7 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	mem_chk(heaviside_time_order_k, "heaviside_time_order_k");
 	fftw_complex* heavi_order_time_order_k = (fftw_complex* )fftw_malloc(sizeof(fftw_complex) * num_osc);
 	mem_chk(heavi_order_time_order_k, "heavi_order_time_order_k");
+	#endif
 
 	// Allocate arrays needed to compute the phase order parameters
 	fftw_complex* conv = (fftw_complex* )fftw_malloc(sizeof(fftw_complex) * num_osc);
@@ -1200,14 +1207,18 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	mem_chk(F_k_avg, "F_k_avg");
 	double* Phi_k_dot_avg = (double* )malloc(sizeof(double) * num_osc); 
 	mem_chk(Phi_k_dot_avg, "Phi_k_dot_avg");
+	double* Phi_k_dot = (double* )malloc(sizeof(double) * num_osc); 
+	mem_chk(Phi_k_dot, "Phi_k_dot");
 	double* Phi_k_last = (double* )malloc(sizeof(double) * num_osc); 
 	mem_chk(Phi_k_last, "Phi_k_last");
 	double* Omega_k = (double* )malloc(sizeof(double) * num_osc); 
 	mem_chk(Omega_k, "Omega_k");
 
 	// Allocate memory for the real order quantities
-	double* theta_k = (double* )malloc(sizeof(double) * num_osc); 
-	mem_chk(theta_k, "theta_k");
+	double* sin_theta_k_avg = (double* )malloc(sizeof(double) * num_osc); 
+	mem_chk(sin_theta_k_avg, "sin_theta_k_avg");
+	double* sin_theta_k = (double* )malloc(sizeof(double) * num_osc); 
+	mem_chk(sin_theta_k, "sin_theta_k");
 	double* P_k = (double* )malloc(sizeof(double) * num_osc); 
 	mem_chk(P_k, "P_k");
 	double* R_k = (double* )malloc(sizeof(double) * num_osc); 
@@ -1234,9 +1245,10 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 		Phi_k_last[i]	 = 0.0;
 		Phi_k_dot_avg[i] = 0.0;
 
-		P_k[i] = 0.0;
-		R_k[i] = 0.0;
-		theta_k[i] = 0.0;
+		P_k[i]             = 0.0;
+		R_k[i]             = 0.0;
+		sin_theta_k[i]     = 0.0;
+		sin_theta_k_avg[i] = 0.0;
 	}
 	#endif
 	
@@ -1555,8 +1567,10 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 			// Get the convolution
 			conv_2N_pad(conv, u_z, &fftw_plan_r2c_pad, &fftw_plan_c2r_pad, N, num_osc, k0);
 
+			#ifdef __ALT_ORDER_PARAMS
 			// Calculate alternative sync order params
 			sync_phase(ordered_sync_phase, heaviside_sync_phase, heaviside_ordered_sync_phase, phi, amp, kmin, kmax);
+			#endif
 
 			// compute scale dependent phase order parameter
 			for (int i = kmin; i < num_osc; ++i) {
@@ -1570,19 +1584,23 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 				phase_shift_order_k[i] = I * (conv[i] * cexp(-I * phi[i])); // / amp_norm[i]);
 				
 				// The phaseshift parameters - theta_k
-				theta_k[i] += sin(carg(phase_shift_order_k[i]));
+				sin_theta_k[i] = sin(carg(phase_shift_order_k[i]));
+				sin_theta_k_avg[i] += sin_theta_k[i]; 
 
 				// Update the temporary time order parameters
 				tmp_time_order_k[i]             += cexp(I * carg(phase_shift_order_k[i]));
+				#ifdef __ALT_ORDER_PARAMS
 				tmp_ordered_time_order_k[i]     += cexp(I * carg(ordered_sync_phase[i]));
 				tmp_heavi_time_order_k[i]       += cexp(I * carg(heaviside_sync_phase[i]));
 				tmp_heavi_order_time_order_k[i] += cexp(I * carg(heaviside_ordered_sync_phase[i]));
-
+				#endif
 				// Calculate the Kuramoto order parameter in time
 				theta_time_order_k[i]       = tmp_time_order_k[i] / t_count;
+				#ifdef __ALT_ORDER_PARAMS
 				ordered_time_order_k[i]     = tmp_ordered_time_order_k[i] / t_count;
 				heaviside_time_order_k[i]   = tmp_heavi_time_order_k[i] / t_count;
 				heavi_order_time_order_k[i] = tmp_heavi_order_time_order_k[i] / t_count;
+				#endif
 
 				// The synchronization parameter of the order param in time - R_k
 				R_k[i] += cabs(theta_time_order_k[i]);
@@ -1591,7 +1609,8 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 				F_k_avg[i] += ((double)i / (2.0 * amp[i])) * cabs(adler_order_k[i]);
 				if (save_data_indx > 0) {
 					// Finite difference for \dot{\Phi}_k = arg(exp^{i \Phi_k(t2)}exp^{-i \Phi_k(t1)}) -
-					Phi_k_dot_avg[i] += carg(adler_order_k[i] * cexp(-I * Phi_k_last[i])) / dt;
+					Phi_k_dot[i] = carg(adler_order_k[i] * cexp(-I * Phi_k_last[i])) / dt;
+					Phi_k_dot_avg[i] += Phi_k_dot[i];
 
 					// Locking -> omega_k = <\dot{\Phi}_k> / <F_k>
 					Omega_k[i] = (Phi_k_dot_avg[i] / t_count) / (F_k_avg[i] / t_count);
@@ -1607,7 +1626,6 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 			t_count++;
 
 			// Write the scale order parameters to file
-			// write_hyperslab_data(HDF_file_space[6], HDF_data_set[6], HDF_mem_space[6], COMPLEX_DATATYPE, order_k, "ScaleOrderParam", num_osc, save_data_indx);
 			#ifdef __ADLER_PHASE_ORDER
 			write_hyperslab_data(HDF_file_space[8], HDF_data_set[8], HDF_mem_space[8], COMPLEX_DATATYPE, adler_order_k, "AdlerScaleOrderParam", num_osc, save_data_indx);
 			#endif
@@ -1620,10 +1638,14 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 			#ifdef __OMEGA_K
 			write_hyperslab_data(HDF_file_space[11], HDF_data_set[11], HDF_mem_space[11], H5T_NATIVE_DOUBLE, Omega_k, "PhiPhaseLocking", num_osc, save_data_indx);
 			#endif
-
-			// write_hyperslab_data(HDF_file_space[11], HDF_data_set[11], HDF_mem_space[11], H5T_NATIVE_DOUBLE, theta_k, "Theta_k", num_osc, save_data_indx);
+			#ifdef __SIN_THETA_K
+			write_hyperslab_data(HDF_file_space[11], HDF_data_set[11], HDF_mem_space[11], H5T_NATIVE_DOUBLE, sin_theta_k, "SinTheta_k", num_osc, save_data_indx);
+			#endif
+			#ifdef __PHI_K_DOT
+			write_hyperslab_data(HDF_file_space[6], HDF_data_set[6], HDF_mem_space[6], H5T_NATIVE_DOUBLE, Phi_k_dot, "Phi_k_dot", num_osc, save_data_indx);
+			#endif
+			
 			// write_hyperslab_data(HDF_file_space[12], HDF_data_set[12], HDF_mem_space[12], H5T_NATIVE_DOUBLE, R_k, "R_k", num_osc, save_data_indx);
-			// write_hyperslab_data(HDF_file_space[6], HDF_data_set[6], HDF_mem_space[6], H5T_NATIVE_DOUBLE, P_k, "P_k", num_osc, save_data_indx);
 			#endif
 
 			#ifdef __REALSPACE_STATS			
@@ -1754,21 +1776,32 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	for (int i = 0; i < num_osc; ++i) {
 		P_k[i] /= (t_count - 1);
 		R_k[i] /= (t_count - 1);
-		theta_k[i] /= (t_count -1);
+		sin_theta_k_avg[i] /= (t_count -1);
 	}
-	// // Write P_k averaged over time
-	// if ( (H5LTmake_dataset(HDF_Outputfile_handle, "P_k_avg", D1, D1dims, H5T_NATIVE_DOUBLE, P_k)) < 0) {
-	// 	printf("\n\n!!Failed to make - P_k_avg - Dataset!!\n\n");
-	// }
-	// // Write sin(Theta_k) averaged over time
-	// if ( (H5LTmake_dataset(HDF_Outputfile_handle, "SinTheta_k_avg", D1, D1dims, H5T_NATIVE_DOUBLE, theta_k)) < 0) {
-	// 	printf("\n\n!!Failed to make - SinTheta_k_avg - Dataset!!\n\n");
-	// }
+	
+	// Write P_k averaged over time
+	#ifdef __P_K_AVG
+	if ( (H5LTmake_dataset(HDF_Outputfile_handle, "P_k_avg", D1, D1dims, H5T_NATIVE_DOUBLE, P_k)) < 0) {
+		printf("\n\n!!Failed to make - P_k_avg - Dataset!!\n\n");
+	}
+	#endif
+	
+	// Write sin(Theta_k) averaged over time
+	#ifdef __SIN_THETA_K_AVG
+	if ( (H5LTmake_dataset(HDF_Outputfile_handle, "SinTheta_k_avg", D1, D1dims, H5T_NATIVE_DOUBLE, sin_theta_k_avg)) < 0) {
+		printf("\n\n!!Failed to make - SinTheta_k_avg - Dataset!!\n\n");
+	}
+	#endif
+	
 	// Write R_k averaged over time
+	#ifdef __R_K_AVG
 	if ( (H5LTmake_dataset(HDF_Outputfile_handle, "R_k_avg", D1, D1dims, H5T_NATIVE_DOUBLE, R_k)) < 0) {
 		printf("\n\n!!Failed to make - R_k_avg - Dataset!!\n\n");
 	}
+	#endif
+
 	// Write the alternative order paramters to file
+	#ifdef __ALT_ORDER_PARAMS
 	double* tmp_array = (double* )malloc(sizeof(double) * num_osc);
 	for (int i = 0; i < num_osc; ++i) {
 		tmp_array[i] = cabs(ordered_time_order_k[i]);
@@ -1789,6 +1822,7 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 		printf("\n\n!!Failed to make - HeavisideOrderedSyncPhase - Dataset!!\n\n");
 	}
 	free(tmp_array);
+	#endif
 	#endif
 	
 	#ifdef __REALSPACE_STATS
@@ -1960,6 +1994,7 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	fftw_free(theta_time_order_k);	
 	fftw_free(conv);
 
+	#ifdef __ALT_ORDER_PARAMS
 	fftw_free(ordered_time_order_k);
 	fftw_free(heaviside_time_order_k);
 	fftw_free(heavi_order_time_order_k);
@@ -1969,12 +2004,14 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	fftw_free(tmp_ordered_time_order_k);
 	fftw_free(tmp_heavi_time_order_k);
 	fftw_free(tmp_heavi_order_time_order_k);
+	#endif
 	
 	free(amp_norm);
 	free(F_k_avg);
 	free(Phi_k_dot_avg);
 	free(Phi_k_last);
-	free(theta_k);
+	free(sin_theta_k_avg);
+	free(sin_theta_k);
 	free(P_k);
 	free(R_k);
 	#endif
@@ -2029,9 +2066,11 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	status = H5Sclose( HDF_file_space[5] );
 	#endif
 	#ifdef __TRIAD_ORDER
-	// status = H5Sclose( HDF_mem_space[6] );
-	// status = H5Dclose( HDF_data_set[6] );
-	// status = H5Sclose( HDF_file_space[6] );
+	#ifdef __PHI_K_DOT
+	status = H5Sclose( HDF_mem_space[6] );
+	status = H5Dclose( HDF_data_set[6] );
+	status = H5Sclose( HDF_file_space[6] );
+	#endif
 	// status = H5Sclose( HDF_mem_space[7] );
 	// status = H5Dclose( HDF_data_set[7] );
 	// status = H5Sclose( HDF_file_space[7] );

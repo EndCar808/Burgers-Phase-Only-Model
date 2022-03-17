@@ -26,17 +26,25 @@
 // ---------------------------------------------------------------------
 //  Datasets
 // ---------------------------------------------------------------------
-// #define __AMPS
-// #define __TIME
+#define __AMPS
+#define __TIME
 // #define __PHASES
 // #define __TRIADS
 // #define __TRIAD_STATS
 #define __TRIAD_ORDER
 #if defined(__TRIAD_ORDER)
+// The in time qunatities
 // #define __ADLER_PHASE_ORDER
 #define __SCALE_PHASE_ORDER
 // #define __THETA_TIME_PHASE_ORDER
 // #define __OMEGA_K
+#define __SIN_THETA_K
+#define __PHI_K_DOT
+// The over time qunatities
+#define __SIN_THETA_K_AVG
+#define __P_K_AVG
+#define __R_K_AVG
+// #define __ALT_ORDER_PARAMS
 #endif
 // #define __MODES
 // #define __RHS

@@ -8,7 +8,7 @@ if __name__ == '__main__':
 	######################
 	##	Dataspace
 	######################
-	N     = [2048] #[256, 512, 1024, 2048, 4096, 8192, 16384]
+	N     = [512, 1024, 2048] #[256, 512, 1024, 2048, 4096, 8192, 16384]
 	k0    = 1
 	# alpha = np.array([0.0, 0.5, 1.0, 1.2, 1.5, 1.7, 2.0, 2.2, 2.5]) 
 	# alpha = np.array([0.00, 0.50, 1.00, 1.25, 1.5, 1.75, 2.00, 2.5]) 
@@ -29,7 +29,7 @@ if __name__ == '__main__':
 	##	Run commands in parallel
 	#############################
 	## Set the limit of subprocesses / threads to spawn at any one time	
-	procLimit = len(alpha) * 2
+	procLimit = np.maximum(len(N), len(alpha))
 	print("Process Created = {}".format(procLimit))
 
 	# Create output objects to store process error and output
