@@ -29,6 +29,9 @@ from matplotlib import pyplot as plt
 from basic_units import radians
 
 
+# @njit
+# def window_average():
+
 
 
 ######################
@@ -99,7 +102,7 @@ if __name__ == '__main__':
     k_indx = [9, 10, int(kmax / 2), int(kmax - 50), int(kmax - 20), int(kmax - 10), kmax]
 
     for k in k_indx:
-        fig, ax = plt.subplots(ncols=3, nrows=2, figsize = (16, 9))
+        fig, ax = plt.subplots(ncols=3, nrows=2, figsize = (16, 9), gridspec_kw = dict(hspace = 0.2, wspace = 0.3))
 
         ## Compute theta_k
         theta_k = np.mod(np.angle(scale_order_param[:, k]) + 2.0 * np.pi, 2.0 * np.pi)
@@ -121,9 +124,9 @@ if __name__ == '__main__':
         ax[0, 1].set_ylabel(r"PDF")
         ax[0, 1].set_yscale('log')
 
-        ## Plot F_k and P_k
+        ## Plot histogram of P_k and F_k and P_k over time
         div3   = make_axes_locatable(ax[1, 0])
-        axtop3 = div3.append_axes("top", size = "100%", pad = 0.2)
+        axtop3 = div3.append_axes("top", size = "100%", pad = 0.4)
         counts, bin_edges = np.histogram(P_k, bins = 500)
         bin_centres = (bin_edges[1:] + bin_edges[:-1]) * 0.5
         bin_width = bin_edges[1] - bin_edges[0]
@@ -138,14 +141,125 @@ if __name__ == '__main__':
         ax[1, 0].legend([r"$P_k$", r"$F_k$"])
         ax[1, 0].set_yscale('log')
 
+        ## Plot sin(theta_k)
         ax[0, 2].plot(time, sin_theta_k[:, k])
         ax[0, 2].set_xlabel("t")
         ax[0, 2].set_ylabel(r"$\sin(\theta_k)$")
         
         ## Plot F_k and P_k
-        ax[1, 1].plot(time, Phi_k_dot[:, k])
-        ax[1, 1].set_xlabel("t")
-        ax[1, 1].set_ylabel(r"$\dot{\Phi_k}$")
+        counts, bin_edges = np.histogram(Phi_k_dot[:, k], bins = 500)
+        bin_centres = (bin_edges[1:] + bin_edges[:-1]) * 0.5
+        bin_width = bin_edges[1] - bin_edges[0]
+        pdf = counts / (np.sum(counts) * bin_width)
+        ax[1, 1].plot(bin_centres, pdf)
+        ax[1, 1].set_xlabel(r"$\dot{\Phi_k}$")
+        ax[1, 1].set_ylabel(r"PDF")
+        ax[1, 1].set_yscale('log')
+
+
+        ## Plot \dot(\Phi_k) over time
+        ax[1, 2].plot(time, Phi_k_dot[:, k])
+        ax[1, 2].set_xlabel(r"$t$")
+        ax[1, 2].set_ylabel(r"$\dot{\Phi_k}$")
         
         plt.savefig(output_dir + "/AdlerData_k[{}].png".format(k), bbox_inches='tight')
         plt.close()
+
+
+
+    ################################
+    ##  Plot Window Averaged Data
+    ################################
+    ## Set window sizes
+    steps = [5, 10, 25, 50]
+
+    ## Allocate arrays
+    num_t       = scale_order_param.shape[0]
+
+    ## Loop over data and average over window
+    for k in k_indx:
+
+        ## Get adler data
+        theta_k       = np.mod(np.angle(scale_order_param[:, k]) + 2.0 * np.pi, 2.0 * np.pi)
+        P_k           = np.absolute(scale_order_param[:, k]) 
+        F_k           = k / (2.0 * a_k[k]) * P_k[:]
+        sin_theta_k_k = sin_theta_k[:, k]
+        Phi_k_dot_k   = Phi_k_dot[:, k]
+        for dt in steps:
+            print("k = {} dt = {}".format(k, dt))
+            t               = []
+            theta_k_avg     = []
+            P_k_avg         = []
+            F_k_avg         = []
+            sin_theta_k_avg = []
+            Phi_k_dot_avg   = []
+            i = 0
+            while i < num_t - dt + 1:
+                ## Get averaged data
+                t.append(np.mean(time[i:i + dt]))
+                theta_k_avg.append(np.mean(theta_k[i:i + dt]))
+                P_k_avg.append(np.mean(P_k[i:i + dt]))
+                F_k_avg.append(np.mean(F_k[i:i + dt]))
+                sin_theta_k_avg.append(np.mean(sin_theta_k_k[i:i + dt]))
+                Phi_k_dot_avg.append(np.mean(Phi_k_dot_k[i:i + dt]))
+                i += dt
+
+            ## Plot average data
+            fig, ax = plt.subplots(ncols=3, nrows=2, figsize = (16, 9), gridspec_kw = dict(hspace = 0.2, wspace = 0.3))
+
+            ## Plot t series
+            ax[0, 0].plot(t, theta_k_avg)
+            ax[0, 0].set_xlabel("t")
+            ax[0, 0].set_ylabel(r"$\theta_k$")
+
+            ## Plot histogram
+            counts, bin_edges = np.histogram(theta_k_avg, bins = 500)
+            bin_centres = (bin_edges[1:] + bin_edges[:-1]) * 0.5
+            bin_width = bin_edges[1] - bin_edges[0]
+            pdf = counts / (np.sum(counts) * bin_width)
+            ax[0, 1].plot(bin_centres, pdf, xunits = radians)
+            ax[0, 1].set_xlabel(r"$\theta_k$")
+            ax[0, 1].set_ylabel(r"PDF")
+            ax[0, 1].set_yscale('log')
+
+            ## Plot histogram of P_k and F_k and P_k over time
+            div3   = make_axes_locatable(ax[1, 0])
+            axtop3 = div3.append_axes("top", size = "100%", pad = 0.4)
+            counts, bin_edges = np.histogram(P_k_avg, bins = 500)
+            bin_centres = (bin_edges[1:] + bin_edges[:-1]) * 0.5
+            bin_width = bin_edges[1] - bin_edges[0]
+            pdf = counts / (np.sum(counts) * bin_width)
+            axtop3.plot(bin_centres, pdf)
+            axtop3.set_xlabel(r"P_k")
+            axtop3.set_yscale('log')
+            ax[1, 0].plot(t, P_k_avg, yunits = radians)
+            ax[1, 0].plot(t, F_k_avg, yunits = radians)
+            ax[1, 0].set_xlabel("t")
+            ax[1, 0].set_ylabel(r"Amplitude Data")
+            ax[1, 0].legend([r"$P_k$", r"$F_k$"])
+            ax[1, 0].set_yscale('log')
+
+            ## Plot sin(theta_k)
+            ax[0, 2].plot(t, sin_theta_k_avg)
+            ax[0, 2].set_xlabel("t")
+            ax[0, 2].set_ylabel(r"$\sin(\theta_k)$")
+            
+            ## Plot F_k and P_k
+            counts, bin_edges = np.histogram(Phi_k_dot_avg, bins = 500)
+            bin_centres = (bin_edges[1:] + bin_edges[:-1]) * 0.5
+            bin_width = bin_edges[1] - bin_edges[0]
+            pdf = counts / (np.sum(counts) * bin_width)
+            ax[1, 1].plot(bin_centres, pdf)
+            ax[1, 1].set_xlabel(r"$\dot{\Phi_k}$")
+            ax[1, 1].set_ylabel(r"PDF")
+            ax[1, 1].set_yscale('log')
+
+            ## Plot \dot(\Phi_k) over t
+            ax[1, 2].plot(t, Phi_k_dot_avg)
+            ax[1, 2].set_xlabel(r"$t$")
+            ax[1, 2].set_ylabel(r"$\dot{\Phi_k}$")
+            
+            plt.grid(True)
+            plt.suptitle(r"Window Size: {}$\Delta t$".format(dt))
+            plt.savefig(output_dir + "/AdlerData_WindowAveraged_k[{}]_window[{}].png".format(k, dt), bbox_inches='tight')
+            plt.close()

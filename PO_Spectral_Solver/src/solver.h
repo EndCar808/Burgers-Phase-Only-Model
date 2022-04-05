@@ -30,7 +30,7 @@ void write_hyperslab_data(hid_t file_space, hid_t data_set, hid_t mem_space, hid
 void write_fixed_point(double* phi, double b, char* u0, int N, int num_osc, int k0, int kdim, hid_t* data_set, int save_data_indx);
 
 void fixed_point_search(int N, int Nmax, int k0, double a, double b, int iters, int save_step, char* u0);
-int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0);
+int solver(int N, int k0, double a, double b, int iters, int save_step, int compute_step, char* u0);
 
 double get_timestep(double* amps, fftw_plan plan_c2r, fftw_plan plan_r2c, int* kx, int n, int num_osc, int k0);
 int get_transient_iters(double* amps, fftw_plan plan_c2r, fftw_plan plan_r2c, int* kx, int n, int num_osc, int k0);

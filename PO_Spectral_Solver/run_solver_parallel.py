@@ -16,11 +16,13 @@ if __name__ == '__main__':
 	beta  = [0.0]	
 	u0    = "RANDOM"
 	iters = int(4e5)
+	save_steps = 1
+	comp_steps = 1
 
 	########################
 	##	Create command list
 	########################
-	cmdList = [['./bin/main {} {} {:0.3f} {:0.3f} {} {}'.format(n, k0, a, b, u0, iters)] for n in N for a in alpha for b in beta]
+	cmdList = [['./bin/main -n {} -k {} -a {:0.3f} -b {:0.3f} -u {} -t {} -s {} -c {}'.format(n, k0, a, b, u0, iters, save_steps, comp_steps)] for n in N for a in alpha for b in beta]
 
 	print(cmdList)
 	print(len(cmdList))

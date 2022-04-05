@@ -1023,7 +1023,7 @@ void fixed_point_search(int N, int Nmax, int k0, double a, double b, int iters, 
 
 
 
-int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0) {
+int solver(int N, int k0, double a, double b, int iters, int save_step, int compute_step, char* u0) {
 
 	// ------------------------------
 	//  Variable Definitions
@@ -1316,10 +1316,10 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 	// If calculating stats or integrating until transient get required iters
 	#ifdef __TRANSIENTS
 	int trans_iters    = get_transient_iters(amp, fftw_plan_c2r_pad, fftw_plan_r2c_pad, kx, N, num_osc, k0);
-	int num_save_steps = ntsteps / SAVE_DATA_STEP; 
+	int num_save_steps = ntsteps / save_step; 
 	#else 
 	int trans_iters    = 0;
-	int num_save_steps = ntsteps / SAVE_DATA_STEP + 1; 
+	int num_save_steps = ntsteps / save_step + 1; 
 	#endif
 
 	// Time variables	
@@ -1480,15 +1480,103 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 		}
 
 
+		/////////////////////////
+		// Compute Runtime Data
+		/////////////////////////
+		if ((iter > trans_iters) && (iter % compute_step == 0)) {		
+						 
+			#ifdef __TRIAD_ORDER
+			// Get the normalization constant
+			if (save_data_indx == 0) {
+				amp_normalize(amp_norm, amp, num_osc, k0);
+			}
+
+			// Get the convolution
+			conv_2N_pad(conv, u_z, &fftw_plan_r2c_pad, &fftw_plan_c2r_pad, N, num_osc, k0);
+
+			#ifdef __ALT_ORDER_PARAMS
+			// Calculate alternative sync order params
+			sync_phase(ordered_sync_phase, heaviside_sync_phase, heaviside_ordered_sync_phase, phi, amp, kmin, kmax);
+			#endif
+
+			// compute scale dependent phase order parameter
+			for (int i = kmin; i < num_osc; ++i) {
+				// Proposed scale dependent Kuramoto order parameters
+				adler_order_k[i] = -I * (cexp(I * 2.0 *  phi[i]) * conj(conv[i])); // / amp_norm[i]);
+
+				// P_k
+				P_k[i] += cabs(adler_order_k[i]);
+
+				// Scale dependent Phase shift order parameter
+				phase_shift_order_k[i] = I * (conv[i] * cexp(-I * phi[i])); // / amp_norm[i]);
+				
+				// The phaseshift parameters - theta_k
+				sin_theta_k[i] = sin(carg(phase_shift_order_k[i]));
+				sin_theta_k_avg[i] += sin_theta_k[i]; 
+
+				// Update the temporary time order parameters
+				tmp_time_order_k[i]             += cexp(I * carg(phase_shift_order_k[i]));
+				#ifdef __ALT_ORDER_PARAMS
+				tmp_ordered_time_order_k[i]     += cexp(I * carg(ordered_sync_phase[i]));
+				tmp_heavi_time_order_k[i]       += cexp(I * carg(heaviside_sync_phase[i]));
+				tmp_heavi_order_time_order_k[i] += cexp(I * carg(heaviside_ordered_sync_phase[i]));
+				#endif
+				// Calculate the Kuramoto order parameter in time
+				theta_time_order_k[i]       = tmp_time_order_k[i] / t_count;
+				#ifdef __ALT_ORDER_PARAMS
+				ordered_time_order_k[i]     = tmp_ordered_time_order_k[i] / t_count;
+				heaviside_time_order_k[i]   = tmp_heavi_time_order_k[i] / t_count;
+				heavi_order_time_order_k[i] = tmp_heavi_order_time_order_k[i] / t_count;
+				#endif
+
+				// The synchronization parameter of the order param in time - R_k
+				R_k[i] += cabs(theta_time_order_k[i]);
+
+				// Adler parameters
+				F_k_avg[i] += ((double)i / (2.0 * amp[i])) * cabs(adler_order_k[i]);
+				if (save_data_indx > 0) {
+					// Finite difference for \dot{\Phi}_k = arg(exp^{i \Phi_k(t2)}exp^{-i \Phi_k(t1)}) -
+					Phi_k_dot[i] = carg(adler_order_k[i] * cexp(-I * Phi_k_last[i])) / (compute_step * dt);
+					Phi_k_dot_avg[i] += Phi_k_dot[i];
+
+					// Locking -> omega_k = <\dot{\Phi}_k> / <F_k>
+					Omega_k[i] = (Phi_k_dot_avg[i] / t_count) / (F_k_avg[i] / t_count);
+				}
+			}
+
+			// Update Phi_k_last for next iteration
+			for (int i = 0; i < num_osc; ++i) {
+				Phi_k_last[i] = carg(adler_order_k[i]);
+			}
+
+			// increment the counter			
+			t_count++;
+			#endif
+
+			#ifdef __REALSPACE_STATS			
+			// If first non-transient iteration - set bin edges
+			if ((trans_iters != 0) && (save_data_indx == 0)) {
+				// Compute the second moments of the velocity and gradient fields
+				vel_sec_mnt  = sqrt(theoretical_energy(amp, num_osc));
+				grad_sec_mnt = sqrt(gradient_energy(amp, kx, num_osc));				
+				
+				// Initialize the histogram bins for the PDFs
+				gsl_set_vel_inc_hist_bin_ranges(vel_inc_hist, u, u_grad, vel_sec_mnt, grad_sec_mnt, num_osc);
+			}
 			
+			// Compute velocity increment PDFs, stats, structure funcs etc.
+			gsl_compute_real_space_stats(vel_inc_hist, vel_inc_stats, str_func, u, u_grad, vel_sec_mnt, grad_sec_mnt, num_osc, max_p);
+
+			// Increment the stats counter
+			num_stats++;
+			#endif
+		}
 
 
-		//////////////////
+		////////////////////////
 		// Print to file
-		//////////////////
-		if ((iter > trans_iters) && (iter % save_step == 0)) {
-
-			
+		////////////////////////
+		if ((iter > trans_iters) && (iter % save_step == 0)) {		
 						
 			#ifdef __PHASES
 			// Write phases
@@ -1559,72 +1647,6 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 			#endif
 
 			#ifdef __TRIAD_ORDER
-			// Get the normalization constant
-			if (save_data_indx == 0) {
-				amp_normalize(amp_norm, amp, num_osc, k0);
-			}
-
-			// Get the convolution
-			conv_2N_pad(conv, u_z, &fftw_plan_r2c_pad, &fftw_plan_c2r_pad, N, num_osc, k0);
-
-			#ifdef __ALT_ORDER_PARAMS
-			// Calculate alternative sync order params
-			sync_phase(ordered_sync_phase, heaviside_sync_phase, heaviside_ordered_sync_phase, phi, amp, kmin, kmax);
-			#endif
-
-			// compute scale dependent phase order parameter
-			for (int i = kmin; i < num_osc; ++i) {
-				// Proposed scale dependent Kuramoto order parameters
-				adler_order_k[i] = -I * (cexp(I * 2.0 *  phi[i]) * conj(conv[i])); // / amp_norm[i]);
-
-				// P_k
-				P_k[i] += cabs(adler_order_k[i]);
-
-				// Scale dependent Phase shift order parameter
-				phase_shift_order_k[i] = I * (conv[i] * cexp(-I * phi[i])); // / amp_norm[i]);
-				
-				// The phaseshift parameters - theta_k
-				sin_theta_k[i] = sin(carg(phase_shift_order_k[i]));
-				sin_theta_k_avg[i] += sin_theta_k[i]; 
-
-				// Update the temporary time order parameters
-				tmp_time_order_k[i]             += cexp(I * carg(phase_shift_order_k[i]));
-				#ifdef __ALT_ORDER_PARAMS
-				tmp_ordered_time_order_k[i]     += cexp(I * carg(ordered_sync_phase[i]));
-				tmp_heavi_time_order_k[i]       += cexp(I * carg(heaviside_sync_phase[i]));
-				tmp_heavi_order_time_order_k[i] += cexp(I * carg(heaviside_ordered_sync_phase[i]));
-				#endif
-				// Calculate the Kuramoto order parameter in time
-				theta_time_order_k[i]       = tmp_time_order_k[i] / t_count;
-				#ifdef __ALT_ORDER_PARAMS
-				ordered_time_order_k[i]     = tmp_ordered_time_order_k[i] / t_count;
-				heaviside_time_order_k[i]   = tmp_heavi_time_order_k[i] / t_count;
-				heavi_order_time_order_k[i] = tmp_heavi_order_time_order_k[i] / t_count;
-				#endif
-
-				// The synchronization parameter of the order param in time - R_k
-				R_k[i] += cabs(theta_time_order_k[i]);
-
-				// Adler parameters
-				F_k_avg[i] += ((double)i / (2.0 * amp[i])) * cabs(adler_order_k[i]);
-				if (save_data_indx > 0) {
-					// Finite difference for \dot{\Phi}_k = arg(exp^{i \Phi_k(t2)}exp^{-i \Phi_k(t1)}) -
-					Phi_k_dot[i] = carg(adler_order_k[i] * cexp(-I * Phi_k_last[i])) / dt;
-					Phi_k_dot_avg[i] += Phi_k_dot[i];
-
-					// Locking -> omega_k = <\dot{\Phi}_k> / <F_k>
-					Omega_k[i] = (Phi_k_dot_avg[i] / t_count) / (F_k_avg[i] / t_count);
-				}
-			}
-
-			// Update Phi_k_last for next iteration
-			for (int i = 0; i < num_osc; ++i) {
-				Phi_k_last[i] = carg(adler_order_k[i]);
-			}
-
-			// increment the counter			
-			t_count++;
-
 			// Write the scale order parameters to file
 			#ifdef __ADLER_PHASE_ORDER
 			write_hyperslab_data(HDF_file_space[8], HDF_data_set[8], HDF_mem_space[8], COMPLEX_DATATYPE, adler_order_k, "AdlerScaleOrderParam", num_osc, save_data_indx);
@@ -1646,24 +1668,6 @@ int solver(int N, int k0, double a, double b, int iters, int save_step, char* u0
 			#endif
 			
 			// write_hyperslab_data(HDF_file_space[12], HDF_data_set[12], HDF_mem_space[12], H5T_NATIVE_DOUBLE, R_k, "R_k", num_osc, save_data_indx);
-			#endif
-
-			#ifdef __REALSPACE_STATS			
-			// If first non-transient iteration - set bin edges
-			if ((trans_iters != 0) && (save_data_indx == 0)) {
-				// Compute the second moments of the velocity and gradient fields
-				vel_sec_mnt  = sqrt(theoretical_energy(amp, num_osc));
-				grad_sec_mnt = sqrt(gradient_energy(amp, kx, num_osc));				
-				
-				// Initialize the histogram bins for the PDFs
-				gsl_set_vel_inc_hist_bin_ranges(vel_inc_hist, u, u_grad, vel_sec_mnt, grad_sec_mnt, num_osc);
-			}
-			
-			// Compute velocity increment PDFs, stats, structure funcs etc.
-			gsl_compute_real_space_stats(vel_inc_hist, vel_inc_stats, str_func, u, u_grad, vel_sec_mnt, grad_sec_mnt, num_osc, max_p);
-
-			// Increment the stats counter
-			num_stats++;
 			#endif
 
 			#ifdef __GRAD

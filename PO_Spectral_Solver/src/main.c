@@ -7,6 +7,8 @@
 // ---------------------------------------------------------------------
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <string.h>
 #include <math.h>
 #include <time.h>
 #include <string.h>
@@ -40,25 +42,98 @@ int main(int argc, char** argv) {
 	// Start timer
 	clock_t begin = clock();
 
-
-	// Collocation points
-	int N = atoi(argv[1]);
-
-	int k0 = atoi(argv[2]);
-
-
-	double alpha = atof(argv[3]);
-	double beta  = atof(argv[4]);
-
+	// Initialize Default Variables
+	int c;
+	// Space Variables
+	int N    = 64;
+	int k0   = 1;
+	int Nmax = N * 2;
+	// Slope variables
+	double alpha = 1.0;
+	double beta  = 0.0;
 	// Initial Condition
 	char u0[128];
-	strcpy(u0, argv[5]);
-
+	strcpy(u0, "RANDOM");
 	// Time steps
-	int tsteps     = atoi(argv[6]);
-	int save_steps = SAVE_DATA_STEP;
+	int tsteps     = 4e5;
+	int save_steps = 1e2;
+	int compute_steps = 1e2;
 
-	int Nmax = N * 2;
+	// Read in Command line arguements
+	while ((c = getopt(argc, argv, "n:k:a:b:u:t:s:c:")) != -1) {
+		switch (c) {
+			case 'n':
+				// Get the number of collocation points
+				N = atoi(optarg);
+				if (N < 0) {
+					fprintf(stderr, "The number of collocation points N must be positive, value given %d\n-->> Now Exiting!\n\n", N);
+					exit(1);
+				}
+				break;
+			case 'k':
+				// Get the value of k0 -> the number of the first k0 wavenumbers to set to 0
+				k0 = atoi(optarg);
+				if (k0 < 0) {
+					fprintf(stderr, "k0 must be positive, value given %d\n-->> Now Exiting!\n\n", N);
+					exit(1);	
+				}
+				break;
+			case 'a':
+				// Get spectrum slope alpha
+				alpha = atof(optarg);
+				if (alpha < 0.0) {
+					fprintf(stderr, "Spectrum Slope Alpha must be positive, value given %lf\n-->> Now Exiting!\n\n", alpha);
+					exit(1);
+				}
+				break;
+			case 'b':
+				// Get spectrum slope alpha
+				beta = atof(optarg);
+				if (beta < 0.0) {
+					fprintf(stderr, "Spectrum Fall off Beta must be positive, value given %lf\n-->> Now Exiting!\n\n", beta);
+					exit(1);
+				}
+				break;
+			case 'u':
+				// Get the initial condition
+				strncpy(u0, optarg, 128);
+				break;
+			case 't':
+				tsteps = atoi(optarg);
+				if (tsteps < 0.0) {
+					fprintf(stderr, "The number of integration steps must be positive, value given %d\n-->> Now Exiting!\n\n", tsteps);
+					exit(1);
+				}
+				break;
+			case 's':
+				save_steps = atoi(optarg);
+				if (save_steps < 0.0) {
+					fprintf(stderr, "The number of integration steps to perform before saving must be positive, value given %d\n-->> Now Exiting!\n\n", save_steps);
+					exit(1);
+				}
+				break;
+			case 'c':
+				compute_steps = atoi(optarg);
+				if (compute_steps < 0.0) {
+					fprintf(stderr, "The number of integration steps to perform before saving must be positive, value given %d\n-->> Now Exiting!\n\n", compute_steps);
+					exit(1);
+				}
+				break;
+			default:
+				fprintf(stderr, "\n[ERROR] Incorrect command line flag encountered\n");		
+				fprintf(stderr, "Use"" -n"" to specify the number of collocation points\n");
+				fprintf(stderr, "Use"" -k"" to specify k0\n");
+				fprintf(stderr, "Use"" -a"" to specify the Spectrum slope alpha\n");
+				fprintf(stderr, "Use"" -b"" to specify the spectrum fall off beta\n");
+				fprintf(stderr, "Use"" -t"" to specify the number of integration steps\n");
+				fprintf(stderr, "Use"" -u"" to specify the intial condition\n");
+				fprintf(stderr, "Use"" -s"" to specify the number of integration steps before saving to file\n");
+				fprintf(stderr, "Use"" -c"" to specify the number of integration steps before performing computation of runtime data\n");
+				fprintf(stderr, "\nExample usage:\n\t./bin/main -n 64 -k 1 -a 1.0 -b 0.0 -u RANDOM -t 4000000 -s 100 -c 100\n");
+				fprintf(stderr, "\n-->> Now Exiting!\n\n");
+				exit(1);
+		}
+	}
 
 
 	// Get the number of threads 
@@ -87,7 +162,7 @@ int main(int argc, char** argv) {
 	// ------------------------------
 	//  Call Solver Here
 	// ------------------------------
-	int flag = solver(N, k0, alpha, beta, tsteps, save_steps, u0);
+	int flag = solver(N, k0, alpha, beta, tsteps, save_steps, compute_steps, u0);
 	// ------------------------------
 	//  Call Solver Here
 	// ------------------------------
